@@ -1,0 +1,80 @@
+\documentclass[11pt,a4paper]{scrartcl}
+\usepackage[a4paper, top=20mm, bottom=20mm, left=22mm, right=22mm]{geometry}
+\usepackage{lmodern}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[ngerman]{babel}
+\usepackage{microtype}
+\usepackage{parskip}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\pagestyle{empty}
+
+\begin{document}
+
+\begin{center}
+  {\Large\bfseries Kurzfassung: Erste Constrained-Benchmark-Ergebnisse}\\[4pt]
+  {\normalsize 4.~März~2026}
+\end{center}
+
+\bigskip
+
+\subsection*{Was wir gemacht haben}
+
+100 RocksDB-Durchläufe in Docker mit 256\,MB RAM, 1 CPU, kein Swap.
+Drei Parameter variiert: Schreibpuffer (4--128\,MB), Block-Cache (8--128\,MB),
+Kompression (keine/snappy/lz4/zstd). Workload: gleichzeitiges Lesen und
+Schreiben (\texttt{readwhilewriting}). 58 erfolgreich, 42 vom OOM-Killer
+beendet.
+
+\subsection*{Was wir schon sehen}
+
+\begin{enumerate}[nosep]
+  \item \textbf{Schreibpuffer dominiert den Speicherverbrauch.}
+        Ab 64\,MB Schreibpuffer stürzt RocksDB in fast allen Fällen ab.
+        Sicherer Bereich: Schreibpuffer $\leq$\,32\,MB, Cache $\leq$\,64\,MB.
+
+  \item \textbf{Ohne Kompression geht es nicht.}
+        Unkomprimiert: 2.000~ops/sec, 50\,\% Stall-Zeit.
+        Mit zstd: 3.600~ops/sec, 32\,\% Stall-Zeit.
+        Die I/O-Einsparung überwiegt die CPU-Kosten deutlich.
+
+  \item \textbf{17-facher Leistungsunterschied durch Konfiguration allein.}
+        Beste Konfig: 8.900~ops/sec. Schlechteste: 518~ops/sec.
+        Gleiche Hardware, gleiche Daten -- nur andere Parametereinstellungen.
+
+  \item \textbf{Write-Stalls sind massiv.}
+        Im Schnitt 34\,\% der Laufzeit blockiert, schlimmstenfalls 72\,\%.
+        In NebulaStream würde das die gesamte Pipeline aufstauen.
+
+  \item \textbf{Cache-Trefferquote skaliert linear.}
+        8\,MB $\rightarrow$ 5\,\%, 32\,MB $\rightarrow$ 19\,\%, 128\,MB $\rightarrow$ 64\,\%.
+        32\,MB ist ein guter Kompromiss.
+\end{enumerate}
+
+\subsection*{Was wir daraus mitnehmen}
+
+\begin{itemize}[nosep]
+  \item RocksDB \emph{kann} auf 256\,MB laufen -- aber nur mit konservativer
+        Konfiguration und aktiver Kompression.
+  \item Die Konfigurationswahl ist wichtiger als die Hardware. NebulaStream
+        braucht durchdachte Defaults oder Auto-Tuning.
+  \item Write-Stalls sind ein reales Risiko für die Streamverarbeitung und
+        müssen im Pipeline-Design berücksichtigt werden.
+\end{itemize}
+
+\subsection*{Einschränkung}
+
+Nur ein Workload, drei von fünf Parametern, synthetische Datengrößen,
+simulierte Hardware. Die \emph{Richtung} der Ergebnisse ist belastbar, die
+exakten Zahlen nicht direkt auf NebulaStream übertragbar.
+
+\subsection*{Nächste Schritte}
+
+\begin{enumerate}[nosep]
+  \item Reinen Schreib-Workload (\texttt{fillrandom}) ergänzen
+  \item Vollständigen Sweep (900 Kombinationen) mit allen 5 Parametern
+  \item NebulaStream-realistische Schlüssel-/Wertgrößen testen
+\end{enumerate}
+
+\end{document}

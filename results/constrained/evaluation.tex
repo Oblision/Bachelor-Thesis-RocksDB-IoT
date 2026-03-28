@@ -1,0 +1,356 @@
+\documentclass[11pt,a4paper]{scrartcl}
+
+% ── Seitenlayout ──────────────────────────────────────────────────────────────
+\usepackage[a4paper, top=20mm, bottom=20mm, left=22mm, right=22mm]{geometry}
+
+% ── Typografie ────────────────────────────────────────────────────────────────
+\usepackage{lmodern}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[ngerman]{babel}
+\usepackage{microtype}
+\usepackage{parskip}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+
+% ── Kopfzeile ─────────────────────────────────────────────────────────────────
+\usepackage{scrlayer-scrpage}
+\pagestyle{scrheadings}
+\chead{}
+\ohead{\small\textit{Auswertung -- Constrained Benchmarks}}
+\cfoot{\pagemark}
+
+% ═════════════════════════════════════════════════════════════════════════════
+\begin{document}
+
+\begin{center}
+  {\LARGE\bfseries Auswertung der speicherbeschränkten\\RocksDB-Benchmarks}\\[6pt]
+  {\large Vorläufige Analyse zur Besprechung mit dem Betreuer}\\[4pt]
+  {\normalsize 4.~März~2026}
+\end{center}
+
+\bigskip
+
+% ═════════════════════════════════════════════════════════════════════════════
+\section{Was wurde gemacht}
+
+Die zentrale Fragestellung dieser Bachelorarbeit lautet, ob RocksDB als
+Out-of-Core-Zustandsspeicher für NebulaStream geeignet ist -- eine
+Streamverarbeitungs-Engine für IoT- und Smart-City-Szenarien, bei denen der
+verfügbare Arbeitsspeicher auf Edge-Geräten stark begrenzt ist. Um diese Frage
+zu beantworten, haben wir eine Microbenchmark-Suite entwickelt, die das
+RocksDB-eigene Werkzeug \texttt{db\_bench} unter kontrollierten Bedingungen
+ausführt und systematisch zentrale Tuning-Parameter variiert.
+
+Im vorliegenden ersten Experiment unter Speicherbeschränkung wurden 100
+Benchmark-Konfigurationen in einem Docker-Container ausgeführt, der auf
+256\,MB RAM begrenzt war (Swap deaktiviert, ein einzelner CPU-Kern). Dies
+simuliert die Ressourcenausstattung eines Raspberry Pi Zero~W -- die
+Geräteklasse, auf die NebulaStream für die Edge-Verarbeitung abzielt. Der
+Datensatz besteht aus 2~Millionen Schlüssel-Wert-Paaren (16-Byte-Schlüssel,
+100-Byte-Werte) mit einer Gesamtgröße von ca.\ 230\,MB auf der Festplatte
+-- bewusst größer als der verfügbare Arbeitsspeicher, um RocksDB in den
+Out-of-Core-Betrieb zu zwingen, bei dem Daten von der Festplatte gelesen und
+auf diese geschrieben werden müssen, statt alles im RAM vorzuhalten.
+
+Drei Parameter, die die Speicherverteilung innerhalb von RocksDB direkt
+steuern, wurden variiert:
+
+\begin{itemize}
+  \item \textbf{write\_buffer\_size} (4, 16, 32, 64, 128\,MB) -- bestimmt, wie
+        viele Daten im In-Memory-Schreibpuffer (Memtable) angesammelt werden,
+        bevor sie auf die Festplatte geschrieben (geflusht) werden. Dies ist der
+        größte einzelne Speicherverbraucher innerhalb von RocksDB.
+  \item \textbf{cache\_size} (8, 16, 32, 64, 128\,MB) -- steuert den
+        Block-Cache, der häufig gelesene Festplattenblöcke im RAM vorhält und
+        damit direkt die Leseleistung beeinflusst.
+  \item \textbf{compression\_type} (none, snappy, lz4, zstd) -- legt fest, ob
+        und wie Daten vor dem Schreiben auf die Festplatte komprimiert werden.
+        Kompression tauscht CPU-Zyklen gegen reduzierte Festplatten-I/O.
+\end{itemize}
+
+Zwei sekundäre Parameter (\texttt{level0\_slowdown\_writes\_trigger} und
+\texttt{min\_level\_to\_compress}) wurden auf ihren Standardwerten fixiert, um
+das Experiment auf die drei oben genannten Dimensionen zu fokussieren. Als
+Workload wurde \texttt{readwhilewriting} verwendet, der gleichzeitig zufällige
+Lese- und Schreibzugriffe durchführt -- dies modelliert ein
+Streamverarbeitungs-Szenario, in dem die Engine gleichzeitig neue Sensordaten
+aufnimmt und bestehenden Zustand nachschlägt (z.\,B.\ für Fenster-Joins oder
+Aggregationen).
+
+Von den 100 Durchläufen wurden 58 erfolgreich abgeschlossen und 42 vom
+Linux-OOM-Killer beendet, als der Speicherverbrauch von RocksDB das
+256\,MB-Containerlimit überschritt.
+
+
+% ═════════════════════════════════════════════════════════════════════════════
+\section{Was wir herausgefunden haben}
+
+\subsection{Arbeitsspeicher ist die bindende Beschränkung, und write\_buffer\_size dominiert}
+
+Das auffälligste Ergebnis ist das OOM-Kill-Muster. Jeder einzelne Durchlauf
+mit einem 128\,MB-Schreibpuffer wurde beendet, unabhängig von Cache-Größe oder
+Kompression. Bei einem 64\,MB-Schreibpuffer wurden 85\,\% der Durchläufe
+abgebrochen. Der Grund ist nachvollziehbar: RocksDB hält mindestens zwei
+Memtables vor (eine aktive, eine wird gerade geflusht), sodass ein
+64\,MB-Schreibpuffer allein mindestens 128\,MB belegt -- die Hälfte des
+gesamten Gerätespeichers -- noch bevor Block-Cache, Compaction-Puffer oder das
+Betriebssystem berücksichtigt werden.
+
+Der sichere Betriebsbereich liegt bei write\_buffer $\leq$\,32\,MB kombiniert
+mit cache $\leq$\,64\,MB. Dies ist eine harte Grenze, kein gradueller Abfall:
+Konfigurationen wechseln innerhalb eines einzigen Parameterschritts von
+\glqq funktioniert zuverlässig\grqq{} zu \glqq stürzt immer ab\grqq.
+
+Für NebulaStream bedeutet dies, dass der Speicherbedarf des Storage-Backends
+sorgfältig gegen den Speicherbedarf der Stream-Operatoren abgewogen werden
+muss. Auf einem 256\,MB-Gerät kann RocksDB realistisch höchstens 64--96\,MB
+beanspruchen (Schreibpuffer + Cache zusammen), der Rest verbleibt für
+NebulaStreams Operator-Zustand, Netzwerkpuffer und das Betriebssystem.
+
+\subsection{Kompression ist nicht optional -- sie ist essenziell}
+
+Unter unkonstrained Bedingungen (unsere früheren Baseline-Läufe auf macOS mit
+unbegrenztem Speicher) machte Kompression kaum einen Unterschied, da der
+gesamte Datensatz in den Arbeitsspeicher passte und Festplatten-I/O
+vernachlässigbar war. Unter der 256\,MB-Beschränkung kehrt sich das Bild
+vollständig um:
+
+\begin{itemize}
+  \item Unkomprimierter Speicher lieferte im Durchschnitt nur
+        1.998~ops/sec, mit einer p99-Latenz von fast 12\,ms und einer
+        Schreibverstärkung von 3,9$\times$. Die Engine verbrachte über 50\,\%
+        ihrer Zeit im Stall-Zustand.
+  \item \texttt{zstd}-Kompression lieferte 3.627~ops/sec
+        (1,8$\times$ schneller), mit einer p99-Latenz unter 3,2\,ms und einer
+        Schreibverstärkung von nur 1,8$\times$.
+  \item \texttt{lz4} und \texttt{snappy} lagen zwischen diesen Extremen,
+        wobei \texttt{lz4} \texttt{snappy} leicht übertraf.
+\end{itemize}
+
+Der Mechanismus ist klar: Kompression verkleinert die auf die Festplatte
+geschriebenen und von ihr gelesenen Daten, und genau die Festplatte ist der
+Engpass unter Speicherdruck. Obwohl Kompression CPU-Zyklen kostet -- und wir
+nur einen einzelnen Kern haben -- überwiegen die I/O-Einsparungen den
+CPU-Mehraufwand bei Weitem. Dies ist ein Schlüsselergebnis für NebulaStream:
+Jeder Produktiveinsatz auf Edge-Hardware \emph{muss} Kompression im
+Storage-Backend aktivieren.
+
+Dass \texttt{zstd} (der CPU-intensivste Codec) leichtgewichtige Alternativen
+wie \texttt{lz4} übertrifft, ist bemerkenswert. Es deutet darauf hin, dass
+unter extremem Speicherdruck die I/O-Last so dominant ist, dass selbst
+aggressive Kompression sich lohnt. Auf leistungsfähigeren Edge-Geräten mit
+mehreren Kernen wäre der Vorteil von \texttt{zstd} wahrscheinlich noch größer,
+da die Kompression auf einem dedizierten Kern laufen könnte.
+
+\subsection{Ein 17-facher Leistungsabfall innerhalb derselben Hardware}
+
+Die beste Konfiguration (write\_buffer=4\,MB, lz4, cache=8\,MB) erreichte
+8.900~ops/sec. Die schlechteste überlebende Konfiguration
+(write\_buffer=16\,MB, keine Kompression, cache=16\,MB) schaffte nur
+518~ops/sec. Das ist ein \textbf{17-facher Unterschied} auf identischer
+Hardware mit identischen Daten, verursacht ausschließlich durch die Wahl der
+Konfigurationsparameter.
+
+Dies ist wohl das wichtigste Ergebnis für die Arbeit: Es zeigt, dass die
+\emph{Wahl der Tuning-Parameter wichtiger ist als die Hardware-Spezifikation}
+für RocksDB auf beschränkten Geräten. Ein gut konfiguriertes 256\,MB-Gerät
+übertrifft ein schlecht konfiguriertes um eine Größenordnung. Dies hat direkte
+Auswirkungen auf NebulaStreams Standardkonfiguration und jede
+Auto-Tuning-Strategie, die es einsetzen könnte.
+
+\subsection{Write-Stalls sind gravierend und würden die Streamverarbeitung stören}
+
+RocksDB blockiert eingehende Schreibvorgänge, wenn die interne Compaction nicht
+mit der Ingestion-Rate Schritt halten kann. In unseren Experimenten lag der
+durchschnittliche Stall-Anteil bei 34,3\,\%, mit einem Höchstwert von
+71,8\,\%. Das bedeutet, dass die Storage-Engine im Durchschnitt mehr als ein
+Drittel der gesamten Laufzeit neue Schreibvorgänge blockierte.
+
+Im Kontext der Streamverarbeitung ist dies kritisch: Ein Write-Stall im
+Zustandsspeicher propagiert als Gegendruck (Back-Pressure) durch die gesamte
+Operator-Pipeline. Wenn die Storage-Engine für 100\,ms blockiert, kann kein
+vorgelagerter Operator in dieser Zeit Ergebnisse ausgeben. Für
+Echtzeit-Anwendungen (z.\,B.\ Ampelsteuerung auf Basis von
+Verkehrskameradaten) kann das verpasste Deadlines bedeuten.
+
+Wir beobachteten ein kontraintuitives Muster: Der kleinste Schreibpuffer
+(4\,MB) hatte den \emph{höchsten} Stall-Anteil (40--63\,\%), aber auch den
+\emph{höchsten} Durchsatz. Die Erklärung: Kleine Puffer flushen häufig (viele
+kurze Stalls), während große Puffer selten flushen, aber jeder einzelne Flush
+unter Speicherdruck teuer ist. Der Nettoeffekt ist, dass viele kleine Flushes
+schneller abgeschlossen werden als wenige große, wenn der Speicher knapp ist.
+
+\subsection{Cache-Trefferquote skaliert linear, aber mit abnehmendem Grenznutzen}
+
+Die Block-Cache-Trefferquoten reichten von 4,5\,\% bei 8\,MB bis 64,1\,\% bei
+128\,MB und skalierten annähernd linear mit der Cache-Größe. Es gab keinen
+plötzlichen Abfall oder Wendepunkt. Ein 32\,MB-Cache (12,5\,\% des
+Gerätespeichers) erreichte eine Trefferquote von 18,8\,\%, was wir als
+vernünftigen Ausgangspunkt betrachten, der ausreichend Speicher für den
+Schreibpuffer und NebulaStreams eigene Operatoren übrig lässt.
+
+
+% ═════════════════════════════════════════════════════════════════════════════
+\section{Einordnung in die Bachelorarbeit}
+
+\subsection{Umfang und Einschränkungen dieser Ergebnisse}
+
+Es ist wichtig, transparent zu benennen, was dieses Experiment aussagen kann
+und was nicht. Wir haben einen \textbf{schmalen Ausschnitt} des gesamten
+Parameterraums getestet:
+
+\begin{itemize}
+  \item \textbf{Ein einzelner Workload} (\texttt{readwhilewriting}) von
+        mehreren relevanten. Reine Schreiblast (\texttt{fillrandom}), reine
+        Leselast (\texttt{readrandom}) und Zustandsbereinigung
+        (\texttt{deleterandom}) wurden noch nicht getestet.
+  \item \textbf{Drei von fünf Tuning-Dimensionen.} Der L0-Compaction-Trigger
+        und das minimale Kompressionslevel wurden fixiert. Diese Parameter
+        könnten mit Schreibpuffer- und Cache-Größe in Weisen interagieren, die
+        wir noch nicht erfasst haben.
+  \item \textbf{Synthetische Schlüssel-Wert-Größen.} Unsere 16-Byte-Schlüssel
+        und 100-Byte-Werte sind eine vertretbare Annäherung, entsprechen aber
+        nicht den tatsächlichen NebulaStream-Zustandsformaten, die je nach
+        Operatortyp variieren.
+  \item \textbf{Simulierte Hardware.} Dockers cgroup-Speicherlimits auf macOS
+        erzwingen die 256\,MB-Grenze zuverlässig, aber der zugrunde liegende
+        Speicher (SSD über die Docker-VM) ist schneller als die SD-Karten
+        realer Raspberry-Pi-Geräte. Unsere Durchsatzzahlen sind daher
+        \emph{optimistische Obergrenzen} -- tatsächliche Edge-Hardware wäre
+        langsamer.
+  \item \textbf{Keine Konkurrenz durch NebulaStream selbst.} In der Produktion
+        konkurriert das Storage-Backend um CPU und Speicher mit NebulaStreams
+        Query-Engine, Netzwerk-Stack und weiteren Operatoren. Unser Benchmark
+        betreibt RocksDB isoliert, sodass der Speicher- und CPU-Spielraum
+        großzügiger ist als in der Realität.
+\end{itemize}
+
+Aufgrund dieser Einschränkungen sollten die Ergebnisse als
+\textbf{Richtungsbefunde} interpretiert werden -- sie identifizieren, welche
+Parameter wichtig sind und wo die kritischen Schwellenwerte liegen, aber die
+exakten Zahlen (z.\,B.\ \glqq 8.900~ops/sec mit 4\,MB-Schreibpuffer\grqq)
+lassen sich nicht direkt auf einen realen NebulaStream-Einsatz übertragen. Die
+\emph{relativen} Zusammenhänge (Kompression hilft, große Schreibpuffer führen
+zum Absturz, Stalls sind gravierend) sind robust und sollten über
+Konfigurationen hinweg Bestand haben.
+
+\subsection{Was wir belastbar aussagen können}
+
+Trotz des begrenzten Umfangs sind mehrere Schlussfolgerungen gut gestützt:
+
+\begin{enumerate}
+  \item \textbf{RocksDB kann innerhalb von 256\,MB betrieben werden} -- aber
+        nur, wenn Schreibpuffer und Cache konservativ dimensioniert werden
+        ($\leq$\,32\,MB bzw.\ $\leq$\,64\,MB). Die Machbarkeitsfrage wird mit
+        einem bedingten \glqq Ja\grqq{} beantwortet.
+  \item \textbf{Kompression ist zwingend erforderlich.} Die
+        Leistungseinbußen bei unkomprimiertem Speicher unter Speicherdruck
+        sind so gravierend, dass Kompression eine nicht verhandelbare
+        Standardeinstellung für jeden Edge-Einsatz sein muss.
+  \item \textbf{Die Konfigurationssensitivität ist extrem.} Ein 17-facher
+        Leistungsunterschied innerhalb desselben Speicherbudgets bedeutet, dass
+        NebulaStream nicht mit naiven Standardwerten ausgeliefert werden kann --
+        es braucht entweder sorgfältig gewähltes statisches Tuning oder
+        adaptives Auto-Tuning.
+  \item \textbf{Write-Stalls sind ein reales Problem für die
+        Streamverarbeitung.} Das Storage-Backend kann die
+        Verarbeitungs-Pipeline für signifikante Zeitanteile blockieren, was in
+        NebulaStreams Back-Pressure- und Scheduling-Design berücksichtigt werden
+        muss.
+\end{enumerate}
+
+\subsection{Was Annahme oder Schlussfolgerung bleibt}
+
+Die folgenden Punkte sind auf Basis unserer Daten plausibel, aber noch nicht
+bewiesen:
+
+\begin{itemize}
+  \item Dass \texttt{zstd} auch auf tatsächlicher Single-Core-ARM-Hardware
+        optimal bleibt (unsere Benchmarks liefen auf einem x86-Docker-Host, auf
+        dem \texttt{zstd}s SIMD-Optimierungen sich anders verhalten könnten als
+        auf ARM).
+  \item Dass sich die OOM-Grenzen vorhersagbar verschieben, wenn NebulaStreams
+        eigener Speicherbedarf hinzukommt (wir haben beides nicht gemeinsam
+        betrieben).
+  \item Dass die Write-Stall-Muster auch für reine Ingestion
+        (\texttt{fillrandom}) oder Zustandsbereinigung (\texttt{deleterandom})
+        gelten, die andere I/O-Profile aufweisen.
+  \item Dass Schlüssel-/Wertgrößen, die realen NebulaStream-Operatoren
+        entsprechen, qualitativ ähnliche Ergebnisse liefern (größere Werte
+        würden das Kompressionsverhältnis und die Cache-Effizienz verändern).
+\end{itemize}
+
+
+% ═════════════════════════════════════════════════════════════════════════════
+\section{Vorgeschlagene nächste Schritte}
+
+Basierend auf diesen vorläufigen Ergebnissen schlagen wir folgenden Plan für
+die verbleibende Arbeit vor, grob nach Priorität geordnet:
+
+\begin{enumerate}
+
+  \item \textbf{\texttt{fillrandom}-Workload ergänzen} (hohe Priorität,
+        geringer Aufwand).\\
+        Reine sequentielle Ingestion ist das häufigste Zugriffsmuster für
+        Sensordatenströme. Die Durchführung des gleichen Parameter-Sweeps mit
+        \texttt{fillrandom} würde bestätigen, ob die Erkenntnisse zu
+        Kompression und Schreibpuffer auf reine Schreiblasten übertragbar sind,
+        und Write-Stall-Daten ohne den Störfaktor gleichzeitiger Lesezugriffe
+        liefern.
+
+  \item \textbf{Vollständigen Parameter-Sweep durchführen} (hohe Priorität,
+        hoher Aufwand).\\
+        Das aktuelle Experiment mit 100 Durchläufen hat zwei Parameter fixiert.
+        Der vollständige Sweep (900 Kombinationen) ergänzt
+        \texttt{level0\_slowdown\_writes\_trigger} (10, 20, 40) und
+        \texttt{min\_level\_to\_compress} ($-1$, 0, 2). Der L0-Trigger steuert
+        direkt, ab wann RocksDB Schreibvorgänge drosselt, was unter
+        Speicherdruck signifikant mit der Schreibpuffergröße interagieren
+        könnte. Geschätzte Laufzeit: 2--5 Tage mit parallelen Docker-Workern.
+
+  \item \textbf{NebulaStream-realistische Schlüssel-/Wertgrößen verwenden}
+        (mittlere Priorität).\\
+        Die NebulaStream-Codebasis konsultieren, um tatsächliche
+        Zustandsrecord-Größen gängiger Operatoren zu ermitteln (z.\,B.\
+        Fenster-Count: kleiner Wert; Fenster-Join: großer Wert mit
+        serialisierten Tupeln). Eine fokussierte Teilmenge der Konfigurationen
+        mit diesen Größen erneut durchführen, um die externe Übertragbarkeit zu
+        validieren.
+
+  \item \textbf{\texttt{deleterandom}-Workload ergänzen} (mittlere Priorität,
+        geringer Aufwand).\\
+        Streamverarbeitungs-Engines lassen alten Zustand verfallen (z.\,B.\
+        geschlossene Fenster, eviktierte Join-Einträge). Löschmuster
+        beeinflussen das Compaction-Verhalten und die Space-Amplification anders
+        als Einfügungen. Dies würde die Workload-Abdeckung abrunden.
+
+  \item \textbf{Test auf realer Raspberry-Pi-Hardware} (niedrigere Priorität,
+        hoher Aufwand).\\
+        Ein kleiner Validierungslauf (10--20 Konfigurationen) auf einem
+        physischen Raspberry Pi Zero~W mit SD-Karte würde die Docker-Simulation
+        empirisch absichern. Das Hauptrisiko ist, dass die I/O-Latenz der
+        SD-Karte Write-Stalls über das hinaus verstärkt, was wir beobachtet
+        haben. Selbst ein begrenzter Lauf auf realer Hardware würde die
+        Schlussfolgerungen der Arbeit erheblich stärken.
+
+  \item \textbf{Integration mit NebulaStream-Prototyp} (Stretch-Ziel).\\
+        Die ultimative Validierung wäre die Ausführung einer einfachen
+        NebulaStream-Pipeline (z.\,B.\ eine gleitende Fensteraggregation über
+        synthetische Sensordaten) mit RocksDB als Zustandsspeicher auf
+        beschränkter Hardware. Dies geht über den Scope des Microbenchmarks
+        hinaus, könnte aber eine starke Demonstration im Evaluationskapitel
+        der Arbeit sein.
+
+\end{enumerate}
+
+\bigskip
+\noindent\rule{\textwidth}{0.3pt}
+\smallskip
+{\small Dieses Dokument begleitet den vorläufigen Ergebnisbericht
+(\texttt{report\_preliminary.tex}) und dient als Vorbereitungsmaterial für die
+Betreuerbesprechung am 4.~März~2026. Der Ergebnisbericht enthält die Rohdaten,
+Visualisierungen und tabellierten Befunde; dieses Dokument liefert den
+interpretativen Kontext.}
+
+\end{document}

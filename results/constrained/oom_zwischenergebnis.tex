@@ -1,0 +1,138 @@
+\documentclass[11pt,a4paper]{scrartcl}
+\usepackage[a4paper, top=20mm, bottom=20mm, left=22mm, right=22mm]{geometry}
+\usepackage{lmodern}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[ngerman]{babel}
+\usepackage{microtype}
+\usepackage{parskip}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage[hidelinks]{hyperref}
+\pagestyle{empty}
+
+\begin{document}
+
+\begin{center}
+  {\Large\bfseries Zwischenergebnis: OOM-Grenzen bei 256\,MB}\\[4pt]
+  {\normalsize Referenz f\"ur zuk\"unftige Benchmark-L\"aufe}\\[2pt]
+  {\small Stand: 4.~M\"arz~2026}
+\end{center}
+
+\bigskip
+
+\subsection*{Kontext}
+
+100 RocksDB-Durchl\"aufe in Docker mit 256\,MB RAM, kein Swap, 1 CPU.
+Workload: \texttt{readwhilewriting} (gleichzeitiges Lesen und Schreiben).
+58 erfolgreich, 42 vom OOM-Killer beendet (Exit-Code 137).
+
+\subsection*{Empirisches Speichermodell}
+
+Aus den 100 Durchl\"aufen l\"asst sich folgendes Modell ableiten:
+
+\begin{center}
+\fbox{\parbox{0.7\textwidth}{\centering
+\textbf{Speicherverbrauch} $\approx$ 2 $\times$ \texttt{write\_buffer\_size} + \texttt{cache\_size} + $\sim$100\,MB Overhead
+}}
+\end{center}
+
+Der Faktor~2 kommt daher, dass RocksDB bis zu \texttt{max\_write\_buffer\_number}~(=~2)
+Memtables gleichzeitig h\"alt. Der Overhead umfasst Block-Index, Filter-Bl\"ocke,
+Compaction-Puffer und allgemeinen Prozess-Overhead.
+
+\subsection*{OOM-Matrix bei 256\,MB}
+
+\begin{center}
+\begin{tabular}{l *{5}{c}}
+\toprule
+ & \multicolumn{5}{c}{\texttt{cache\_size}} \\
+\cmidrule(lr){2-6}
+\texttt{write\_buffer\_size} & 8\,MB & 16\,MB & 32\,MB & 64\,MB & 128\,MB \\
+\midrule
+4\,MB   & ok & ok & ok & ok & ok \\
+16\,MB  & ok & ok & ok & ok & \textbf{OOM} \\
+32\,MB  & ok & ok & ok & ok & \textbf{OOM} \\
+64\,MB  & \textbf{OOM} & \textbf{OOM} & \textbf{OOM} & \textbf{OOM} & \textbf{OOM} \\
+128\,MB & \textbf{OOM} & \textbf{OOM} & \textbf{OOM} & \textbf{OOM} & \textbf{OOM} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{13 sichere Kombinationen} (wbuf $\times$ cache, ohne Kompression):
+\begin{itemize}[nosep]
+  \item \texttt{wbuf=4\,MB}: alle Cache-Gr\"o\ss en (8--128\,MB) $\rightarrow$ 5 Kombinationen
+  \item \texttt{wbuf=16\,MB}: Cache $\leq$ 64\,MB $\rightarrow$ 4 Kombinationen
+  \item \texttt{wbuf=32\,MB}: Cache $\leq$ 64\,MB $\rightarrow$ 4 Kombinationen
+\end{itemize}
+
+\subsection*{OOM-Grenze bei 256\,MB}
+
+Die empirische Grenze ist:
+\[
+2 \times \texttt{wbuf} + \texttt{cache} + 100\,\text{MB} \leq 256\,\text{MB}
+\quad\Leftrightarrow\quad
+2 \times \texttt{wbuf} + \texttt{cache} \leq 156\,\text{MB}
+\]
+
+Konfigurationen, die diese Grenze \"uberschreiten, wurden ausnahmslos vom
+OOM-Killer beendet. Konfigurationen unterhalb der Grenze liefen alle
+erfolgreich durch.
+
+\subsection*{Prognose f\"ur 512\,MB (Raspberry Pi 4)}
+
+Mit dem gleichen Modell:
+\[
+2 \times \texttt{wbuf} + \texttt{cache} \leq 412\,\text{MB}
+\]
+
+\textbf{27 sichere Kombinationen} (14 neu gegen\"uber 256\,MB):
+
+\begin{center}
+\begin{tabular}{l *{6}{c}}
+\toprule
+ & \multicolumn{6}{c}{\texttt{cache\_size}} \\
+\cmidrule(lr){2-7}
+\texttt{write\_buffer\_size} & 8\,MB & 16\,MB & 32\,MB & 64\,MB & 128\,MB & 256\,MB \\
+\midrule
+4\,MB   & \textsf{=} & \textsf{=} & \textsf{=} & \textsf{=} & \textsf{=} & \textbf{neu} \\
+16\,MB  & \textsf{=} & \textsf{=} & \textsf{=} & \textsf{=} & \textbf{neu} & \textbf{neu} \\
+32\,MB  & \textsf{=} & \textsf{=} & \textsf{=} & \textsf{=} & \textbf{neu} & -- \\
+64\,MB  & \textbf{neu} & \textbf{neu} & \textbf{neu} & \textbf{neu} & \textbf{neu} & -- \\
+128\,MB & \textbf{neu} & \textbf{neu} & \textbf{neu} & \textbf{neu} & \textbf{neu} & -- \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+{\small \textsf{=} = auch bei 256\,MB sicher, \textbf{neu} = nur bei 512\,MB m\"oglich, -- = voraussichtlich OOM}
+
+\subsection*{Konsequenzen f\"ur weitere Benchmarks}
+
+\begin{enumerate}[nosep]
+  \item \textbf{256\,MB Extended Run:} Nur die 13 sicheren Kombinationen mit
+        Wiederholungen (3~Reps, 2~Workloads). Erwartete Dauer: $\sim$20\,h mit
+        4 parallelen Containern.
+  \item \textbf{512\,MB Extended Run:} Nur die 14 \emph{neuen} Kombinationen,
+        die bei 256\,MB nicht m\"oglich waren (56 Param-Kombinationen mit Kompression).
+        Erwartete Dauer: $\sim$21\,h mit 4 parallelen Containern.
+  \item \textbf{OOM-Konfigurationen \"uberspringen:} Konfigurationen, die die
+        Speichergrenze \"uberschreiten, werden nicht mehr getestet. Das spart
+        $\sim$30\,min pro OOM-Durchlauf (42 OOMs $\times$ 30\,min = 21\,h eingespart).
+\end{enumerate}
+
+\subsection*{Bedeutung f\"ur die Bachelorarbeit}
+
+\begin{itemize}[nosep]
+  \item Das Speichermodell zeigt, dass \texttt{write\_buffer\_size} der
+        \emph{dominante} Speicherverbraucher ist (Faktor~2 durch doppelte Memtables).
+  \item F\"ur NebulaStream auf 256\,MB-Ger\"aten darf der Schreibpuffer maximal
+        32\,MB gro\ss{} sein -- idealerweise 4\,MB f\"ur maximale Stabilit\"at.
+  \item Die Cache-Gr\"o\ss e kann flexibler gew\"ahlt werden, muss aber zusammen
+        mit dem Schreibpuffer die Gesamtgrenze einhalten.
+  \item Auf moderneren Edge-Ger\"aten (512\,MB, z.\,B.\ Raspberry Pi 4) sind
+        gr\"o\ss ere Schreibpuffer (64--128\,MB) m\"oglich, was die
+        Schreibverst\"arkung deutlich reduzieren sollte.
+\end{itemize}
+
+\end{document}
