@@ -1,5 +1,5 @@
 # Build artifacts
-rocksdb/build/
+Microbenchmark-BA/rocksdb/build/
 
 # Python
 __pycache__/
@@ -9,10 +9,10 @@ __pycache__/
 venv/
 
 # Results (raw logs can be large)
-results/raw/
-results/constrained/raw/
-results/constrained_512mb/raw/
-constrained_run.log
+Microbenchmark-BA/results/raw/
+Microbenchmark-BA/results/constrained/raw/
+Microbenchmark-BA/results/constrained_512mb/raw/
+Microbenchmark-BA/constrained_run.log
 
 # Temp DB directories
 /tmp/rocksdb_bench_*
@@ -23,3 +23,11 @@ constrained_run.log
 # IDE
 .vscode/
 .idea/
+
+# Unrelated files
+music-venture/
+
+# Handwritten notes / signatures (personal)
+*.jpeg
+*.jpg
+2026-01-26_130519_signature.pdf
