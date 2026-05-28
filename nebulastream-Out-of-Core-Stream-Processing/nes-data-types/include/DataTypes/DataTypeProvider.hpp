@@ -1,0 +1,34 @@
+/*
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        https://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+*/
+#pragma once
+
+#include <optional>
+#include <string>
+#include <DataTypes/DataType.hpp>
+
+namespace NES::DataTypeProvider
+{
+
+std::optional<DataType> tryProvideDataType(const std::string& type);
+std::optional<DataType> tryProvideDataType(const std::string& type, DataType::NULLABLE isNullable);
+
+/// @param type name of the data type (must be the exact name: INT8, INT16, CHAR, BOOLEAN, ...)
+/// @param isNullable defines if the data type can be null
+/// Throws an UnknownPluginType, if the name does not match any type enum
+DataType provideDataType(const std::string& type);
+DataType provideDataType(const std::string& type, DataType::NULLABLE isNullable);
+DataType provideDataType(DataType::Type type);
+DataType provideDataType(DataType::Type type, DataType::NULLABLE isNullable);
+
+}

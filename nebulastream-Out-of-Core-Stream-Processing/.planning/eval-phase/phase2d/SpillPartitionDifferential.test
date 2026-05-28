@@ -1,0 +1,33 @@
+# name: aggregation/SpillPartitionDifferential.test
+# description: 2d differential-correctness gate (the key-disjoint dup-row guard). A keyed tumbling GROUP BY SUM
+#   over a Generator source that produces MANY completed windows (ts span 0..2_000_000 with WINDOW 100_000 ms => 20
+#   windows), so the retained band spills and the TERMINAL flush runs the partitioned-emit path when
+#   number_of_partitions > 1. The SAME query is run twice by the differential runner
+#   (.planning/eval-phase/phase2d/run-spill-differential.sh) — once with spill.number_of_partitions=1 and once with =8 —
+#   and the two output files are diffed: they MUST be byte-identical (same rows, no duplicates, no drops). Identical
+#   output proves the K contiguous chunks emitted per window at P=8 are key-disjoint and complete vs the single chunk at
+#   P=1. This .test file carries NO valid expected block (the runner compares the two runs against each other, not
+#   against a fixed block), so in plain `systest` mode it reports FAILED on output-mismatch — that is expected; use the
+#   differential runner. See 2d-done.md.
+# groups: [Aggregation, Spill, Differential]
+#
+# State growth: 20 windows of distinct keys; each completed (cold) window is spillable, so the spiller evicts the band
+# and the terminal flush re-materialises it one window at a time through the partitioned-emit path at P>1.
+
+CREATE LOGICAL SOURCE s(key UINT64 NOT NULL, val UINT64 NOT NULL, ts UINT64 NOT NULL);
+CREATE PHYSICAL SOURCE FOR s TYPE Generator SET(
+    1 AS `SOURCE`.SEED,
+    'ALL' AS `SOURCE`.STOP_GENERATOR_WHEN_SEQUENCE_FINISHES,
+    'emit_rate 50000000' AS `SOURCE`.GENERATOR_RATE_CONFIG,
+    'SEQUENCE UINT64 0 50000 1, SEQUENCE UINT64 0 100 1, SEQUENCE UINT64 0 2000000 1' AS `SOURCE`.GENERATOR_SCHEMA
+);
+
+CREATE SINK out(s.start UINT64 NOT NULL, s.end UINT64 NOT NULL, s.key UINT64 NOT NULL, s.sumVal UINT64 NOT NULL) TYPE File;
+
+SELECT start, end, key, SUM(val) AS sumVal
+FROM s
+GROUP BY key
+WINDOW TUMBLING(ts, size 100000 ms)
+INTO out;
+----
+0,100000,0,0

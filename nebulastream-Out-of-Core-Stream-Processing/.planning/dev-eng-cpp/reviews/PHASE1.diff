@@ -1,0 +1,410 @@
+diff --git a/nes-physical-operators/include/SliceStore/SpillableTimeBasedSliceStore.hpp b/nes-physical-operators/include/SliceStore/SpillableTimeBasedSliceStore.hpp
+index 8f7c140f7e..f36d4a9c46 100644
+--- a/nes-physical-operators/include/SliceStore/SpillableTimeBasedSliceStore.hpp
++++ b/nes-physical-operators/include/SliceStore/SpillableTimeBasedSliceStore.hpp
+@@ -122,7 +122,13 @@ public:
+     /// HashMap* will be snapshotted for the async probe → it must not be spilled afterwards).
+     std::map<WindowInfoAndSequenceNumber, std::vector<std::shared_ptr<Slice>>>
+     getTriggerableWindowSlices(Timestamp globalWatermark) override;
++    /// Phase 1 (L1): LAZY terminal flush. Returns the retained band WITHOUT unspilling it — the handler calls
++    /// ensureWindowSlicesResident() per window to re-materialise one window at a time (bounding the terminal-flush peak).
+     std::map<WindowInfoAndSequenceNumber, std::vector<std::shared_ptr<Slice>>> getAllNonTriggeredSlices() override;
++    /// Phase 1 (L1): per-window unspill + mark-emitted hook for the paced terminal flush. Unspills any spilled slice in
++    /// this one window (under the eviction-mutex discipline) and marks it emitted so the spiller cannot re-pick it while
++    /// the async probe drains it. Called by WindowBasedOperatorHandler::triggerAllWindows just before emitting the window.
++    void ensureWindowSlicesResident(const std::vector<std::shared_ptr<Slice>>& windowSlices) override;
+     /// Random-access read (join-probe path; out of 4b scope): unspills for consistency, but does NOT mark emitted.
+     std::optional<std::shared_ptr<Slice>> getSliceBySliceEnd(SliceEnd sliceEnd) override;
+     /// Erases backend records for spilled slices that the base GC has dropped.
+diff --git a/nes-physical-operators/include/SliceStore/WindowSlicesStoreInterface.hpp b/nes-physical-operators/include/SliceStore/WindowSlicesStoreInterface.hpp
+index 0eb7b2a61e..c4e37faf07 100644
+--- a/nes-physical-operators/include/SliceStore/WindowSlicesStoreInterface.hpp
++++ b/nes-physical-operators/include/SliceStore/WindowSlicesStoreInterface.hpp
+@@ -81,8 +81,20 @@ public:
+     /// Retrieves all current non-deleted slices that have not been triggered yet
+     /// This method returns for each window all slices that have not been triggered yet, regardless of any watermark timestamp
+     /// Additionally, it returns a sequence number per window that is incremented for each window and thus, it can be used to set it in the emitted tuple buffer for the probe operator.
++    ///
++    /// CONTRACT (out-of-core, Phase 1 L1): the slices returned by getAllNonTriggeredSlices() are NOT guaranteed resident.
++    /// An out-of-core store may hand them back still spilled so the terminal flush can re-materialise the retained band
++    /// ONE window at a time instead of all at once (bounding the terminal-flush memory peak). The caller MUST therefore
++    /// call ensureWindowSlicesResident(windowSlices) for a window before dereferencing that window's slice HashMap*s.
+     virtual std::map<WindowInfoAndSequenceNumber, std::vector<std::shared_ptr<Slice>>> getAllNonTriggeredSlices() = 0;
+ 
++    /// Ensures the given window's slices are resident (in memory) and ready to be read/emitted, unspilling them from the
++    /// out-of-core backend if necessary and marking them emitted so they are not concurrently re-spilled. Called per
++    /// window by the terminal-flush loop just before that window's slices are dereferenced, so an out-of-core store
++    /// re-materialises only one window's footprint at a time. Default = no-op: in-memory stores keep all slices resident,
++    /// so there is nothing to do.
++    virtual void ensureWindowSlicesResident(const std::vector<std::shared_ptr<Slice>>& windowSlices) { (void)windowSlices; }
++
+     /// Garbage collect all slices and windows that are not valid anymore
+     /// It is open for the implementation to delete the slices in this call or to mark them for deletion
+     /// There is no guarantee that the slices are deleted after this call
+diff --git a/nes-physical-operators/src/SliceStore/SpillableTimeBasedSliceStore.cpp b/nes-physical-operators/src/SliceStore/SpillableTimeBasedSliceStore.cpp
+index c083bfa19b..0591454c30 100644
+--- a/nes-physical-operators/src/SliceStore/SpillableTimeBasedSliceStore.cpp
++++ b/nes-physical-operators/src/SliceStore/SpillableTimeBasedSliceStore.cpp
+@@ -228,7 +228,19 @@ bool SpillableTimeBasedSliceStore::recordCreatedSlice(const std::shared_ptr<Slic
+ void SpillableTimeBasedSliceStore::unspillAndMarkEmitted(
+     std::map<WindowInfoAndSequenceNumber, std::vector<std::shared_ptr<Slice>>>& windowSlices)
+ {
+-    /// PR-3 trigger-WAIT (closes the spill-vs-emit / spill-vs-trigger UAF). For each returned spillable slice:
++    /// Batch form used by the STEADY-STATE emit path (getTriggerableWindowSlices). Delegates to the per-window primitive
++    /// ensureWindowSlicesResident so the steady path and the Phase-1 paced terminal flush share exactly ONE unspill+
++    /// mark-emitted code path. The terminal path (triggerAllWindows) instead calls ensureWindowSlicesResident directly,
++    /// one window at a time, so it never re-materialises the whole retained band at once.
++    for (auto& [windowInfo, slices] : windowSlices)
++    {
++        ensureWindowSlicesResident(slices);
++    }
++}
++
++void SpillableTimeBasedSliceStore::ensureWindowSlicesResident(const std::vector<std::shared_ptr<Slice>>& windowSlices)
++{
++    /// PR-3 trigger-WAIT (closes the spill-vs-emit / spill-vs-trigger UAF). For each spillable slice in THIS window:
+     ///   1. under evictionMutex, WAIT on spillerCv until no in-flight spill of this sliceEnd remains, THEN insert it
+     ///      into emittedKeys BEFORE releasing the mutex — so no NEW spill of this slice can start after the wait (the
+     ///      spiller's pickAndReserveColdSlice rejects emitted slices), and a slice mid-spill cannot be handed to the
+@@ -236,65 +248,63 @@ void SpillableTimeBasedSliceStore::unspillAndMarkEmitted(
+     ///   2. OUTSIDE the mutex, if the slice is non-resident (it was fully spilled before we claimed it), unspill it
+     ///      (uniform no-I/O-under-lock) — this cannot race a spiller because the slice is now emitted.
+     /// The slice always ends resident+emitted. (See the eviction-mutex invariant on evictionMutex.)
++    NES_DEBUG("ensureWindowSlicesResident: ensuring {} slice(s) resident for one window", windowSlices.size());
+     auto provider = bufferProvider.copy();
+-    for (auto& [windowInfo, slices] : windowSlices)
++    for (const auto& slice : windowSlices)
+     {
+-        for (auto& slice : slices)
++        auto spillable = std::dynamic_pointer_cast<SpillableAggregationSlice>(slice);
++        if (spillable == nullptr)
+         {
+-            auto spillable = std::dynamic_pointer_cast<SpillableAggregationSlice>(slice);
+-            if (spillable == nullptr)
++            continue;
++        }
++        const auto sliceEnd = spillable->getSliceEnd();
++        bool needsUnspill = false;
++        {
++            std::unique_lock lock(evictionMutex);
++            if (spillInProgress.contains(sliceEnd))
+             {
+-                continue;
++                NES_TRACE("Trigger of slice {} waiting on in-flight spill", sliceEnd);
++                spillerCv.wait(lock, [&] { return !spillInProgress.contains(sliceEnd); });
+             }
+-            const auto sliceEnd = spillable->getSliceEnd();
+-            bool needsUnspill = false;
++            /// Claim it BEFORE releasing the mutex: the spiller can never (re-)pick an emitted slice.
++            emittedKeys.wlock()->insert(sliceEnd);
++            /// Increment C: emitted now ⇒ emittedKeys protects it; drop any (now-redundant) late-write pin so
++            /// pinnedKeys stays bounded by live, unemitted, late-touched slices.
++            pinnedKeys.erase(sliceEnd);
++            /// If it is spilled we will unspill it OUTSIDE the lock. Reserve it in spillInProgress for the duration
++            /// so a concurrent residentBytes() SKIPS this slice while unspill() is rebuilding its maps (the read
++            /// would otherwise race the map mutation). No spiller can pick it (it is emitted), so the reservation is
++            /// purely to fence the footprint reader.
++            needsUnspill = !spillable->isResident();
++            if (needsUnspill)
+             {
+-                std::unique_lock lock(evictionMutex);
+-                if (spillInProgress.contains(sliceEnd))
+-                {
+-                    NES_TRACE("Trigger of slice {} waiting on in-flight spill", sliceEnd);
+-                    spillerCv.wait(lock, [&] { return !spillInProgress.contains(sliceEnd); });
+-                }
+-                /// Claim it BEFORE releasing the mutex: the spiller can never (re-)pick an emitted slice.
+-                emittedKeys.wlock()->insert(sliceEnd);
+-                /// Increment C: emitted now ⇒ emittedKeys protects it; drop any (now-redundant) late-write pin so
+-                /// pinnedKeys stays bounded by live, unemitted, late-touched slices.
+-                pinnedKeys.erase(sliceEnd);
+-                /// If it is spilled we will unspill it OUTSIDE the lock. Reserve it in spillInProgress for the duration
+-                /// so a concurrent residentBytes() SKIPS this slice while unspill() is rebuilding its maps (the read
+-                /// would otherwise race the map mutation). No spiller can pick it (it is emitted), so the reservation is
+-                /// purely to fence the footprint reader.
+-                needsUnspill = !spillable->isResident();
+-                if (needsUnspill)
+-                {
+-                    spillInProgress.insert(sliceEnd);
+-                }
++                spillInProgress.insert(sliceEnd);
+             }
+-            if (needsUnspill)
++        }
++        if (needsUnspill)
++        {
++            INVARIANT(provider != nullptr, "buffer provider must be stashed before an unspill-on-read");
++            NES_DEBUG("Unspilling slice {} on trigger read", sliceEnd);
++            /// L1: mirror the PR-2 spill guard on the unspill path. If unspill() throws, the spillInProgress
++            /// reservation (the footprint-reader fence) must STILL be released — a leak would make residentBytes()
++            /// permanently skip this slice AND hang any future spillerCv.wait on this sliceEnd forever. The guard's
++            /// release runs under evictionMutex (via releaseReservation) and notifies spillerCv, exactly matching the
++            /// success-path cleanup below. Commit only after the spilledKeys.erase succeeds so the success path does
++            /// not double-erase the reservation (the manual block below + the guard would otherwise both run).
++            ReservationGuard unspillGuard{*this, sliceEnd};
++            const auto unspillStart = std::chrono::steady_clock::now();
++            spillable->unspill(*backend, *provider); /// I/O OUTSIDE evictionMutex (slice is emitted ⇒ no spiller race)
++            /// residentBytesOf measured AFTER unspill() — the bytes re-materialized into the pool (mirror of the spill
++            /// sites, which read the footprint freed BEFORE spill(); reading here before unspill() would yield 0).
++            recordUnspillSample(std::chrono::steady_clock::now() - unspillStart, residentBytesOf(*spillable));
++            spilledKeys.wlock()->erase(sliceEnd);
++            /// Release the footprint-reader fence + wake anyone waiting on this sliceEnd.
+             {
+-                INVARIANT(provider != nullptr, "buffer provider must be stashed before an unspill-on-read");
+-                NES_DEBUG("Unspilling slice {} on trigger read", sliceEnd);
+-                /// L1: mirror the PR-2 spill guard on the unspill path. If unspill() throws, the spillInProgress
+-                /// reservation (the footprint-reader fence) must STILL be released — a leak would make residentBytes()
+-                /// permanently skip this slice AND hang any future spillerCv.wait on this sliceEnd forever. The guard's
+-                /// release runs under evictionMutex (via releaseReservation) and notifies spillerCv, exactly matching the
+-                /// success-path cleanup below. Commit only after the spilledKeys.erase succeeds so the success path does
+-                /// not double-erase the reservation (the manual block below + the guard would otherwise both run).
+-                ReservationGuard unspillGuard{*this, sliceEnd};
+-                const auto unspillStart = std::chrono::steady_clock::now();
+-                spillable->unspill(*backend, *provider); /// I/O OUTSIDE evictionMutex (slice is emitted ⇒ no spiller race)
+-                /// residentBytesOf measured AFTER unspill() — the bytes re-materialized into the pool (mirror of the spill
+-                /// sites, which read the footprint freed BEFORE spill(); reading here before unspill() would yield 0).
+-                recordUnspillSample(std::chrono::steady_clock::now() - unspillStart, residentBytesOf(*spillable));
+-                spilledKeys.wlock()->erase(sliceEnd);
+-                /// Release the footprint-reader fence + wake anyone waiting on this sliceEnd.
+-                {
+-                    std::unique_lock lock(evictionMutex);
+-                    spillInProgress.erase(sliceEnd);
+-                }
+-                spillerCv.notify_all();
+-                unspillGuard.committed = true; /// success: reservation already erased above, do not double-erase
++                std::unique_lock lock(evictionMutex);
++                spillInProgress.erase(sliceEnd);
+             }
++            spillerCv.notify_all();
++            unspillGuard.committed = true; /// success: reservation already erased above, do not double-erase
+         }
+     }
+ }
+@@ -383,10 +393,14 @@ SpillableTimeBasedSliceStore::getTriggerableWindowSlices(const Timestamp globalW
+ std::map<WindowInfoAndSequenceNumber, std::vector<std::shared_ptr<Slice>>> SpillableTimeBasedSliceStore::getAllNonTriggeredSlices()
+ {
+     auto result = DefaultTimeBasedSliceStore::getAllNonTriggeredSlices();
+-    unspillAndMarkEmitted(result);
++    /// Phase 1 (L1): LAZY terminal flush. Do NOT unspill the whole retained band here — that re-materialised every
++    /// completed window into the buffer pool at once (the terminal-flush memory peak ≈ whole band). Instead return the
++    /// band still-spilled; WindowBasedOperatorHandler::triggerAllWindows calls ensureWindowSlicesResident() per window,
++    /// unspilling + emitting ONE window at a time so the unspill peak is bounded to a single window's footprint.
+     /// Deliberately do NOT bump lastSeenWatermark here: this is the terminate path, where the spiller is quiesced
+     /// before deleteState, so cold-selection is moot. Leaving it unchanged keeps the learned watermark a pure
+     /// build-progress signal (O-B-watermark).
++    NES_TRACE("getAllNonTriggeredSlices: returning {} windows (lazy; unspilled per-window by the handler)", result.size());
+     return result;
+ }
+ 
+diff --git a/nes-physical-operators/src/WindowBasedOperatorHandler.cpp b/nes-physical-operators/src/WindowBasedOperatorHandler.cpp
+index 05c2036ec0..3f46a219be 100644
+--- a/nes-physical-operators/src/WindowBasedOperatorHandler.cpp
++++ b/nes-physical-operators/src/WindowBasedOperatorHandler.cpp
+@@ -90,9 +90,23 @@ void WindowBasedOperatorHandler::checkAndTriggerWindows(const BufferMetaData& bu
+ 
+ void WindowBasedOperatorHandler::triggerAllWindows(PipelineExecutionContext* pipelineCtx)
+ {
+-    const auto slicesAndWindowInfo = sliceAndWindowStore->getAllNonTriggeredSlices();
+-    NES_TRACE("Triggering {} windows for origin: {}", slicesAndWindowInfo.size(), outputOriginId);
+-    triggerSlices(slicesAndWindowInfo, pipelineCtx);
++    /// Phase 1 (L1) paced terminal flush. getAllNonTriggeredSlices() now returns the retained band possibly STILL
++    /// spilled (out-of-core stores defer the unspill so the whole band is not re-materialised at once). We therefore
++    /// ensure-resident and trigger ONE window at a time: each window is unspilled (ensureWindowSlicesResident) right
++    /// before it is emitted (triggerSlices), bounding the terminal-flush unspill peak to a single window's footprint.
++    /// For in-memory stores ensureWindowSlicesResident is a no-op, so behaviour there is unchanged.
++    auto slicesAndWindowInfo = sliceAndWindowStore->getAllNonTriggeredSlices();
++    NES_TRACE("Triggering {} windows (paced, one at a time) for origin: {}", slicesAndWindowInfo.size(), outputOriginId);
++    for (auto& [windowInfo, slices] : slicesAndWindowInfo)
++    {
++        sliceAndWindowStore->ensureWindowSlicesResident(slices);
++        /// One single-entry map per window reuses the existing triggerSlices(map) contract unchanged (shared with the
++        /// steady-state path and the join handlers). The per-window heap allocation is intentional + cheap: this runs once
++        /// per window on the end-of-stream terminal flush only. Avoiding it would require a new single-(window,slices)
++        /// triggerSlices overload across all three handler implementations — out of proportion here.
++        std::map<WindowInfoAndSequenceNumber, std::vector<std::shared_ptr<Slice>>> oneWindow{{windowInfo, slices}};
++        triggerSlices(oneWindow, pipelineCtx);
++    }
+ }
+ 
+ }
+diff --git a/nes-physical-operators/tests/SpillableTimeBasedSliceStoreConcurrencyTest.cpp b/nes-physical-operators/tests/SpillableTimeBasedSliceStoreConcurrencyTest.cpp
+index 46ad534331..68bf4498cc 100644
+--- a/nes-physical-operators/tests/SpillableTimeBasedSliceStoreConcurrencyTest.cpp
++++ b/nes-physical-operators/tests/SpillableTimeBasedSliceStoreConcurrencyTest.cpp
+@@ -433,9 +433,15 @@ TEST_F(SpillableTimeBasedSliceStoreConcurrencyTest, concurrentBuildTriggerSpillI
+         }
+         trigger.join();
+ 
+-        /// Drain anything not yet triggered (windows still filling/cold at the end). getAllNonTriggeredSlices unspills
+-        /// and emits, so every returned slice must again be resident; fold it into the checksum exactly once.
++        /// Drain anything not yet triggered (windows still filling/cold at the end). Phase 1 (L1): getAllNonTriggeredSlices
++        /// is now LAZY — it returns the band possibly STILL spilled so the terminal flush can re-materialise one window at
++        /// a time. Mirror the handler's paced flush: ensureWindowSlicesResident per window (unspill + mark emitted) before
++        /// folding each window into the checksum exactly once. Every returned slice is resident afterwards.
+         const auto drained = store->getAllNonTriggeredSlices();
++        for (const auto& [windowInfo, slices] : drained)
++        {
++            store->ensureWindowSlicesResident(slices);
++        }
+         foldTriggered(drained);
+ 
+         /// THE UAF DETECTOR: every inserted contribution accounted for exactly once across triggered + drained.
+diff --git a/nes-physical-operators/tests/SpillableTimeBasedSliceStoreTest.cpp b/nes-physical-operators/tests/SpillableTimeBasedSliceStoreTest.cpp
+index f3a1fa2e61..8b7d6457e8 100644
+--- a/nes-physical-operators/tests/SpillableTimeBasedSliceStoreTest.cpp
++++ b/nes-physical-operators/tests/SpillableTimeBasedSliceStoreTest.cpp
+@@ -854,16 +854,26 @@ TEST_F(SpillableTimeBasedSliceStoreTest, emitLagBacklogFullyFlushedOnTerminate)
+         populate(slice, WorkerThreadId(0), 3, ts);
+         created.push_back(slice->getSliceEnd());
+     }
++    /// Spill the WHOLE retained backlog first, so the terminal flush must re-materialise every window from disk via the
++    /// Phase-1 paced ensureWindowSlicesResident path — proving nothing is orphaned even when every window starts spilled.
++    for (const auto end : created)
++    {
++        store->forceSpill(end);
++        ASSERT_FALSE(store->isSliceResident(end));
++    }
+ 
+     /// Huge lag ⇒ lagged cutoff clamps to 0 ⇒ NOTHING emits via the trigger even at a high true watermark.
+     EXPECT_TRUE(store->getTriggerableWindowSlices(Timestamp(5000)).empty());
+ 
+-    /// Terminate: every retained window must be flushed (and unspilled-to-resident on the way out).
++    /// Terminate (Phase 1 L1): getAllNonTriggeredSlices is LAZY — it returns the band still spilled; the handler
++    /// re-materialises one window at a time via ensureWindowSlicesResident. Mirror that here, then assert every window is
++    /// flushed AND resident on the way out.
+     store->incrementNumberOfInputPipelines();
+-    const auto drained = store->getAllNonTriggeredSlices();
++    auto drained = store->getAllNonTriggeredSlices();
+     std::vector<SliceEnd> drainedEnds;
+-    for (const auto& [windowInfo, slices] : drained)
++    for (auto& [windowInfo, slices] : drained)
+     {
++        store->ensureWindowSlicesResident(slices); /// paced re-materialise: one window at a time
+         for (const auto& slice : slices)
+         {
+             drainedEnds.push_back(slice->getSliceEnd());
+@@ -875,6 +885,124 @@ TEST_F(SpillableTimeBasedSliceStoreTest, emitLagBacklogFullyFlushedOnTerminate)
+     EXPECT_EQ(drainedEnds, created); /// the whole backlog, nothing orphaned
+ }
+ 
++/// ── Phase 1 (L1) — paced terminal flush. getAllNonTriggeredSlices is now LAZY (does NOT eagerly unspill the whole
++/// band); the handler unspills ONE window at a time via the new ensureWindowSlicesResident hook just before emitting it,
++/// bounding the terminal-flush unspill peak (Option 1). These prove the store-side mechanism; the end-to-end process-RSS
++/// win is measured out-of-gate by the Phase-0c harness. ──────────────────────────────────────────────────────────────
++
++/// P1-T1 (RED proof, existing API only): the terminal drain returns SPILLED slices STILL spilled — it no longer
++/// re-materialises the whole retained band up front. Pre-Phase-1 this FAILS (getAllNonTriggeredSlices eagerly unspilled
++/// every slice). All windows must still be present (nothing dropped by going lazy).
++TEST_F(SpillableTimeBasedSliceStoreTest, terminalFlushReturnsSlicesStillSpilled)
++{
++    InMemorySpillBackend* backend = nullptr;
++    auto store = makeStore(&backend);
++    std::vector<SliceEnd> ends;
++    for (const uint64_t ts : {50ULL, 150ULL, 250ULL})
++    {
++        const auto slice = store->getSlicesOrCreate(Timestamp(ts), spillableSliceFactory())[0];
++        populate(slice, WorkerThreadId(0), 5, ts);
++        ends.push_back(slice->getSliceEnd());
++    }
++    for (const auto end : ends)
++    {
++        store->forceSpill(end);
++        ASSERT_FALSE(store->isSliceResident(end));
++    }
++
++    store->incrementNumberOfInputPipelines();
++    const auto drained = store->getAllNonTriggeredSlices();
++    for (const auto end : ends)
++    {
++        EXPECT_FALSE(store->isSliceResident(end)); /// lazy: NOT unspilled by the terminal drain itself
++        EXPECT_TRUE(triggeredContains(drained, end)); /// ...but every window is still returned
++    }
++}
++
++/// P1-T2 (the peak-bounding mechanism): ensureWindowSlicesResident unspills ONLY the window it is handed; the rest of
++/// the band stays on disk, so at most one window's footprint is re-materialised at a time.
++TEST_F(SpillableTimeBasedSliceStoreTest, ensureWindowSlicesResidentUnspillsOnlyThatWindow)
++{
++    InMemorySpillBackend* backend = nullptr;
++    auto store = makeStore(&backend);
++    for (const uint64_t ts : {50ULL, 150ULL, 250ULL})
++    {
++        const auto slice = store->getSlicesOrCreate(Timestamp(ts), spillableSliceFactory())[0];
++        populate(slice, WorkerThreadId(0), 5, ts);
++        store->forceSpill(slice->getSliceEnd());
++    }
++
++    store->incrementNumberOfInputPipelines();
++    auto drained = store->getAllNonTriggeredSlices();
++    ASSERT_EQ(drained.size(), 3U);
++    std::vector<std::vector<std::shared_ptr<Slice>>> windows; /// ordered by windowEnd (map ordering)
++    for (auto& [windowInfo, slices] : drained)
++    {
++        windows.push_back(slices);
++    }
++    store->ensureWindowSlicesResident(windows[0]);
++    EXPECT_TRUE(store->isSliceResident(windows[0].front()->getSliceEnd()));
++    EXPECT_FALSE(store->isSliceResident(windows[1].front()->getSliceEnd()));
++    EXPECT_FALSE(store->isSliceResident(windows[2].front()->getSliceEnd()));
++}
++
++/// P1-T3 (correct + complete): the full paced drain (ensure every window) yields the SAME window set and per-window
++/// contents as before spilling — pacing the unspill loses nothing and duplicates nothing.
++TEST_F(SpillableTimeBasedSliceStoreTest, pacedTerminalFlushFullDrainCorrectAndComplete)
++{
++    InMemorySpillBackend* backend = nullptr;
++    auto store = makeStore(&backend);
++    std::map<SliceEnd, std::vector<Entry>> expected;
++    std::vector<std::shared_ptr<Slice>> slices;
++    for (const uint64_t ts : {50ULL, 150ULL, 250ULL})
++    {
++        const auto slice = store->getSlicesOrCreate(Timestamp(ts), spillableSliceFactory())[0];
++        populate(slice, WorkerThreadId(0), 5, ts);
++        expected[slice->getSliceEnd()] = sortedEntries(*dynamic_cast<SpillableAggregationSlice*>(slice.get()), WorkerThreadId(0));
++        slices.push_back(slice);
++    }
++    for (const auto& s : slices)
++    {
++        store->forceSpill(s->getSliceEnd());
++        ASSERT_FALSE(store->isSliceResident(s->getSliceEnd()));
++    }
++
++    store->incrementNumberOfInputPipelines();
++    auto drained = store->getAllNonTriggeredSlices();
++    std::map<SliceEnd, std::vector<Entry>> got;
++    for (auto& [windowInfo, windowSlices] : drained)
++    {
++        store->ensureWindowSlicesResident(windowSlices); /// paced: one window at a time, just before reading it
++        for (const auto& s : windowSlices)
++        {
++            EXPECT_TRUE(store->isSliceResident(s->getSliceEnd()));
++            got[s->getSliceEnd()] = sortedEntries(*dynamic_cast<SpillableAggregationSlice*>(s.get()), WorkerThreadId(0));
++        }
++    }
++    EXPECT_EQ(got, expected); /// same windows, same contents
++}
++
++/// P1-T4 (invariant preserved): ensureWindowSlicesResident marks each window emitted, so the async-probe-drain guard
++/// still holds — an emitted slice can never be re-spilled (forceSpill rejects it). This proves the mark-emitted step did
++/// not get lost when it moved out of getAllNonTriggeredSlices into the per-window hook.
++TEST_F(SpillableTimeBasedSliceStoreTest, ensureWindowSlicesResidentMarksEmittedAndPreventsRespill)
++{
++    InMemorySpillBackend* backend = nullptr;
++    auto store = makeStore(&backend);
++    const auto slice = store->getSlicesOrCreate(Timestamp(50), spillableSliceFactory())[0];
++    const auto sliceEnd = slice->getSliceEnd();
++    populate(slice, WorkerThreadId(0), 5, 0);
++    store->forceSpill(sliceEnd);
++
++    store->incrementNumberOfInputPipelines();
++    auto drained = store->getAllNonTriggeredSlices();
++    ASSERT_EQ(drained.size(), 1U);
++    store->ensureWindowSlicesResident(drained.begin()->second);
++    EXPECT_TRUE(store->isSliceResident(sliceEnd));
++    /// Emitted now ⇒ the spiller / hard-eviction can never touch it again.
++    ASSERT_EXCEPTION_ERRORCODE(store->forceSpill(sliceEnd), ErrorCode::SpillStoreFailure);
++}
++
+ /// C-T5 (the E0 → fixed proof): emitLag > 0 makes the cold-AND-unemitted set NON-EMPTY (the retained band), so the
+ /// spiller finally engages on a real trigger drive (NOT the setLastSeenWatermarkForTest seeding hook). The emitted
+ /// window and the still-hot window are never spilled.

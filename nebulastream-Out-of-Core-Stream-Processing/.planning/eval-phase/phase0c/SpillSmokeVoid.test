@@ -1,0 +1,36 @@
+# name: phase0c/SpillSmokeVoid.test
+# description: Phase 0c CLEAN-MEASUREMENT workload. Identical tumbling GROUP BY SUM as E0-REDO's breadth case,
+#   but the sink is **Void** so the systest harness SKIPS its result check (SystestResultCheck.cpp:769-785 returns
+#   nullopt for a VOID sink BEFORE any loadQueryResult call). That removes the 2M-row result-check OOM that
+#   confounded E0 (run G/Ghi/Bns* all died 137 inside loadQueryResult diffing 2M rows). The Void sink still
+#   RECEIVES every triggered window, so the TERMINAL FLUSH burst — the real bottleneck — is unchanged; Void
+#   merely discards the tuples instead of writing them. There is also no NetworkSink on the single-node embedded
+#   path (QueryDecomposition only injects one when the plan is cut across two worker nodes), so the only confounder
+#   we needed to remove was the result check. ⇒ the measured cgroup memory.peak now reflects the QUERY's peak RSS.
+#
+# Workload (UNCHANGED from E0-REDO so numbers are directly comparable):
+#   key/ts both SEQUENCE 0..2,000,000 step 1 (=> 2,000,001 tuples, all-distinct keys), val SEQUENCE 0..100.
+#   WINDOW TUMBLING(ts, 100000 ms) => 20 completed windows of 100,000 distinct keys each.
+#   emit_lag (CLI: --worker.default_query_execution.spill.emit_lag, ms) retains a band of completed-but-unemitted
+#   windows => spillable. emit_rate 50000000 removes the default 1000 tup/s throttle.
+#
+# The SYSTEM knobs (cap, pool, spill on/off, soft/hard, emit_lag, wbuf, cache, threads) are varied by run-rss.sh
+# via `-- --worker.<dotted.path>=<value>`; the workload here is fixed.
+# groups: [Spill, Phase0c, ManualOnly]
+
+CREATE LOGICAL SOURCE s(key UINT64 NOT NULL, val UINT64 NOT NULL, ts UINT64 NOT NULL);
+CREATE PHYSICAL SOURCE FOR s TYPE Generator SET(
+    1 AS `SOURCE`.SEED,
+    'ALL' AS `SOURCE`.STOP_GENERATOR_WHEN_SEQUENCE_FINISHES,
+    'emit_rate 50000000' AS `SOURCE`.GENERATOR_RATE_CONFIG,
+    'SEQUENCE UINT64 0 2000000 1, SEQUENCE UINT64 0 100 1, SEQUENCE UINT64 0 2000000 1' AS `SOURCE`.GENERATOR_SCHEMA
+);
+
+CREATE SINK out(s.start UINT64 NOT NULL, s.end UINT64 NOT NULL, s.key UINT64 NOT NULL, s.sumVal UINT64 NOT NULL) TYPE Void;
+
+SELECT start, end, key, SUM(val) AS sumVal
+FROM s
+GROUP BY key
+WINDOW TUMBLING(ts, size 100000 ms)
+INTO out;
+----

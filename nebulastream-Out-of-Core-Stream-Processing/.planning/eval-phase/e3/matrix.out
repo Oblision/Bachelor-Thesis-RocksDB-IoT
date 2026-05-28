@@ -1,0 +1,153 @@
+=== E3 matrix start Mon May 25 14:52:12 CEST 2026 ===
+[run-eval] label=ooc_400k_c320_r1 variant=ooc cap=320 spill=on P=8 emit_lag=400000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT ooc_400k_c320_r1 status=ok rc=0 elapsed=130.983s thr=15269t/s peak=320MB store_peak=19MB spilled=19 restored_b=71073792 writeamp=1.0000 sst=16193603 p50=2 p95=1232 p99=1366
+[run-eval] label=inmem_400k_c320_r1 variant=inmem cap=320 spill=off P=1 emit_lag=400000 pool=16000 threads=4 wbuf=0 cache=0
+[run-eval] RESULT inmem_400k_c320_r1 status=ok rc=0 elapsed=131.629s thr=15194t/s peak=320MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=4 p95=1224 p99=1363
+[run-eval] label=ooc_400k_c320_r2 variant=ooc cap=320 spill=on P=8 emit_lag=400000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT ooc_400k_c320_r2 status=ok rc=0 elapsed=131.717s thr=15184t/s peak=320MB store_peak=19MB spilled=19 restored_b=71074816 writeamp=1.0000 sst=16315039 p50=3 p95=1181 p99=1266
+[run-eval] label=inmem_400k_c320_r2 variant=inmem cap=320 spill=off P=1 emit_lag=400000 pool=16000 threads=4 wbuf=0 cache=0
+[run-eval] RESULT inmem_400k_c320_r2 status=ok rc=0 elapsed=116.665s thr=17143t/s peak=320MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=5 p95=1224 p99=1332
+[run-eval] label=ooc_400k_c320_r3 variant=ooc cap=320 spill=on P=8 emit_lag=400000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT ooc_400k_c320_r3 status=ok rc=0 elapsed=130.429s thr=15334t/s peak=320MB store_peak=19MB spilled=19 restored_b=71075840 writeamp=1.0000 sst=16203650 p50=3 p95=514 p99=1316
+[run-eval] label=inmem_400k_c320_r3 variant=inmem cap=320 spill=off P=1 emit_lag=400000 pool=16000 threads=4 wbuf=0 cache=0
+[run-eval] RESULT inmem_400k_c320_r3 status=ok rc=0 elapsed=114.239s thr=17507t/s peak=320MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=3 p95=490 p99=554
+[run-eval] label=ooc_400k_c512_r1 variant=ooc cap=512 spill=on P=8 emit_lag=400000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT ooc_400k_c512_r1 status=ok rc=0 elapsed=130.990s thr=15268t/s peak=433MB store_peak=19MB spilled=19 restored_b=71073792 writeamp=1.0000 sst=16309630 p50=2 p95=499 p99=560
+[run-eval] label=inmem_400k_c512_r1 variant=inmem cap=512 spill=off P=1 emit_lag=400000 pool=16000 threads=4 wbuf=0 cache=0
+[run-eval] RESULT inmem_400k_c512_r1 status=ok rc=0 elapsed=113.172s thr=17672t/s peak=330MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=4 p95=493 p99=555
+[run-eval] label=ooc_400k_c512_r2 variant=ooc cap=512 spill=on P=8 emit_lag=400000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT ooc_400k_c512_r2 status=ok rc=0 elapsed=132.260s thr=15121t/s peak=447MB store_peak=19MB spilled=19 restored_b=71075840 writeamp=1.0000 sst=16179552 p50=2 p95=1169 p99=1252
+[run-eval] label=inmem_400k_c512_r2 variant=inmem cap=512 spill=off P=1 emit_lag=400000 pool=16000 threads=4 wbuf=0 cache=0
+[run-eval] RESULT inmem_400k_c512_r2 status=ok rc=0 elapsed=117.757s thr=16984t/s peak=328MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=4 p95=1220 p99=1327
+[run-eval] label=ooc_400k_c512_r3 variant=ooc cap=512 spill=on P=8 emit_lag=400000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT ooc_400k_c512_r3 status=ok rc=0 elapsed=134.255s thr=14897t/s peak=448MB store_peak=19MB spilled=19 restored_b=71076864 writeamp=1.0000 sst=16243098 p50=4 p95=1240 p99=1362
+[run-eval] label=inmem_400k_c512_r3 variant=inmem cap=512 spill=off P=1 emit_lag=400000 pool=16000 threads=4 wbuf=0 cache=0
+[run-eval] RESULT inmem_400k_c512_r3 status=ok rc=0 elapsed=118.023s thr=16945t/s peak=335MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=4 p95=1223 p99=1320
+[run-eval] label=ref_400k_uncapped_r1 variant=inmem_uncapped cap=none spill=off P=1 emit_lag=400000 pool=16000 threads=4 wbuf=0 cache=0
+[run-eval] RESULT ref_400k_uncapped_r1 status=ok rc=0 elapsed=117.688s thr=16994t/s peak=336MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=4 p95=1235 p99=1331
+[run-eval] label=ref_400k_uncapped_r2 variant=inmem_uncapped cap=none spill=off P=1 emit_lag=400000 pool=16000 threads=4 wbuf=0 cache=0
+[run-eval] RESULT ref_400k_uncapped_r2 status=ok rc=0 elapsed=134.127s thr=14911t/s peak=328MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=5 p95=1225 p99=1326
+[run-eval] label=ref_400k_uncapped_r3 variant=inmem_uncapped cap=none spill=off P=1 emit_lag=400000 pool=16000 threads=4 wbuf=0 cache=0
+[run-eval] RESULT ref_400k_uncapped_r3 status=ok rc=0 elapsed=118.824s thr=16831t/s peak=330MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=4 p95=1223 p99=1321
+[run-eval] label=ooc_800k_c320_r1 variant=ooc cap=320 spill=on P=8 emit_lag=800000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT ooc_800k_c320_r1 status=ok rc=0 elapsed=134.144s thr=14909t/s peak=320MB store_peak=19MB spilled=19 restored_b=64289792 writeamp=1.0000 sst=16234679 p50=2 p95=1237 p99=1370
+[run-eval] label=inmem_800k_c320_r1 variant=inmem cap=320 spill=off P=1 emit_lag=800000 pool=16000 threads=4 wbuf=0 cache=0
+[run-eval] RESULT inmem_800k_c320_r1 status=ok rc=0 elapsed=117.808s thr=16976t/s peak=320MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=5 p95=1231 p99=1348
+[run-eval] label=ooc_800k_c320_r2 variant=ooc cap=320 spill=on P=8 emit_lag=800000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT ooc_800k_c320_r2 status=ok rc=0 elapsed=134.428s thr=14877t/s peak=320MB store_peak=19MB spilled=19 restored_b=64287744 writeamp=1.0000 sst=16196011 p50=2 p95=1246 p99=1364
+[run-eval] label=inmem_800k_c320_r2 variant=inmem cap=320 spill=off P=1 emit_lag=800000 pool=16000 threads=4 wbuf=0 cache=0
+[run-eval] RESULT inmem_800k_c320_r2 status=ok rc=0 elapsed=118.100s thr=16934t/s peak=320MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=5 p95=1221 p99=1329
+[run-eval] label=ooc_800k_c320_r3 variant=ooc cap=320 spill=on P=8 emit_lag=800000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT ooc_800k_c320_r3 status=ok rc=0 elapsed=136.160s thr=14688t/s peak=320MB store_peak=19MB spilled=19 restored_b=64287744 writeamp=1.0000 sst=16253639 p50=2 p95=1254 p99=2332
+[run-eval] label=inmem_800k_c320_r3 variant=inmem cap=320 spill=off P=1 emit_lag=800000 pool=16000 threads=4 wbuf=0 cache=0
+[run-eval] RESULT inmem_800k_c320_r3 status=ok rc=0 elapsed=132.866s thr=15052t/s peak=320MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=4 p95=1225 p99=1316
+[run-eval] label=ooc_800k_c512_r1 variant=ooc cap=512 spill=on P=8 emit_lag=800000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT ooc_800k_c512_r1 status=ok rc=0 elapsed=133.342s thr=14999t/s peak=441MB store_peak=19MB spilled=19 restored_b=64287744 writeamp=1.0000 sst=16275977 p50=2 p95=1238 p99=1352
+[run-eval] label=inmem_800k_c512_r1 variant=inmem cap=512 spill=off P=1 emit_lag=800000 pool=16000 threads=4 wbuf=0 cache=0
+[run-eval] RESULT inmem_800k_c512_r1 status=ok rc=0 elapsed=118.848s thr=16828t/s peak=329MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=4 p95=1219 p99=1317
+[run-eval] label=ooc_800k_c512_r2 variant=ooc cap=512 spill=on P=8 emit_lag=800000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT ooc_800k_c512_r2 status=ok rc=0 elapsed=120.091s thr=16654t/s peak=457MB store_peak=19MB spilled=19 restored_b=64286720 writeamp=1.0000 sst=16232646 p50=2 p95=1241 p99=1368
+[run-eval] label=inmem_800k_c512_r2 variant=inmem cap=512 spill=off P=1 emit_lag=800000 pool=16000 threads=4 wbuf=0 cache=0
+[run-eval] RESULT inmem_800k_c512_r2 status=ok rc=0 elapsed=133.943s thr=14931t/s peak=326MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=5 p95=1225 p99=1325
+[run-eval] label=ooc_800k_c512_r3 variant=ooc cap=512 spill=on P=8 emit_lag=800000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT ooc_800k_c512_r3 status=ok rc=0 elapsed=134.519s thr=14867t/s peak=430MB store_peak=19MB spilled=19 restored_b=64287744 writeamp=1.0000 sst=16422664 p50=3 p95=1240 p99=1364
+[run-eval] label=inmem_800k_c512_r3 variant=inmem cap=512 spill=off P=1 emit_lag=800000 pool=16000 threads=4 wbuf=0 cache=0
+[run-eval] RESULT inmem_800k_c512_r3 status=ok rc=0 elapsed=133.256s thr=15008t/s peak=330MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=0 p95=1 p99=2
+[run-eval] label=ref_800k_uncapped_r1 variant=inmem_uncapped cap=none spill=off P=1 emit_lag=800000 pool=16000 threads=4 wbuf=0 cache=0
+[run-eval] RESULT ref_800k_uncapped_r1 status=ok rc=0 elapsed=117.533s thr=17016t/s peak=326MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=5 p95=1227 p99=1319
+[run-eval] label=ref_800k_uncapped_r2 variant=inmem_uncapped cap=none spill=off P=1 emit_lag=800000 pool=16000 threads=4 wbuf=0 cache=0
+[run-eval] RESULT ref_800k_uncapped_r2 status=ok rc=0 elapsed=134.154s thr=14908t/s peak=331MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=5 p95=1259 p99=1356
+[run-eval] label=ref_800k_uncapped_r3 variant=inmem_uncapped cap=none spill=off P=1 emit_lag=800000 pool=16000 threads=4 wbuf=0 cache=0
+[run-eval] RESULT ref_800k_uncapped_r3 status=ok rc=0 elapsed=118.029s thr=16945t/s peak=334MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=4 p95=1298 p99=1429
+[run-eval] label=ooc_1200k_c320_r1 variant=ooc cap=320 spill=on P=8 emit_lag=1200000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT ooc_1200k_c320_r1 status=ok rc=0 elapsed=135.706s thr=14737t/s peak=320MB store_peak=19MB spilled=19 restored_b=57501696 writeamp=1.0000 sst=16299059 p50=2 p95=1285 p99=1434
+[run-eval] label=inmem_1200k_c320_r1 variant=inmem cap=320 spill=off P=1 emit_lag=1200000 pool=16000 threads=4 wbuf=0 cache=0
+[run-eval] RESULT inmem_1200k_c320_r1 status=ok rc=0 elapsed=117.858s thr=16969t/s peak=320MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=4 p95=1277 p99=1402
+[run-eval] label=ooc_1200k_c320_r2 variant=ooc cap=320 spill=on P=8 emit_lag=1200000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT ooc_1200k_c320_r2 status=ok rc=0 elapsed=135.608s thr=14748t/s peak=320MB store_peak=19MB spilled=19 restored_b=57500672 writeamp=1.0000 sst=16231441 p50=2 p95=1288 p99=1425
+[run-eval] label=inmem_1200k_c320_r2 variant=inmem cap=320 spill=off P=1 emit_lag=1200000 pool=16000 threads=4 wbuf=0 cache=0
+[run-eval] RESULT inmem_1200k_c320_r2 status=ok rc=0 elapsed=118.338s thr=16900t/s peak=320MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=3 p95=1278 p99=1388
+[run-eval] label=ooc_1200k_c320_r3 variant=ooc cap=320 spill=on P=8 emit_lag=1200000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT ooc_1200k_c320_r3 status=ok rc=0 elapsed=118.680s thr=16852t/s peak=320MB store_peak=15MB spilled=19 restored_b=57499648 writeamp=1.0000 sst=16318652 p50=1 p95=1300 p99=1436
+[run-eval] label=inmem_1200k_c320_r3 variant=inmem cap=320 spill=off P=1 emit_lag=1200000 pool=16000 threads=4 wbuf=0 cache=0
+[run-eval] RESULT inmem_1200k_c320_r3 status=ok rc=0 elapsed=118.693s thr=16850t/s peak=320MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=3 p95=1273 p99=1394
+[run-eval] label=ooc_1200k_c512_r1 variant=ooc cap=512 spill=on P=8 emit_lag=1200000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT ooc_1200k_c512_r1 status=ok rc=0 elapsed=134.104s thr=14913t/s peak=462MB store_peak=19MB spilled=19 restored_b=57500672 writeamp=1.0000 sst=16291930 p50=2 p95=1288 p99=1439
+[run-eval] label=inmem_1200k_c512_r1 variant=inmem cap=512 spill=off P=1 emit_lag=1200000 pool=16000 threads=4 wbuf=0 cache=0
+[run-eval] RESULT inmem_1200k_c512_r1 status=ok rc=0 elapsed=117.351s thr=17042t/s peak=327MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=3 p95=1270 p99=1396
+[run-eval] label=ooc_1200k_c512_r2 variant=ooc cap=512 spill=on P=8 emit_lag=1200000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT ooc_1200k_c512_r2 status=ok rc=0 elapsed=119.906s thr=16679t/s peak=461MB store_peak=19MB spilled=19 restored_b=57498624 writeamp=1.0000 sst=16398441 p50=2 p95=1297 p99=1446
+[run-eval] label=inmem_1200k_c512_r2 variant=inmem cap=512 spill=off P=1 emit_lag=1200000 pool=16000 threads=4 wbuf=0 cache=0
+[run-eval] RESULT inmem_1200k_c512_r2 status=ok rc=0 elapsed=117.453s thr=17028t/s peak=327MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=4 p95=1283 p99=1396
+[run-eval] label=ooc_1200k_c512_r3 variant=ooc cap=512 spill=on P=8 emit_lag=1200000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT ooc_1200k_c512_r3 status=ok rc=0 elapsed=134.320s thr=14889t/s peak=456MB store_peak=19MB spilled=19 restored_b=57500672 writeamp=1.0000 sst=16253532 p50=2 p95=1286 p99=1408
+[run-eval] label=inmem_1200k_c512_r3 variant=inmem cap=512 spill=off P=1 emit_lag=1200000 pool=16000 threads=4 wbuf=0 cache=0
+[run-eval] RESULT inmem_1200k_c512_r3 status=ok rc=0 elapsed=134.410s thr=14879t/s peak=328MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=4 p95=1270 p99=1400
+[run-eval] label=ref_1200k_uncapped_r1 variant=inmem_uncapped cap=none spill=off P=1 emit_lag=1200000 pool=16000 threads=4 wbuf=0 cache=0
+[run-eval] RESULT ref_1200k_uncapped_r1 status=ok rc=0 elapsed=134.230s thr=14899t/s peak=329MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=4 p95=1264 p99=1367
+[run-eval] label=ref_1200k_uncapped_r2 variant=inmem_uncapped cap=none spill=off P=1 emit_lag=1200000 pool=16000 threads=4 wbuf=0 cache=0
+[run-eval] RESULT ref_1200k_uncapped_r2 status=ok rc=0 elapsed=117.620s thr=17003t/s peak=330MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=5 p95=1273 p99=1400
+[run-eval] label=ref_1200k_uncapped_r3 variant=inmem_uncapped cap=none spill=off P=1 emit_lag=1200000 pool=16000 threads=4 wbuf=0 cache=0
+[run-eval] RESULT ref_1200k_uncapped_r3 status=ok rc=0 elapsed=132.968s thr=15041t/s peak=329MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=4 p95=1263 p99=1378
+[run-eval] label=ooc_1600k_c320_r1 variant=ooc cap=320 spill=on P=8 emit_lag=1600000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT ooc_1600k_c320_r1 status=ok rc=0 elapsed=135.019s thr=14812t/s peak=320MB store_peak=15MB spilled=19 restored_b=50713600 writeamp=1.0000 sst=16325838 p50=1 p95=1283 p99=1458
+[run-eval] label=inmem_1600k_c320_r1 variant=inmem cap=320 spill=off P=1 emit_lag=1600000 pool=16000 threads=4 wbuf=0 cache=0
+[run-eval] RESULT inmem_1600k_c320_r1 status=ok rc=0 elapsed=134.554s thr=14863t/s peak=320MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=4 p95=1275 p99=1394
+[run-eval] label=ooc_1600k_c320_r2 variant=ooc cap=320 spill=on P=8 emit_lag=1600000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT ooc_1600k_c320_r2 status=ok rc=0 elapsed=136.540s thr=14647t/s peak=320MB store_peak=15MB spilled=19 restored_b=50714624 writeamp=1.0000 sst=16404972 p50=2 p95=1277 p99=1409
+[run-eval] label=inmem_1600k_c320_r2 variant=inmem cap=320 spill=off P=1 emit_lag=1600000 pool=16000 threads=4 wbuf=0 cache=0
+[run-eval] RESULT inmem_1600k_c320_r2 status=ok rc=0 elapsed=117.844s thr=16971t/s peak=320MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=3 p95=1280 p99=1409
+[run-eval] label=ooc_1600k_c320_r3 variant=ooc cap=320 spill=on P=8 emit_lag=1600000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT ooc_1600k_c320_r3 status=ok rc=0 elapsed=135.606s thr=14748t/s peak=320MB store_peak=15MB spilled=19 restored_b=50715648 writeamp=1.0000 sst=16346571 p50=1 p95=1288 p99=1443
+[run-eval] label=inmem_1600k_c320_r3 variant=inmem cap=320 spill=off P=1 emit_lag=1600000 pool=16000 threads=4 wbuf=0 cache=0
+[run-eval] RESULT inmem_1600k_c320_r3 status=ok rc=0 elapsed=133.946s thr=14931t/s peak=320MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=4 p95=1271 p99=1362
+[run-eval] label=ooc_1600k_c512_r1 variant=ooc cap=512 spill=on P=8 emit_lag=1600000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT ooc_1600k_c512_r1 status=ok rc=0 elapsed=136.752s thr=14625t/s peak=433MB store_peak=15MB spilled=19 restored_b=50713600 writeamp=1.0000 sst=16149209 p50=1 p95=1294 p99=1459
+[run-eval] label=inmem_1600k_c512_r1 variant=inmem cap=512 spill=off P=1 emit_lag=1600000 pool=16000 threads=4 wbuf=0 cache=0
+[run-eval] RESULT inmem_1600k_c512_r1 status=ok rc=0 elapsed=133.384s thr=14994t/s peak=327MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=4 p95=1267 p99=1383
+[run-eval] label=ooc_1600k_c512_r2 variant=ooc cap=512 spill=on P=8 emit_lag=1600000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT ooc_1600k_c512_r2 status=ok rc=0 elapsed=135.051s thr=14809t/s peak=440MB store_peak=15MB spilled=19 restored_b=50713600 writeamp=1.0000 sst=16326890 p50=1 p95=1289 p99=1438
+[run-eval] label=inmem_1600k_c512_r2 variant=inmem cap=512 spill=off P=1 emit_lag=1600000 pool=16000 threads=4 wbuf=0 cache=0
+[run-eval] RESULT inmem_1600k_c512_r2 status=ok rc=0 elapsed=117.790s thr=16979t/s peak=328MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=4 p95=1272 p99=1394
+[run-eval] label=ooc_1600k_c512_r3 variant=ooc cap=512 spill=on P=8 emit_lag=1600000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT ooc_1600k_c512_r3 status=ok rc=0 elapsed=136.859s thr=14613t/s peak=441MB store_peak=15MB spilled=19 restored_b=50713600 writeamp=1.0000 sst=16354775 p50=1 p95=1279 p99=1435
+[run-eval] label=inmem_1600k_c512_r3 variant=inmem cap=512 spill=off P=1 emit_lag=1600000 pool=16000 threads=4 wbuf=0 cache=0
+[run-eval] RESULT inmem_1600k_c512_r3 status=ok rc=0 elapsed=117.795s thr=16978t/s peak=327MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=5 p95=1289 p99=1427
+[run-eval] label=ref_1600k_uncapped_r1 variant=inmem_uncapped cap=none spill=off P=1 emit_lag=1600000 pool=16000 threads=4 wbuf=0 cache=0
+[run-eval] RESULT ref_1600k_uncapped_r1 status=ok rc=0 elapsed=117.186s thr=17066t/s peak=331MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=4 p95=1263 p99=1370
+[run-eval] label=ref_1600k_uncapped_r2 variant=inmem_uncapped cap=none spill=off P=1 emit_lag=1600000 pool=16000 threads=4 wbuf=0 cache=0
+[run-eval] RESULT ref_1600k_uncapped_r2 status=ok rc=0 elapsed=117.825s thr=16974t/s peak=332MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=5 p95=1278 p99=1399
+[run-eval] label=ref_1600k_uncapped_r3 variant=inmem_uncapped cap=none spill=off P=1 emit_lag=1600000 pool=16000 threads=4 wbuf=0 cache=0
+[run-eval] RESULT ref_1600k_uncapped_r3 status=ok rc=0 elapsed=117.891s thr=16964t/s peak=331MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=3 p95=1268 p99=1391
+[run-eval] label=ooc_2000k_c320_r1 variant=ooc cap=320 spill=on P=8 emit_lag=2000000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT ooc_2000k_c320_r1 status=ok rc=0 elapsed=135.102s thr=14803t/s peak=320MB store_peak=4MB spilled=19 restored_b=45624320 writeamp=1.0000 sst=16235155 p50=1 p95=1284 p99=1462
+[run-eval] label=inmem_2000k_c320_r1 variant=inmem cap=320 spill=off P=1 emit_lag=2000000 pool=16000 threads=4 wbuf=0 cache=0
+[run-eval] RESULT inmem_2000k_c320_r1 status=ok rc=0 elapsed=117.625s thr=17003t/s peak=320MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=5 p95=1281 p99=1383
+[run-eval] label=ooc_2000k_c320_r2 variant=ooc cap=320 spill=on P=8 emit_lag=2000000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT ooc_2000k_c320_r2 status=ok rc=0 elapsed=119.667s thr=16713t/s peak=320MB store_peak=4MB spilled=19 restored_b=45624320 writeamp=1.0000 sst=16257253 p50=1 p95=1292 p99=1483
+[run-eval] label=inmem_2000k_c320_r2 variant=inmem cap=320 spill=off P=1 emit_lag=2000000 pool=16000 threads=4 wbuf=0 cache=0
+[run-eval] RESULT inmem_2000k_c320_r2 status=ok rc=0 elapsed=117.923s thr=16960t/s peak=320MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=3 p95=1277 p99=1397
+[run-eval] label=ooc_2000k_c320_r3 variant=ooc cap=320 spill=on P=8 emit_lag=2000000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT ooc_2000k_c320_r3 status=ok rc=0 elapsed=134.702s thr=14847t/s peak=320MB store_peak=4MB spilled=19 restored_b=45624320 writeamp=1.0000 sst=16249794 p50=1 p95=1285 p99=1446
+[run-eval] label=inmem_2000k_c320_r3 variant=inmem cap=320 spill=off P=1 emit_lag=2000000 pool=16000 threads=4 wbuf=0 cache=0
+[run-eval] RESULT inmem_2000k_c320_r3 status=ok rc=0 elapsed=118.074s thr=16938t/s peak=320MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=4 p95=1286 p99=1408
+[run-eval] label=ooc_2000k_c512_r1 variant=ooc cap=512 spill=on P=8 emit_lag=2000000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT ooc_2000k_c512_r1 status=ok rc=0 elapsed=135.012s thr=14813t/s peak=413MB store_peak=4MB spilled=19 restored_b=45624320 writeamp=1.0000 sst=16185952 p50=1 p95=1284 p99=1464
+[run-eval] label=inmem_2000k_c512_r1 variant=inmem cap=512 spill=off P=1 emit_lag=2000000 pool=16000 threads=4 wbuf=0 cache=0
+[run-eval] RESULT inmem_2000k_c512_r1 status=ok rc=0 elapsed=131.329s thr=15228t/s peak=328MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=5 p95=1285 p99=1415
+[run-eval] label=ooc_2000k_c512_r2 variant=ooc cap=512 spill=on P=8 emit_lag=2000000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT ooc_2000k_c512_r2 status=ok rc=0 elapsed=135.536s thr=14756t/s peak=412MB store_peak=4MB spilled=19 restored_b=45624320 writeamp=1.0000 sst=16362060 p50=1 p95=1273 p99=1426
+[run-eval] label=inmem_2000k_c512_r2 variant=inmem cap=512 spill=off P=1 emit_lag=2000000 pool=16000 threads=4 wbuf=0 cache=0
+[run-eval] RESULT inmem_2000k_c512_r2 status=ok rc=0 elapsed=118.670s thr=16853t/s peak=327MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=4 p95=1267 p99=1400
+[run-eval] label=ooc_2000k_c512_r3 variant=ooc cap=512 spill=on P=8 emit_lag=2000000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT ooc_2000k_c512_r3 status=ok rc=0 elapsed=134.158s thr=14907t/s peak=413MB store_peak=4MB spilled=19 restored_b=45624320 writeamp=1.0000 sst=16188344 p50=1 p95=1291 p99=1460
+[run-eval] label=inmem_2000k_c512_r3 variant=inmem cap=512 spill=off P=1 emit_lag=2000000 pool=16000 threads=4 wbuf=0 cache=0
+[run-eval] RESULT inmem_2000k_c512_r3 status=ok rc=0 elapsed=117.544s thr=17014t/s peak=329MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=0 p95=1 p99=2
+[run-eval] label=ref_2000k_uncapped_r1 variant=inmem_uncapped cap=none spill=off P=1 emit_lag=2000000 pool=16000 threads=4 wbuf=0 cache=0
+[run-eval] RESULT ref_2000k_uncapped_r1 status=ok rc=0 elapsed=117.878s thr=16966t/s peak=333MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=4 p95=1284 p99=1428
+[run-eval] label=ref_2000k_uncapped_r2 variant=inmem_uncapped cap=none spill=off P=1 emit_lag=2000000 pool=16000 threads=4 wbuf=0 cache=0
+[run-eval] RESULT ref_2000k_uncapped_r2 status=ok rc=0 elapsed=117.905s thr=16962t/s peak=328MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=5 p95=1279 p99=1400
+[run-eval] label=ref_2000k_uncapped_r3 variant=inmem_uncapped cap=none spill=off P=1 emit_lag=2000000 pool=16000 threads=4 wbuf=0 cache=0
+[run-eval] RESULT ref_2000k_uncapped_r3 status=ok rc=0 elapsed=117.486s thr=17023t/s peak=331MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=5 p95=1284 p99=1397
+=== E3 matrix done Mon May 25 17:30:25 CEST 2026 ===
+results: /Users/oblision/Desktop/Desktop/Uni_TI_BS/Bachelor Arbeit/Bachelor-Thesis/nebulastream-Out-of-Core-Stream-Processing/.planning/eval-phase/e3/runs.tsv

@@ -1,0 +1,42 @@
+# name: aggregation/SpillSmoke.test
+# description: E0 smoke - tumbling GROUP BY SUM aggregation over a Generator source. Drives
+#   large keyed window-aggregation state to (a) OOM-kill the in-memory store under a hard memory
+#   ceiling and (b) exercise the spillable (out-of-core) store. Run-and-observe: there is NO valid
+#   expected-output block (the row below is a deliberate placeholder), so the query is reported as
+#   FAILED on output-mismatch in normal mode -- that is expected for E0. Read the EXIT CODE
+#   (137 = cgroup OOM-kill) + the spill DEBUG log instead. See E0-SMOKE-RESULTS.md.
+# groups: [Aggregation, Spill]
+#
+# == How state size is controlled (Generator semantics, verified from source) ==
+# Every SEQUENCE field advances by `step` per tuple and CLAMPS (does NOT wrap) at `end`; total
+# tuples = max over fields of (end-start)/step; STOP='ALL' ends the run when all fields reach end.
+# 'emit_rate 50000000' removes the default 1000 tuples/s throttle (else a 1M-tuple run takes ~20 min).
+#   entrySize ~= 40 B (u64 key + u64 sum + ChainedHashMapEntry header) => entriesPerPage=25, page=1024B.
+#
+# This canonical instance = ONE giant tumbling window (ts clamps at 500 < window 100000ms, so ALL
+# ~6M distinct keys land in window [0,100000)). That single hash map (~240 MB resident) OOM-kills
+# the in-memory store at a 512 MB ceiling. NOTE (E0 finding): a single window is always the HOT
+# (actively-built) slice and therefore CANNOT be spilled, so spill-ON also OOMs here. To make the
+# spill governor evict, state must live in COLD (sliceEnd < build-watermark, not-yet-emitted)
+# slices, which a monotonic-timestamp tumbling query does not produce in steady state (the engine
+# couples watermark-advance to immediate emit). See E0-SMOKE-RESULTS.md "Structural blocker".
+# To grow MANY windows instead of one giant one, raise the ts span (3rd SEQUENCE end) above the
+# window size, e.g. ts 0..2000000 with WINDOW 100000 ms => 20 windows.
+
+CREATE LOGICAL SOURCE s(key UINT64 NOT NULL, val UINT64 NOT NULL, ts UINT64 NOT NULL);
+CREATE PHYSICAL SOURCE FOR s TYPE Generator SET(
+    1 AS `SOURCE`.SEED,
+    'ALL' AS `SOURCE`.STOP_GENERATOR_WHEN_SEQUENCE_FINISHES,
+    'emit_rate 50000000' AS `SOURCE`.GENERATOR_RATE_CONFIG,
+    'SEQUENCE UINT64 0 6000000 1, SEQUENCE UINT64 0 100 1, SEQUENCE UINT64 0 500 1' AS `SOURCE`.GENERATOR_SCHEMA
+);
+
+CREATE SINK out(s.start UINT64 NOT NULL, s.end UINT64 NOT NULL, s.key UINT64 NOT NULL, s.sumVal UINT64 NOT NULL) TYPE File;
+
+SELECT start, end, key, SUM(val) AS sumVal
+FROM s
+GROUP BY key
+WINDOW TUMBLING(ts, size 100000 ms)
+INTO out;
+----
+0,100000,0,0

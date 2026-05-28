@@ -1,0 +1,20 @@
+# 5M-key uniform workload — pushes total window state high enough that even the in-memory baseline OOMs
+# at 320/512 MB (strengthens the §3.3.1 result). Same shape as phase0c, SEQUENCE 0..5,000,000 => 50 windows.
+# groups: [Spill, E3Big, ManualOnly]
+
+CREATE LOGICAL SOURCE s(key UINT64 NOT NULL, val UINT64 NOT NULL, ts UINT64 NOT NULL);
+CREATE PHYSICAL SOURCE FOR s TYPE Generator SET(
+    1 AS `SOURCE`.SEED,
+    'ALL' AS `SOURCE`.STOP_GENERATOR_WHEN_SEQUENCE_FINISHES,
+    'emit_rate 50000000' AS `SOURCE`.GENERATOR_RATE_CONFIG,
+    'SEQUENCE UINT64 0 5000000 1, SEQUENCE UINT64 0 100 1, SEQUENCE UINT64 0 5000000 1' AS `SOURCE`.GENERATOR_SCHEMA
+);
+
+CREATE SINK out(s.start UINT64 NOT NULL, s.end UINT64 NOT NULL, s.key UINT64 NOT NULL, s.sumVal UINT64 NOT NULL) TYPE Void;
+
+SELECT start, end, key, SUM(val) AS sumVal
+FROM s
+GROUP BY key
+WINDOW TUMBLING(ts, size 100000 ms)
+INTO out;
+----

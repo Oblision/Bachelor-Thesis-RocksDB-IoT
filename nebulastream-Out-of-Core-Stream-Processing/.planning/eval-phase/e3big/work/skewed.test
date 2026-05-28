@@ -1,0 +1,25 @@
+# Skewed-key workload (proposal §3.1 "skewed smart-city sensor streams"). The Generator's integer
+# NORMAL_DISTRIBUTION maps to std::binomial_distribution(t, p): output in [0, t], mean t*p, var t*p*(1-p).
+# Here key = NORMAL_DISTRIBUTION UINT64 2000000 0.5  => concentrated near 1,000,000 (hot keys) with a tail
+# => a HOT-KEY / lower-cardinality contrast to the uniform (all-distinct, cold-key) workload.
+# NOTE/limitation: the Generator cannot produce broad Zipf skew over a wide key range (binomial is narrow for
+# large t); this exercises hot-key skew, not long-tail Zipf. ts stays SEQUENCE (monotonic event time for windows).
+# VERIFY during validation: confirm it parses + how many distinct keys it actually yields.
+# groups: [Spill, E3Big, ManualOnly]
+
+CREATE LOGICAL SOURCE s(key UINT64 NOT NULL, val UINT64 NOT NULL, ts UINT64 NOT NULL);
+CREATE PHYSICAL SOURCE FOR s TYPE Generator SET(
+    1 AS `SOURCE`.SEED,
+    'ALL' AS `SOURCE`.STOP_GENERATOR_WHEN_SEQUENCE_FINISHES,
+    'emit_rate 50000000' AS `SOURCE`.GENERATOR_RATE_CONFIG,
+    'NORMAL_DISTRIBUTION UINT64 2000000 0.5, SEQUENCE UINT64 0 100 1, SEQUENCE UINT64 0 2000000 1' AS `SOURCE`.GENERATOR_SCHEMA
+);
+
+CREATE SINK out(s.start UINT64 NOT NULL, s.end UINT64 NOT NULL, s.key UINT64 NOT NULL, s.sumVal UINT64 NOT NULL) TYPE Void;
+
+SELECT start, end, key, SUM(val) AS sumVal
+FROM s
+GROUP BY key
+WINDOW TUMBLING(ts, size 100000 ms)
+INTO out;
+----

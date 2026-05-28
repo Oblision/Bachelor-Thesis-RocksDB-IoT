@@ -1,6 +1,26 @@
 # Build artifacts
 Microbenchmark-BA/rocksdb/build/
 
+# Bachelor-Thesis/ is its own git repo (Oblision/bachelor-thesis, TU Berlin
+# thesis-template upstream) for the LaTex thesis. NOT tracked by this wrapper.
+/Bachelor-Thesis/
+
+# Vendored NES OOC build artifacts (DO NOT commit cmake-build-debug — ~14 GB)
+/nebulastream-Out-of-Core-Stream-Processing/cmake-build-debug/
+/nebulastream-Out-of-Core-Stream-Processing/cmake-build-*/
+/nebulastream-Out-of-Core-Stream-Processing/build/
+/nebulastream-Out-of-Core-Stream-Processing/.idea/
+/nebulastream-Out-of-Core-Stream-Processing/systest.log
+
+# Eval harness scratch (10k+ TSV/log files, generated, large)
+/nebulastream-Out-of-Core-Stream-Processing/.planning/eval-phase/e3big/results/
+/nebulastream-Out-of-Core-Stream-Processing/.planning/eval-phase/e3big/logs/
+/nebulastream-Out-of-Core-Stream-Processing/.planning/eval-phase/e3big/launch.out
+/nebulastream-Out-of-Core-Stream-Processing/.planning/eval-phase/e3big/launch.pid
+/nebulastream-Out-of-Core-Stream-Processing/.planning/eval-phase/e3big/jobs.txt
+/nebulastream-Out-of-Core-Stream-Processing/.planning/eval-phase/e3big/val*.out
+/nebulastream-Out-of-Core-Stream-Processing/.planning/eval-phase/e3big/val*.txt
+
 # Python
 __pycache__/
 *.pyc

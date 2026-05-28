@@ -1,0 +1,381 @@
+#!/bin/bash
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+#    https://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+set -e
+
+# Enable Docker BuildKit, which is required by our Dockerfiles (they use
+# BuildKit-only features such as --mount, --chmod, --checksum, and --secret).
+export DOCKER_BUILDKIT=1
+
+# BuildKit requires Docker >= 18.09. Check early to give a clear error message.
+DOCKER_VERSION=$(docker version --format '{{.Server.Version}}' 2>/dev/null || echo "0.0.0")
+DOCKER_MAJOR=$(echo "$DOCKER_VERSION" | cut -d. -f1)
+DOCKER_MINOR=$(echo "$DOCKER_VERSION" | cut -d. -f2)
+if [ "$DOCKER_MAJOR" -lt 18 ] || { [ "$DOCKER_MAJOR" -eq 18 ] && [ "$DOCKER_MINOR" -lt 9 ]; }; then
+    echo "Error: Docker >= 18.09 is required for BuildKit support (found $DOCKER_VERSION)."
+    echo "Please upgrade Docker: https://docs.docker.com/engine/install/"
+    exit 1
+fi
+
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+usage() {
+    echo "Usage: $0 [-y|--yes] [-l|--local] [-r|--rootless] [--libstdcxx|--libcxx] [--address|--thread|--undefined|--no-sanitizer] [--name] [--no-vcpkg-cache]"
+    echo "Options:"
+    echo "  -y, --yes            Non-interactive mode (requires --libstdcxx or --libcxx and a sanitizer option)"
+    echo "  -l, --local          Build all Docker images locally"
+    echo "  -r, --rootless       Force rootless Docker mode"
+    echo "  --libstdcxx          Use libstdcxx standard library"
+    echo "  --libcxx             Use libcxx standard library"
+    echo "  --address            Enable Address Sanitizer"
+    echo "  --thread             Enable Thread Sanitizer"
+    echo "  --undefined          Enable Undefined Behavior Sanitizer"
+    echo "  --no-sanitizer       Disable sanitizers (use no sanitizer)"
+    echo "  --name               Add a name suffix to the tag (nes-development:local-<name>)"
+    echo "  --no-vcpkg-cache     Disable vcpkg binary caching (by default uses public read-only cache)"
+    echo ""
+    echo "Environment variables for S3-compatible vcpkg binary caching (local builds only):"
+    echo "  VCPKG_CACHE_ACCESS_KEY   S3 access key (enables authenticated readwrite cache)"
+    echo "  VCPKG_CACHE_SECRET_KEY   S3 secret key"
+    echo "  VCPKG_CACHE_ENDPOINT     S3 endpoint URL (e.g. https://<id>.r2.cloudflarestorage.com)"
+    echo "  VCPKG_CACHE_BUCKET       S3 bucket name (default: nes-vcpkg-cache)"
+    echo "  VCPKG_CACHE_REGION       S3 region (default: auto)"
+    echo "  VCPKG_CACHE_PUBLIC_URL   Public read-only cache URL (set automatically if no credentials provided)"
+    exit 1
+}
+
+# If set we built rebuilt all docker images locally
+NON_INTERACTIVE=0
+BUILD_LOCAL=0
+FORCE_ROOTLESS=0
+STDLIB=""
+SANITIZER=""
+NAME_SUFFIX=""
+DISABLE_VCPKG_CACHE=0
+
+while [[ "$#" -gt 0 ]]; do
+    case "$1" in
+        -y|--yes)
+            NON_INTERACTIVE=1
+            shift
+            ;;
+        -l|--local)
+            BUILD_LOCAL=1
+            shift
+            ;;
+        -r|--rootless)
+            FORCE_ROOTLESS=1
+            shift
+            ;;
+        --libstdcxx)
+            echo "Set the standard library to libstdcxx"
+            STDLIB=libstdcxx
+            shift
+            ;;
+        --libcxx)
+            echo "Set the standard library to libcxx"
+            STDLIB=libcxx
+            shift
+            ;;
+        --address)
+            echo "Enabling Address Sanitizer"
+            SANITIZER="address"
+            shift
+            ;;
+        --thread)
+            echo "Enabling Thread Sanitizer"
+            SANITIZER="thread"
+            shift
+            ;;
+        --undefined)
+            echo "Enabling Undefined Behavior Sanitizer"
+            SANITIZER="undefined"
+            shift
+            ;;
+        --no-sanitizer)
+            echo "Disabling sanitizers"
+            SANITIZER="none"
+            shift
+            ;;
+        --no-vcpkg-cache)
+            DISABLE_VCPKG_CACHE=1
+            shift
+            ;;
+        --name)
+            if [[ -n "$2" && ! "$2" =~ ^- ]]; then
+                NAME_SUFFIX="$2"
+                echo "Using name suffix: ${NAME_SUFFIX}"
+                shift 2
+            else
+                echo "Error: --name requires a name argument"
+                usage
+            fi
+            ;;
+        -h|--help)
+            usage
+            ;;
+        -*)
+            echo "Unknown option: $1"
+            usage
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
+
+# Check if the standard library is set, otherwise prompt the user
+if [[ "$STDLIB" != "libcxx" && "$STDLIB" != "libstdcxx" ]]; then
+  if [ "$NON_INTERACTIVE" = 1 ]; then
+    echo -e "${RED}Error: Non-interactive mode requires either --libstdcxx or --libcxx to be specified${NC}"
+    usage
+  fi
+  echo "Please choose a standard library implementation:"
+    echo "1. llvm libc++ "
+    echo "2. gcc libstdc++ "
+    read -p "Enter the number (1 or 2): " -r
+    case $REPLY in
+      1) STDLIB="libcxx" ;;
+      2) STDLIB="libstdcxx" ;;
+      *)
+        echo "Invalid option. Please re-run the script and select 1 or 2."
+        exit 1
+        ;;
+    esac
+fi
+
+# Check if the sanitizer is set, otherwise prompt the user
+if [[ "$SANITIZER" != "address" && "$SANITIZER" != "thread" && "$SANITIZER" != "undefined" && "$SANITIZER" != "none" ]]; then
+  if [ "$NON_INTERACTIVE" = 1 ]; then
+    echo -e "${RED}Error: Non-interactive mode requires --address, --thread, --undefined, or --no-sanitizer to be specified${NC}"
+    usage
+  fi
+  echo "Please choose a sanitizer (or none):"
+    echo "1. none"
+    echo "2. Address Sanitizer"
+    echo "3. Thread Sanitizer"
+    echo "4. Undefined Behavior Sanitizer"
+    read -p "Enter the number (1-4): " -r
+    case $REPLY in
+      1) SANITIZER="none" ;;
+      2) SANITIZER="address" ;;
+      3) SANITIZER="thread" ;;
+      4) SANITIZER="undefined" ;;
+      *)
+        echo "Invalid option. Please re-run the script and select 1-4."
+        exit 1
+        ;;
+    esac
+fi
+
+# If name suffix not set via command line, ask the user
+if [[ -z "$NAME_SUFFIX" ]]; then
+  if [ "$NON_INTERACTIVE" = 0 ]; then
+    read -p "Do you want to specify a name for the Docker image? [y/N] " -r
+    if [[ $REPLY =~ ^([yY][eE][sS]|[yY])$ ]]; then
+      read -p "Enter the name suffix for the tag (image will be nes-development:local-<suffix>): " -r NAME_SUFFIX
+      if [[ -z "$NAME_SUFFIX" ]]; then
+        echo "No name provided, using default image name"
+      else
+        echo "Using name suffix: ${NAME_SUFFIX}"
+      fi
+    fi
+  fi
+fi
+
+# Construct the final image name
+if [[ -n "$NAME_SUFFIX" ]]; then
+  FINAL_IMAGE_NAME="nebulastream/nes-development:local-${NAME_SUFFIX}"
+else
+  FINAL_IMAGE_NAME="nebulastream/nes-development:local"
+fi
+
+# Ask for confirmation of settings
+echo # Move to a new line after input
+echo "Build configuration:"
+echo "- Standard library: ${STDLIB}"
+echo "- Sanitizer: ${SANITIZER}"
+echo "- Image name: ${FINAL_IMAGE_NAME}"
+if [ "$NON_INTERACTIVE" = 0 ]; then
+  read -p "Is this configuration correct? [Y/n] " -r
+  echo # Move to a new line after input
+  input=${REPLY:-Y}
+  if [[ ! $input =~ ^([yY][eE][sS]|[yY])$ ]]; then
+    echo "Please re-run the script with the correct options."
+    exit 1
+  fi
+else
+  echo "Running in non-interactive mode, proceeding with configuration..."
+fi
+
+cd "$(git rev-parse --show-toplevel)"
+HASH=$(docker/dependency/hash_dependencies.sh)
+ARCH=$(uname -m)
+if [ "$ARCH" == "x86_64" ]; then
+   ARCH="x64"
+elif [[ "$ARCH" == "aarch64" || "$ARCH" == "arm64" ]]; then
+   ARCH="arm64"
+else
+  echo -e "${RED}Arch: $ARCH is not supported. Only x86_64 and aarch64|arm64 are handled. Arch is determined using 'uname -m'${NC}"
+  exit 1
+fi
+TAG=${HASH}-${ARCH}-${STDLIB}-${SANITIZER}
+
+# Docker on macOS appears to always enable the mapping from the container root user to the hosts current
+# user
+if [[ $OSTYPE == 'darwin'* ]]; then
+  FORCE_ROOTLESS=1
+fi
+
+# If Docker is running in rootless mode, the root user inside the container
+# maps to the user running the rootless Docker daemon (likely the current user).
+# Therefore, we can safely use the root user within the container.
+# If rootless mode is not detected, we install the current user into the container.
+# This assumes there is no custom user mapping between the host and container, which is reasonable.
+USE_ROOTLESS=false
+USE_UID=$(id -u)
+USE_GID=$(id -g)
+USE_USERNAME=$(whoami)
+if docker info -f "{{println .SecurityOptions}}" | grep -q rootless || [ "$FORCE_ROOTLESS" = 1 ]; then
+  echo "Detected docker rootless mode. Container internal user will be root"
+  USE_ROOTLESS=true
+  USE_UID=0
+  USE_GID=0
+  USE_USERNAME=root
+fi
+
+
+# Set default public vcpkg cache URL if no S3 credentials are set and caching is not disabled
+VCPKG_CACHE_DEFAULT_PUBLIC_URL="https://pub-5953001ad2a543df8a2121726cf1908b.r2.dev"
+if [[ "$DISABLE_VCPKG_CACHE" -eq 0 && -z "$VCPKG_CACHE_ACCESS_KEY" && -z "$VCPKG_CACHE_PUBLIC_URL" ]]; then
+  export VCPKG_CACHE_PUBLIC_URL="$VCPKG_CACHE_DEFAULT_PUBLIC_URL"
+fi
+if [[ "$DISABLE_VCPKG_CACHE" -eq 1 ]]; then
+  unset VCPKG_CACHE_PUBLIC_URL
+  unset VCPKG_CACHE_ACCESS_KEY
+fi
+
+if [ $BUILD_LOCAL -eq 1 ]; then
+  echo "Building local docker images using hash: ${HASH}."
+  echo "This might take a while..."
+  docker build -f docker/dependency/Base.dockerfile -t nebulastream/nes-development-base:local .
+
+  CACHE_ARGS=""
+  export VCPKG_CACHE_BUCKET="${VCPKG_CACHE_BUCKET:-nes-vcpkg-cache}"
+  export VCPKG_CACHE_REGION="${VCPKG_CACHE_REGION:-auto}"
+  if [[ -n "$VCPKG_CACHE_ACCESS_KEY" && -n "$VCPKG_CACHE_SECRET_KEY" && -n "$VCPKG_CACHE_ENDPOINT" ]]; then
+      echo "S3 credentials found. Building with authenticated readwrite cache (bucket: ${VCPKG_CACHE_BUCKET})..."
+      CACHE_ARGS="--secret id=VCPKG_CACHE_ACCESS_KEY,env=VCPKG_CACHE_ACCESS_KEY"
+      CACHE_ARGS="$CACHE_ARGS --secret id=VCPKG_CACHE_SECRET_KEY,env=VCPKG_CACHE_SECRET_KEY"
+      CACHE_ARGS="$CACHE_ARGS --secret id=VCPKG_CACHE_ENDPOINT,env=VCPKG_CACHE_ENDPOINT"
+      CACHE_ARGS="$CACHE_ARGS --secret id=VCPKG_CACHE_BUCKET,env=VCPKG_CACHE_BUCKET"
+      CACHE_ARGS="$CACHE_ARGS --secret id=VCPKG_CACHE_REGION,env=VCPKG_CACHE_REGION"
+  elif [[ -n "$VCPKG_CACHE_PUBLIC_URL" ]]; then
+      echo "Using public read-only cache: ${VCPKG_CACHE_PUBLIC_URL}"
+      CACHE_ARGS="--build-arg VCPKG_CACHE_PUBLIC_URL=${VCPKG_CACHE_PUBLIC_URL}"
+  else
+      echo "No cache configured. Building without cloud cache..."
+  fi
+
+  docker build -f docker/dependency/Dependency.dockerfile \
+          --build-arg VCPKG_DEPENDENCY_HASH="${HASH}" \
+          --build-arg TAG=local \
+          --build-arg STDLIB="${STDLIB}" \
+          --build-arg ARCH="${ARCH}" \
+          --build-arg SANITIZER="${SANITIZER}" \
+          $CACHE_ARGS \
+          -t nebulastream/nes-development-dependency:local .
+
+  docker build -f docker/dependency/Development.dockerfile \
+            --build-arg TAG=local \
+            -t nebulastream/nes-development:default .
+
+  docker build -f docker/dependency/DevelopmentLocal.dockerfile \
+               -t ${FINAL_IMAGE_NAME} \
+               --build-arg UID=${USE_UID} \
+               --build-arg GID=${USE_GID} \
+               --build-arg USERNAME=${USE_USERNAME} \
+               --build-arg ROOTLESS=${USE_ROOTLESS} \
+               --build-arg TAG=default .
+else
+  if ! docker manifest inspect nebulastream/nes-development:${TAG} > /dev/null 2>&1 ; then
+   echo -e "${RED}Remote image development image for hash ${TAG} does not exist.
+Either build locally with the -l option, or open a PR (draft) and let the CI build the development image${NC}"
+   exit 1
+  fi
+
+  echo "Basing local development image on remote on nebulastream/nes-development:${TAG}"
+  docker build -f docker/dependency/DevelopmentLocal.dockerfile \
+               -t ${FINAL_IMAGE_NAME} \
+               --build-arg UID=${USE_UID} \
+               --build-arg GID=${USE_GID} \
+               --build-arg USERNAME=${USE_USERNAME} \
+               --build-arg ROOTLESS=${USE_ROOTLESS} \
+               --build-arg TAG=${TAG} .
+fi
+
+# Detect the docker socket path (works for both rootful and rootless Docker)
+DOCKER_SOCKET=""
+
+# Try to get docker socket path from context
+DOCKER_CONTEXT_HOST=$(docker context inspect --format '{{.Endpoints.docker.Host}}' 2>/dev/null || echo "")
+if [ -n "$DOCKER_CONTEXT_HOST" ]; then
+    # Extract path from unix:///path/to/docker.sock format
+    DOCKER_SOCKET=$(echo "$DOCKER_CONTEXT_HOST" | sed 's|^unix://||')
+fi
+
+# Fallback: Check common locations
+if [ ! -S "$DOCKER_SOCKET" ]; then
+    # Try rootless location
+    if [ -S "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/docker.sock" ]; then
+        DOCKER_SOCKET="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/docker.sock"
+    # Try rootful location
+    elif [ -S "/var/run/docker.sock" ]; then
+        DOCKER_SOCKET="/var/run/docker.sock"
+    else
+        DOCKER_SOCKET="/var/run/docker.sock"  # Default fallback
+    fi
+fi
+
+echo ""
+echo "========================================================================================"
+echo "Docker Development Environment Setup Complete!"
+echo "========================================================================================"
+echo ""
+echo "To enable Docker-in-Docker testing, mount the docker socket:"
+echo ""
+if [ -S "$DOCKER_SOCKET" ]; then
+    echo "Detected docker socket at: $DOCKER_SOCKET"
+    echo ""
+    echo "Command line:"
+    echo "  docker run -v $DOCKER_SOCKET:/var/run/docker.sock \\"
+    echo "    -v \$(pwd):\$(pwd) -w \$(pwd) nebulastream/nes-development:local"
+    echo ""
+    echo "CLion Docker Toolchain (Settings → Docker → Container settings → Run options):"
+    echo "  -v $DOCKER_SOCKET:/var/run/docker.sock"
+else
+    echo "Warning: Could not detect docker socket automatically."
+    echo ""
+    echo "Rootful Docker (default):"
+    echo "  -v /var/run/docker.sock:/var/run/docker.sock"
+    echo ""
+    echo "Rootless Docker (typical):"
+    echo "  -v \$XDG_RUNTIME_DIR/docker.sock:/var/run/docker.sock"
+    echo "  or"
+    echo "  -v /run/user/\$(id -u)/docker.sock:/var/run/docker.sock"
+fi
+echo ""
+echo "Note: Docker CLI connects to host Docker daemon via socket. No isolation namespace."
+echo "========================================================================================"

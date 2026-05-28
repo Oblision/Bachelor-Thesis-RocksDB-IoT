@@ -1,0 +1,37 @@
+# name: aggregation/SpillSmoke.test
+# description: E0-REDO smoke - tumbling GROUP BY SUM over a Generator source, MANY completed windows.
+#   With the Increment-C emit-decouple, emit_lag (CLI: --worker.default_query_execution.spill.emit_lag, ms)
+#   RETAINS a backlog of COMPLETED windows; those are cold-but-unemitted => spillable (the breadth case).
+#   Run-and-observe: NO valid expected-output block (placeholder below), so the query reports FAILED on
+#   output-mismatch in normal mode -- expected for E0. Read the EXIT CODE (137 = cgroup OOM-kill), the
+#   spill DEBUG log, and the RocksDB spill dir size instead. See E0-SMOKE-RESULTS.md + E0-REDO-RESULTS.md.
+# groups: [Aggregation, Spill]
+#
+# == Generator semantics (verified) ==
+# Every SEQUENCE field advances by `step` per tuple and CLAMPS at `end` (no wrap); total tuples = max over
+# fields of (end-start)/step; STOP='ALL' ends when all fields reach end. 'emit_rate 50000000' removes the
+# default 1000 tup/s throttle. entrySize ~= 40 B (u64 key + u64 sum + header) => entriesPerPage=25, page=1024B.
+#
+# This instance: key/ts both step 1 over 0..2,000,000 (=> 2,000,001 tuples, all-distinct keys, ts 0..2,000,000);
+# WINDOW 100000 ms => ~20 completed windows of ~100,000 distinct keys each. With emit_lag large enough to retain
+# the completed windows, the retained band (~2M keys ~= 600 MB real RSS) exceeds a 512 MB ceiling: spill OFF OOMs
+# (137), spill ON evicts the cold-but-unemitted completed windows to RocksDB and survives. Unlike the original E0's
+# single giant HOT window (depth, unspillable), these are COMPLETED windows (breadth) and ARE spillable.
+
+CREATE LOGICAL SOURCE s(key UINT64 NOT NULL, val UINT64 NOT NULL, ts UINT64 NOT NULL);
+CREATE PHYSICAL SOURCE FOR s TYPE Generator SET(
+    1 AS `SOURCE`.SEED,
+    'ALL' AS `SOURCE`.STOP_GENERATOR_WHEN_SEQUENCE_FINISHES,
+    'emit_rate 50000000' AS `SOURCE`.GENERATOR_RATE_CONFIG,
+    'SEQUENCE UINT64 0 2000000 1, SEQUENCE UINT64 0 100 1, SEQUENCE UINT64 0 2000000 1' AS `SOURCE`.GENERATOR_SCHEMA
+);
+
+CREATE SINK out(s.start UINT64 NOT NULL, s.end UINT64 NOT NULL, s.key UINT64 NOT NULL, s.sumVal UINT64 NOT NULL) TYPE File;
+
+SELECT start, end, key, SUM(val) AS sumVal
+FROM s
+GROUP BY key
+WINDOW TUMBLING(ts, size 100000 ms)
+INTO out;
+----
+0,100000,0,0

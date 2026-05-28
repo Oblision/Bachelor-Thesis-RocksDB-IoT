@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Out-of-Core Stream Processing in NebulaStream — Summary</title>
+<style>
+  :root{
+    --s1:.25rem; --s2:.5rem; --s3:.75rem; --s4:1rem; --s5:1.5rem; --s6:2rem; --s7:3rem; --s8:4rem;
+    --ink:#1a2230; --muted:#5b6677; --faint:#8a93a3; --line:#e2e7ee; --bg:#f4f6f9; --card:#ffffff;
+    --accent:#2f6f8f; --accent2:#3a7ca5; --ok:#1c7c4a; --okbg:#e6f4ec; --bad:#b3263b; --badbg:#fbe9ec;
+    --warn:#9a6a00; --warnbg:#fdf3df; --rock:#5a4a8a; --rockbg:#efeaf8;
+    --radius:12px; --maxw:880px; --mono:"SF Mono",ui-monospace,"Cascadia Code",Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.6;
+       font-size:16px;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:var(--s5) var(--s4);}
+
+  /* ---- masthead ---- */
+  header.top{background:linear-gradient(135deg,#23394a,#2f6f8f);color:#fff;border-radius:var(--radius);
+       padding:var(--s7) var(--s6);margin-bottom:var(--s6);}
+  header.top .kicker{text-transform:uppercase;letter-spacing:.14em;font-size:.72rem;opacity:.85;margin:0 0 var(--s3);}
+  header.top h1{font-size:clamp(1.6rem,4vw,2.3rem);line-height:1.2;margin:0 0 var(--s3);font-weight:700;}
+  header.top p.sub{margin:0;font-size:1.02rem;opacity:.92;max-width:60ch;}
+  .toc{display:flex;flex-wrap:wrap;gap:var(--s2);margin-top:var(--s5);}
+  .toc a{color:#fff;text-decoration:none;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);
+       padding:var(--s2) var(--s3);border-radius:999px;font-size:.82rem;transition:background .2s ease;}
+  .toc a:hover{background:rgba(255,255,255,.28);}
+
+  /* ---- pages ---- */
+  .page{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+       padding:var(--s7) var(--s6);margin-bottom:var(--s6);box-shadow:0 1px 2px rgba(20,30,50,.04);}
+  .page-head{display:flex;align-items:center;gap:var(--s3);margin-bottom:var(--s5);
+       border-bottom:2px solid var(--line);padding-bottom:var(--s4);}
+  .pageno{flex:0 0 auto;width:2.4rem;height:2.4rem;border-radius:50%;background:var(--accent);color:#fff;
+       display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.05rem;}
+  .page-head h2{margin:0;font-size:1.5rem;line-height:1.25;font-weight:700;}
+  .page-head .tag{margin-left:auto;font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;}
+  h3{font-size:1.08rem;margin:var(--s6) 0 var(--s3);font-weight:650;color:var(--accent);}
+  p{margin:0 0 var(--s4);max-width:72ch;}
+  ul{margin:0 0 var(--s4);padding-left:var(--s5);} li{margin:0 0 var(--s2);max-width:70ch;}
+  strong{font-weight:650;} .em{color:var(--accent);font-weight:600;}
+
+  /* ---- diagrams (flex/grid + gap => never overlap) ---- */
+  .diagram{background:#fafbfd;border:1px solid var(--line);border-radius:var(--radius);
+       padding:var(--s6);margin:var(--s5) 0;}
+  .flow{display:flex;flex-wrap:wrap;align-items:stretch;justify-content:center;gap:var(--s3);}
+  .node{background:var(--card);border:1.5px solid var(--accent2);border-radius:10px;
+       padding:var(--s3) var(--s4);min-width:7.5rem;text-align:center;font-size:.86rem;line-height:1.35;
+       display:flex;flex-direction:column;justify-content:center;gap:var(--s1);}
+  .node .nt{font-weight:650;color:var(--ink);} .node .nd{font-size:.74rem;color:var(--muted);}
+  .node.warnnode{border-color:var(--bad);background:var(--badbg);}
+  .node.okk{border-color:var(--ok);background:var(--okbg);}
+  .node.rock{border-color:var(--rock);background:var(--rockbg);}
+  .arrow{display:flex;align-items:center;justify-content:center;color:var(--faint);font-size:1.4rem;
+       flex:0 0 auto;min-width:1.4rem;}
+  .vstack{display:flex;flex-direction:column;gap:var(--s3);}
+  .vstack .arrow{transform:rotate(90deg);align-self:center;}
+  .dcap{text-align:center;font-size:.78rem;color:var(--muted);margin-top:var(--s4);font-style:italic;}
+
+  /* ladder diagram (3 discoveries) */
+  .ladder{display:grid;gap:var(--s4);}
+  .rung{display:grid;grid-template-columns:2.2rem 1fr;gap:var(--s4);align-items:start;
+       background:var(--card);border:1px solid var(--line);border-left:4px solid var(--accent);
+       border-radius:10px;padding:var(--s4) var(--s5);}
+  .rung .num{background:var(--accent);color:#fff;border-radius:50%;width:2.2rem;height:2.2rem;
+       display:flex;align-items:center;justify-content:center;font-weight:700;}
+  .rung h4{margin:0 0 var(--s2);font-size:1rem;} .rung p{margin:0;font-size:.9rem;color:var(--muted);}
+  .rung .fix{display:inline-block;margin-top:var(--s2);font-size:.82rem;color:var(--ok);font-weight:600;}
+
+  /* partition split diagram */
+  .parts{display:grid;grid-template-columns:repeat(auto-fit,minmax(4rem,1fr));gap:var(--s2);margin-top:var(--s3);}
+  .part{background:var(--rockbg);border:1px solid var(--rock);border-radius:8px;padding:var(--s2);
+       text-align:center;font-size:.72rem;color:var(--rock);font-weight:600;}
+  .part.lit{background:var(--rock);color:#fff;}
+
+  /* ---- figures ---- */
+  figure{margin:var(--s5) 0;background:#fff;border:1px solid var(--line);border-radius:var(--radius);
+       padding:var(--s4);overflow:hidden;}
+  figure img{display:block;width:100%;height:auto;border-radius:6px;}
+  figcaption{font-size:.82rem;color:var(--muted);margin-top:var(--s3);line-height:1.5;text-align:center;}
+
+  /* ---- code ---- */
+  pre{background:#1f2733;color:#e7edf5;border-radius:10px;padding:var(--s4) var(--s5);overflow-x:auto;
+       margin:var(--s4) 0;font-size:.82rem;line-height:1.6;}
+  pre code{font-family:var(--mono);} code:not(pre code){font-family:var(--mono);font-size:.85em;
+       background:#eef1f6;padding:.1em .4em;border-radius:5px;color:#33415a;}
+  .cm{color:#8aa0b8;} .kw{color:#9ad0ff;} .st{color:#bced9b;} .nm{color:#ffd591;}
+
+  /* ---- callouts / stats ---- */
+  .callout{border-radius:10px;padding:var(--s4) var(--s5);margin:var(--s5) 0;border:1px solid;font-size:.92rem;}
+  .callout.warn{background:var(--warnbg);border-color:#ecc98a;}
+  .callout.key{background:var(--okbg);border-color:#a9d9bd;}
+  .callout .lead{font-weight:700;display:block;margin-bottom:var(--s2);}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(8.5rem,1fr));gap:var(--s3);margin:var(--s5) 0;}
+  .stat{background:#fafbfd;border:1px solid var(--line);border-radius:10px;padding:var(--s4);text-align:center;}
+  .stat .v{font-size:1.5rem;font-weight:700;color:var(--accent);line-height:1.1;}
+  .stat .l{font-size:.74rem;color:var(--muted);margin-top:var(--s2);line-height:1.35;}
+  .stat.good .v{color:var(--ok);} .stat.bad .v{color:var(--bad);}
+
+  /* ---- table ---- */
+  table{width:100%;border-collapse:collapse;margin:var(--s4) 0;font-size:.85rem;}
+  th,td{padding:var(--s2) var(--s3);text-align:left;border-bottom:1px solid var(--line);}
+  th{background:#f0f3f7;font-weight:650;font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);}
+  td.ok{color:var(--ok);font-weight:600;} td.bad{color:var(--bad);font-weight:600;}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:var(--s5);}
+  @media(max-width:680px){.two{grid-template-columns:1fr;}}
+
+  footer{color:var(--faint);font-size:.78rem;text-align:center;padding:var(--s5) 0 var(--s7);}
+  @media print{ body{background:#fff;} .page{break-after:page;box-shadow:none;border:1px solid var(--line);
+       padding:var(--s6) var(--s5);} header.top{break-after:page;} .toc{display:none;}
+       .callout,figure,pre,.rung,.diagram,.stats,table,.two{break-inside:avoid;}
+       .page-head{break-after:avoid;} h3{break-after:avoid;} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <p class="kicker">Bachelor Thesis · TU Berlin · DIMA</p>
+    <h1>Out-of-Core Stream Processing in NebulaStream</h1>
+    <p class="sub">Spilling tumbling windowed-aggregation state to RocksDB so a query whose state exceeds RAM
+       completes instead of being OOM-killed — design, implementation, and evaluation.</p>
+    <nav class="toc">
+      <a href="#p1">1 · Problem &amp; Goal</a>
+      <a href="#p2">2 · The System</a>
+      <a href="#p3">3 · Three Discoveries</a>
+      <a href="#p4">4 · Partition-at-Spill</a>
+      <a href="#p5">5 · Evaluation</a>
+    </nav>
+  </header>
+
+  <!-- ============ PAGE 1 ============ -->
+  <section class="page" id="p1">
+    <div class="page-head"><div class="pageno">1</div><h2>The problem and the goal</h2><span class="tag">Motivation</span></div>
+
+    <p>NebulaStream (NES) is a <strong>push-based stream processor</strong>. A windowed aggregation such as
+       <code>GROUP&nbsp;BY key WINDOW TUMBLING</code> keeps one hash map of partial results <em>per window</em> in
+       memory. For long windows or many distinct keys — think city-scale IoT sensor streams — this state can grow
+       larger than RAM, and the engine is <strong>OOM-killed</strong>.</p>
+
+    <div class="diagram">
+      <div class="flow">
+        <div class="node"><span class="nt">Source</span><span class="nd">tuples (key, val, ts)</span></div>
+        <div class="arrow">→</div>
+        <div class="node warnnode"><span class="nt">Slice store</span><span class="nd">per-window hash maps<br><strong>in RAM</strong></span></div>
+        <div class="arrow">→</div>
+        <div class="node"><span class="nt">Trigger / Probe</span><span class="nd">finalize window</span></div>
+        <div class="arrow">→</div>
+        <div class="node"><span class="nt">Sink</span><span class="nd">results</span></div>
+      </div>
+      <p class="dcap">The slice store holds the live aggregation state. When that state &gt; RAM, the process dies.</p>
+    </div>
+
+    <h3>The goal (success gate §3.3)</h3>
+    <p>Process tumbling-window state that is <strong>larger than physical memory, without OOM</strong>, by spilling
+       cold state to disk (RocksDB) and bringing it back only when a window must emit its result.</p>
+
+    <h3>Three research questions</h3>
+    <ul>
+      <li><strong>RQ1 — integration:</strong> how to fit an out-of-core (OOC) backend into the push-based model.</li>
+      <li><strong>RQ2 — performance:</strong> throughput and tail latency (p95/p99) of a research-informed RocksDB
+          configuration for tumbling OOC.</li>
+      <li><strong>RQ3 — efficiency:</strong> how CPU, disk I/O and storage (write amplification, footprint) scale as
+          state grows past memory.</li>
+    </ul>
+
+    <div class="callout warn">
+      <span class="lead">Scope locked by the signed proposal (§2.3.2)</span>
+      Tumbling windows only · no sliding windows · no variable-sized serialization · <strong>no Nautilus
+      JIT / codegen edits</strong>. Every mechanism in this work is therefore <em>host-side</em>.
+    </div>
+  </section>
+
+  <!-- ============ PAGE 2 ============ -->
+  <section class="page" id="p2">
+    <div class="page-head"><div class="pageno">2</div><h2>The system we built</h2><span class="tag">Architecture</span></div>
+
+    <p>The spill machinery slots in <em>underneath</em> the existing slice store, so the query operators above it are
+       unchanged. Four pieces work together:</p>
+
+    <ul>
+      <li><strong>SpillConfig</strong> — the knobs (thresholds, RocksDB sizes, partitions, emit lag).</li>
+      <li><strong>SpillBackend</strong> — a storage interface with three implementations: <em>Null</em>, <em>InMemory</em>,
+          and <strong>RocksDB</strong> (durable, lz4-compressed).</li>
+      <li><strong>SliceSerializer</strong> — turns a window's chained hash map into a flat byte record and back
+          (fixed-size entries).</li>
+      <li><strong>Spillable slice store</strong> — owns the backend and runs a <strong>background spiller thread</strong>
+          that evicts cold slices under memory pressure.</li>
+    </ul>
+
+    <div class="diagram">
+      <div class="flow">
+        <div class="node"><span class="nt">Worker threads</span><span class="nd">fill window state</span></div>
+        <div class="arrow">→</div>
+        <div class="node"><span class="nt">Spillable slice store</span><span class="nd">tracks resident bytes</span></div>
+        <div class="arrow">→</div>
+        <div class="vstack">
+          <div class="node warnnode"><span class="nt">hard threshold</span><span class="nd">synchronous spill</span></div>
+          <div class="arrow">→</div>
+          <div class="node"><span class="nt">background spiller</span><span class="nd">soft threshold · preemptive</span></div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="node rock"><span class="nt">RocksDB</span><span class="nd">cold slices · lz4</span></div>
+      </div>
+      <p class="dcap">Soft threshold wakes the background spiller; hard threshold forces a synchronous spill. Cold
+         (completed, not-yet-emitted) slices are the spill target — never state already handed to the async probe.</p>
+    </div>
+
+    <h3>The configuration surface</h3>
+    <pre><code><span class="cm">// nes-query-compiler/interface/SpillConfig.hpp  (host-side knobs)</span>
+<span class="kw">bool</span>   enabled;              <span class="cm">// turn OOC on/off</span>
+<span class="kw">uint</span>   soft_threshold_mb;    <span class="cm">// background spiller wakes here</span>
+<span class="kw">uint</span>   hard_threshold_mb;    <span class="cm">// synchronous mandatory spill here</span>
+<span class="kw">uint</span>   write_buffer_size_mb; <span class="cm">// RocksDB memtable</span>
+<span class="kw">uint</span>   block_cache_size_mb;  <span class="cm">// RocksDB block cache</span>
+<span class="kw">uint</span>   emit_lag;             <span class="cm">// retain a band of completed windows (event-time)</span>
+<span class="kw">uint</span>   number_of_partitions; <span class="cm">// P — the partition-at-spill factor (page 4)</span></code></pre>
+  </section>
+
+  <!-- ============ PAGE 3 ============ -->
+  <section class="page" id="p3">
+    <div class="page-head"><div class="pageno">3</div><h2>What happened: three discoveries</h2><span class="tag">The story</span></div>
+
+    <p>Getting OOC to actually work was not one step — each fix revealed the <em>next</em>, deeper bottleneck. This
+       is the heart of the project.</p>
+
+    <div class="ladder">
+      <div class="rung">
+        <div class="num">1</div>
+        <div>
+          <h4>“Cold equals emitted” — nothing spilled</h4>
+          <p>The first real query spilled <strong>0 bytes</strong>. In tumbling windows a slice becomes <em>cold</em>
+             and <em>emitted</em> in the same step, so the “cold and not-yet-emitted” set the spiller looks for is
+             always empty.</p>
+          <span class="fix">Fix → emit-decouple: a lagged emit watermark (<code>emit_lag</code>) retains a band of
+             completed-but-unemitted windows, which are now spillable.</span>
+        </div>
+      </div>
+      <div class="rung">
+        <div class="num">2</div>
+        <div>
+          <h4>Terminal-flush re-materialization — config can’t win</h4>
+          <p>Now the query spilled (45&nbsp;MB), yet spill-ON and spill-OFF still died <em>identically</em> at tight
+             caps. The real cause: at end-of-stream the retained band must <strong>re-materialize into RAM in one
+             burst</strong> to emit — no matter where it was stored. First clean measurement: process peak 417&nbsp;MB
+             while the store itself was only ~20&nbsp;MB.</p>
+          <span class="fix">Insight → the burst, not the threshold, is the enemy. Tuning cannot fix it.</span>
+        </div>
+      </div>
+      <div class="rung">
+        <div class="num">3</div>
+        <div>
+          <h4>Bound the burst</h4>
+          <p>Phase&nbsp;1 paces the flush (emit one window at a time, free before the next). Phase&nbsp;2
+             <strong>partitions each window</strong> so only a fraction is ever resident — the contribution on the
+             next page.</p>
+          <span class="fix">Result → the terminal burst shrinks from “whole band” to “one partition.”</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout warn">
+      <span class="lead">Why this matters for the thesis narrative</span>
+      The honest finding is that naive OOC does <em>not</em> solve the OOM on its own — the terminal re-materialization
+      burst defeats it. The contribution (page 4) is what makes OOC viable.
+    </div>
+  </section>
+
+  <!-- ============ PAGE 4 ============ -->
+  <section class="page" id="p4">
+    <div class="page-head"><div class="pageno">4</div><h2>Partition-at-spill — the contribution</h2><span class="tag">Core idea</span></div>
+
+    <p>The idea is textbook <strong>grace-hash / external aggregation</strong> (Shapiro&nbsp;1986; used by Postgres,
+       DuckDB, Spark). At spill time, split a window’s hash map by <code>hash(key) % P</code> into <strong>P
+       self-contained blobs</strong>. At emit time, stream <em>one partition back at a time</em> — so read
+       amplification is 1× and resident memory is only <strong>1/P</strong> of the window.</p>
+
+    <div class="diagram">
+      <div class="vstack" style="align-items:center">
+        <div class="node"><span class="nt">window hash map</span><span class="nd">all keys, in RAM</span></div>
+        <div class="arrow">→</div>
+        <div style="width:100%">
+          <div style="text-align:center;font-size:.8rem;color:var(--muted);margin-bottom:.5rem">spill: split by <code>hash % P</code></div>
+          <div class="parts">
+            <div class="part">p0</div><div class="part">p1</div><div class="part">p2</div><div class="part">p3</div>
+            <div class="part">p4</div><div class="part">p5</div><div class="part">p6</div><div class="part">p7</div>
+          </div>
+        </div>
+        <div class="arrow">→</div>
+        <div style="width:100%">
+          <div style="text-align:center;font-size:.8rem;color:var(--muted);margin-bottom:.5rem">emit: stream one partition resident at a time (1/P)</div>
+          <div class="parts">
+            <div class="part">p0</div><div class="part lit">p1</div><div class="part">p2</div><div class="part">p3</div>
+            <div class="part">p4</div><div class="part">p5</div><div class="part">p6</div><div class="part">p7</div>
+          </div>
+        </div>
+      </div>
+      <p class="dcap">P self-contained blobs on disk; only the highlighted partition is in RAM during emit.</p>
+    </div>
+
+    <pre><code><span class="cm">// at spill: route each entry to one of P self-contained blobs</span>
+partition = hash(key) % P;                 <span class="cm">// keyed (sliceEnd, worker, partition)</span>
+<span class="cm">// at emit: only NON-EMPTY partitions are streamed, contiguously renumbered</span>
+<span class="cm">//   (an empty chunk would crash the un-editable Nautilus probe — audit catch)</span></code></pre>
+
+    <p><strong>Correctness:</strong> with <code>P=1</code> the path is byte-identical to the in-memory engine; a
+       differential test shows <code>P=1</code> vs <code>P=8</code> produce <strong>byte-identical output</strong>
+       (50&nbsp;020 rows) — partitions are key-disjoint and complete.</p>
+
+    <div class="callout key">
+      <span class="lead">Headline result — 320&nbsp;MB cap, 4 threads</span>
+      Naive OOC (P=1) is <strong>OOM-killed</strong>; partition-at-spill (P=8) <strong>completes</strong>, with the
+      slice-store working set dropping from the whole band (~78&nbsp;MB) to <strong>~4&nbsp;MB</strong> — the 1/P bound.
+    </div>
+
+    <figure><img src="{{FIG1}}" alt="OOM survival matrix">
+      <figcaption><strong>Fig 1 — OOM survival.</strong> At 320&nbsp;MB, naive OOC (P=1) dies once retained state
+         ≥ 800k keys; partitioned OOC (P=8) completes the whole ladder. At 512&nbsp;MB all survive.</figcaption></figure>
+
+    <figure><img src="{{FIG2}}" alt="Residency vs state">
+      <figcaption><strong>Fig 2 — Residency (512&nbsp;MB cap).</strong> P=8 store working set stays bounded
+         (~1/P, 19→4&nbsp;MB); P=1 climbs (19→66&nbsp;MB) and its process RSS creeps toward the cap — why P=1 OOMs
+         at the tighter 320&nbsp;MB cap.</figcaption></figure>
+  </section>
+
+  <!-- ============ PAGE 5 ============ -->
+  <section class="page" id="p5">
+    <div class="page-head"><div class="pageno">5</div><h2>Evaluation</h2><span class="tag">Measurement</span></div>
+
+    <p>To answer RQ2/RQ3 we added production-visible, grep-parseable metrics emitted at query stop: spill/restore
+       counts + bytes + latency (including the partitioned read-back), <strong>RocksDB write-amplification + on-disk
+       footprint</strong>, and <strong>per-task p50/p95/p99</strong>. The unit-test suite is at <strong>893/893</strong>
+       (+18 new). The sweep ran 105 capped Docker runs over a state ladder × {320, 512&nbsp;MB} × variants × 3 reps
+       (throughput CV 0.005–0.079, so 3 reps suffice).</p>
+
+    <div class="stats">
+      <div class="stat good"><div class="v">137 → 0</div><div class="l">exit code at 320&nbsp;MB (P=1 → P=8)</div></div>
+      <div class="stat good"><div class="v">~8%</div><div class="l">throughput overhead vs in-memory</div></div>
+      <div class="stat"><div class="v">1.00</div><div class="l">RocksDB write amplification (lz4)</div></div>
+      <div class="stat"><div class="v">~1.5 ms</div><div class="l">per-task p99 (no tail blow-up)</div></div>
+    </div>
+
+    <div class="two">
+      <figure><img src="{{FIG3}}" alt="Throughput vs state">
+        <figcaption><strong>Fig 3 — RQ2 throughput.</strong> OOC vs the uncapped in-memory reference: ~8% overhead.</figcaption></figure>
+      <figure><img src="{{FIG4}}" alt="Tail latency vs state">
+        <figcaption><strong>Fig 4 — RQ2 tail latency.</strong> Per-task p95/p99 stay flat (caveat: per-task, not per-window).</figcaption></figure>
+    </div>
+    <div class="two">
+      <figure><img src="{{FIG5}}" alt="Write amplification and footprint">
+        <figcaption><strong>Fig 5 — RQ3 storage.</strong> Write-amp ~1.0 (flush-dominated) and SST footprint ~16&nbsp;MB.</figcaption></figure>
+      <figure><img src="{{FIG6}}" alt="Spill and restore volume">
+        <figcaption><strong>Fig 6 — RQ2/RQ3 I/O.</strong> Spilled vs partitioned-restored volume across the ladder.</figcaption></figure>
+    </div>
+
+    <h3>Honest caveats</h3>
+    <ul>
+      <li>Latency is <strong>per-task</strong>, not per-window (the engine exposes only per-task events); percentiles
+          are unreliable for very small sample counts.</li>
+      <li>Enabling RocksDB Statistics adds a few % Put-path overhead — constant across cells, so comparisons hold.</li>
+      <li>The in-memory baseline survives at these state sizes; the OOM that partitioning solves is the <em>OOC
+          terminal re-materialization burst</em> (naive P=1), not raw in-memory fit.</li>
+      <li>Process RSS is dominated by the fixed buffer pool; <code>store_peak</code> is the metric partitioning controls.</li>
+    </ul>
+
+    <div class="callout key">
+      <span class="lead">Bottom line</span>
+      Partition-at-spill turns naive OOC — which OOMs on the terminal flush — into a system that completes tumbling
+      windowed aggregation with state spilled to RocksDB, at <strong>~8% throughput overhead</strong>, write-amp 1.0,
+      and a store working set bounded to ~1/P. The §3.3 gate is met and RQ1–RQ3 are answered; the engineering is
+      committed and ready for the thesis write-up.
+    </div>
+  </section>
+
+  <footer>Out-of-Core Stream Processing in NebulaStream · summary generated 2026-05-25 · figures from 105 capped benchmark runs</footer>
+</div>
+</body>
+</html>

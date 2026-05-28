@@ -1,0 +1,62 @@
+=== E3 P=1 sweep start Mon May 25 17:32:07 CEST 2026 ===
+[run-eval] label=oocp1_400k_c320_r1 variant=ooc_p1 cap=320 spill=on P=1 emit_lag=400000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT oocp1_400k_c320_r1 status=ok rc=0 elapsed=133.503s thr=14980t/s peak=320MB store_peak=19MB spilled=19 restored_b=77860864 writeamp=1.0000 sst=17080665 p50=3 p95=1295 p99=1432
+[run-eval] label=oocp1_400k_c320_r2 variant=ooc_p1 cap=320 spill=on P=1 emit_lag=400000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT oocp1_400k_c320_r2 status=ok rc=0 elapsed=118.352s thr=16898t/s peak=320MB store_peak=19MB spilled=19 restored_b=77859840 writeamp=1.0000 sst=17483579 p50=4 p95=1303 p99=1429
+[run-eval] label=oocp1_400k_c320_r3 variant=ooc_p1 cap=320 spill=on P=1 emit_lag=400000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT oocp1_400k_c320_r3 status=ok rc=0 elapsed=134.384s thr=14882t/s peak=320MB store_peak=19MB spilled=19 restored_b=77862912 writeamp=1.0000 sst=16803272 p50=4 p95=1279 p99=1384
+[run-eval] label=oocp1_400k_c512_r1 variant=ooc_p1 cap=512 spill=on P=1 emit_lag=400000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT oocp1_400k_c512_r1 status=ok rc=0 elapsed=134.614s thr=14857t/s peak=436MB store_peak=19MB spilled=19 restored_b=77863936 writeamp=1.0000 sst=16919554 p50=3 p95=1278 p99=1387
+[run-eval] label=oocp1_400k_c512_r2 variant=ooc_p1 cap=512 spill=on P=1 emit_lag=400000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT oocp1_400k_c512_r2 status=ok rc=0 elapsed=118.941s thr=16815t/s peak=445MB store_peak=19MB spilled=19 restored_b=77863936 writeamp=1.0000 sst=17079019 p50=3 p95=1281 p99=1427
+[run-eval] label=oocp1_400k_c512_r3 variant=ooc_p1 cap=512 spill=on P=1 emit_lag=400000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT oocp1_400k_c512_r3 status=ok rc=0 elapsed=133.426s thr=14989t/s peak=464MB store_peak=23MB spilled=19 restored_b=77863936 writeamp=1.0000 sst=17081312 p50=4 p95=1289 p99=1411
+[run-eval] label=oocp1_800k_c320_r1 variant=ooc_p1 cap=320 spill=on P=1 emit_lag=800000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT oocp1_800k_c320_r1 status=oom rc=137 elapsed=195.286s thr=NAt/s peak=320MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=NA p95=NA p99=NA
+[run-eval] label=oocp1_800k_c320_r2 variant=ooc_p1 cap=320 spill=on P=1 emit_lag=800000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT oocp1_800k_c320_r2 status=oom rc=137 elapsed=161.398s thr=NAt/s peak=320MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=NA p95=NA p99=NA
+[run-eval] label=oocp1_800k_c320_r3 variant=ooc_p1 cap=320 spill=on P=1 emit_lag=800000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT oocp1_800k_c320_r3 status=ok rc=0 elapsed=134.821s thr=14834t/s peak=320MB store_peak=27MB spilled=19 restored_b=77859840 writeamp=1.0000 sst=16877252 p50=2 p95=1313 p99=1461
+[run-eval] label=oocp1_800k_c512_r1 variant=ooc_p1 cap=512 spill=on P=1 emit_lag=800000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT oocp1_800k_c512_r1 status=ok rc=0 elapsed=134.326s thr=14889t/s peak=475MB store_peak=31MB spilled=19 restored_b=77862912 writeamp=1.0000 sst=17286887 p50=3 p95=1301 p99=1431
+[run-eval] label=oocp1_800k_c512_r2 variant=ooc_p1 cap=512 spill=on P=1 emit_lag=800000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT oocp1_800k_c512_r2 status=ok rc=0 elapsed=119.551s thr=16729t/s peak=465MB store_peak=31MB spilled=19 restored_b=77862912 writeamp=1.0000 sst=16878616 p50=2 p95=1311 p99=1450
+[run-eval] label=oocp1_800k_c512_r3 variant=ooc_p1 cap=512 spill=on P=1 emit_lag=800000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT oocp1_800k_c512_r3 status=ok rc=0 elapsed=119.227s thr=16774t/s peak=466MB store_peak=27MB spilled=19 restored_b=77858816 writeamp=1.0000 sst=16958796 p50=4 p95=1299 p99=1427
+[run-eval] label=oocp1_1200k_c320_r1 variant=ooc_p1 cap=320 spill=on P=1 emit_lag=1200000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT oocp1_1200k_c320_r1 status=oom rc=137 elapsed=215.147s thr=NAt/s peak=320MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=NA p95=NA p99=NA
+[run-eval] label=oocp1_1200k_c320_r2 variant=ooc_p1 cap=320 spill=on P=1 emit_lag=1200000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT oocp1_1200k_c320_r2 status=oom rc=137 elapsed=202.593s thr=NAt/s peak=320MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=NA p95=NA p99=NA
+[run-eval] label=oocp1_1200k_c320_r3 variant=ooc_p1 cap=320 spill=on P=1 emit_lag=1200000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT oocp1_1200k_c320_r3 status=oom rc=137 elapsed=251.229s thr=NAt/s peak=320MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=NA p95=NA p99=NA
+[run-eval] label=oocp1_1200k_c512_r1 variant=ooc_p1 cap=512 spill=on P=1 emit_lag=1200000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT oocp1_1200k_c512_r1 status=ok rc=0 elapsed=119.859s thr=16686t/s peak=501MB store_peak=42MB spilled=19 restored_b=77861888 writeamp=1.0000 sst=17081455 p50=3 p95=1310 p99=1428
+[run-eval] label=oocp1_1200k_c512_r2 variant=ooc_p1 cap=512 spill=on P=1 emit_lag=1200000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT oocp1_1200k_c512_r2 status=ok rc=0 elapsed=120.212s thr=16637t/s peak=467MB store_peak=39MB spilled=19 restored_b=77859840 writeamp=1.0000 sst=16896479 p50=4 p95=1299 p99=1424
+[run-eval] label=oocp1_1200k_c512_r3 variant=ooc_p1 cap=512 spill=on P=1 emit_lag=1200000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT oocp1_1200k_c512_r3 status=ok rc=0 elapsed=119.769s thr=16698t/s peak=482MB store_peak=39MB spilled=19 restored_b=77859840 writeamp=1.0000 sst=17083557 p50=3 p95=1325 p99=1444
+[run-eval] label=oocp1_1600k_c320_r1 variant=ooc_p1 cap=320 spill=on P=1 emit_lag=1600000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT oocp1_1600k_c320_r1 status=oom rc=137 elapsed=139.029s thr=NAt/s peak=320MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=NA p95=NA p99=NA
+[run-eval] label=oocp1_1600k_c320_r2 variant=ooc_p1 cap=320 spill=on P=1 emit_lag=1600000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT oocp1_1600k_c320_r2 status=oom rc=137 elapsed=152.252s thr=NAt/s peak=320MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=NA p95=NA p99=NA
+[run-eval] label=oocp1_1600k_c320_r3 variant=ooc_p1 cap=320 spill=on P=1 emit_lag=1600000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT oocp1_1600k_c320_r3 status=oom rc=137 elapsed=170.529s thr=NAt/s peak=320MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=NA p95=NA p99=NA
+[run-eval] label=oocp1_1600k_c512_r1 variant=ooc_p1 cap=512 spill=on P=1 emit_lag=1600000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT oocp1_1600k_c512_r1 status=ok rc=0 elapsed=120.092s thr=16653t/s peak=501MB store_peak=50MB spilled=19 restored_b=77860864 writeamp=1.0000 sst=16777525 p50=3 p95=1314 p99=1438
+[run-eval] label=oocp1_1600k_c512_r2 variant=ooc_p1 cap=512 spill=on P=1 emit_lag=1600000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT oocp1_1600k_c512_r2 status=ok rc=0 elapsed=120.028s thr=16662t/s peak=503MB store_peak=58MB spilled=19 restored_b=77860864 writeamp=1.0000 sst=17078440 p50=3 p95=1299 p99=1432
+[run-eval] label=oocp1_1600k_c512_r3 variant=ooc_p1 cap=512 spill=on P=1 emit_lag=1600000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT oocp1_1600k_c512_r3 status=ok rc=0 elapsed=119.968s thr=16671t/s peak=510MB store_peak=62MB spilled=19 restored_b=77859840 writeamp=1.0000 sst=17083536 p50=4 p95=1301 p99=1423
+[run-eval] label=oocp1_2000k_c320_r1 variant=ooc_p1 cap=320 spill=on P=1 emit_lag=2000000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT oocp1_2000k_c320_r1 status=oom rc=137 elapsed=138.412s thr=NAt/s peak=320MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=NA p95=NA p99=NA
+[run-eval] label=oocp1_2000k_c320_r2 variant=ooc_p1 cap=320 spill=on P=1 emit_lag=2000000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT oocp1_2000k_c320_r2 status=oom rc=137 elapsed=207.752s thr=NAt/s peak=320MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=NA p95=NA p99=NA
+[run-eval] label=oocp1_2000k_c320_r3 variant=ooc_p1 cap=320 spill=on P=1 emit_lag=2000000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT oocp1_2000k_c320_r3 status=oom rc=137 elapsed=168.135s thr=NAt/s peak=320MB store_peak=NAMB spilled=0 restored_b=0 writeamp=NA sst=NA p50=NA p95=NA p99=NA
+[run-eval] label=oocp1_2000k_c512_r1 variant=ooc_p1 cap=512 spill=on P=1 emit_lag=2000000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT oocp1_2000k_c512_r1 status=ok rc=0 elapsed=135.650s thr=14743t/s peak=511MB store_peak=62MB spilled=19 restored_b=77861888 writeamp=1.0000 sst=17077845 p50=3 p95=1286 p99=1403
+[run-eval] label=oocp1_2000k_c512_r2 variant=ooc_p1 cap=512 spill=on P=1 emit_lag=2000000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT oocp1_2000k_c512_r2 status=ok rc=0 elapsed=120.815s thr=16554t/s peak=503MB store_peak=66MB spilled=19 restored_b=77860864 writeamp=1.0000 sst=16877067 p50=3 p95=1305 p99=1440
+[run-eval] label=oocp1_2000k_c512_r3 variant=ooc_p1 cap=512 spill=on P=1 emit_lag=2000000 pool=16000 threads=4 wbuf=32 cache=32
+[run-eval] RESULT oocp1_2000k_c512_r3 status=ok rc=0 elapsed=135.880s thr=14718t/s peak=491MB store_peak=74MB spilled=19 restored_b=77860864 writeamp=1.0000 sst=16897073 p50=3 p95=1289 p99=1408
+=== E3 P=1 sweep done Mon May 25 18:45:33 CEST 2026 ===
