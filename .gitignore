@@ -12,7 +12,7 @@ Microbenchmark-BA/rocksdb/build/
 /nebulastream-Out-of-Core-Stream-Processing/.idea/
 /nebulastream-Out-of-Core-Stream-Processing/systest.log
 
-# Eval harness scratch (10k+ TSV/log files, generated, large)
+# Eval harness scratch (10k+ TSV/log files, generated, large) — 10k phase
 /nebulastream-Out-of-Core-Stream-Processing/.planning/eval-phase/e3big/results/
 /nebulastream-Out-of-Core-Stream-Processing/.planning/eval-phase/e3big/logs/
 /nebulastream-Out-of-Core-Stream-Processing/.planning/eval-phase/e3big/launch.out
@@ -20,6 +20,17 @@ Microbenchmark-BA/rocksdb/build/
 /nebulastream-Out-of-Core-Stream-Processing/.planning/eval-phase/e3big/jobs.txt
 /nebulastream-Out-of-Core-Stream-Processing/.planning/eval-phase/e3big/val*.out
 /nebulastream-Out-of-Core-Stream-Processing/.planning/eval-phase/e3big/val*.txt
+
+# Eval harness scratch — Nexmark phase (in-progress sweep — runtime data, not deliverable code)
+/nebulastream-Out-of-Core-Stream-Processing/.planning/eval-phase/nexmark-phase/results/
+/nebulastream-Out-of-Core-Stream-Processing/.planning/eval-phase/nexmark-phase/logs/
+/nebulastream-Out-of-Core-Stream-Processing/.planning/eval-phase/nexmark-phase/launch.out
+/nebulastream-Out-of-Core-Stream-Processing/.planning/eval-phase/nexmark-phase/launch.pid
+/nebulastream-Out-of-Core-Stream-Processing/.planning/eval-phase/nexmark-phase/jobs.txt
+/nebulastream-Out-of-Core-Stream-Processing/.planning/eval-phase/nexmark-phase/smoke.txt
+/nebulastream-Out-of-Core-Stream-Processing/.planning/eval-phase/nexmark-phase/work/rendered/
+/nebulastream-Out-of-Core-Stream-Processing/.planning/eval-phase/nexmark-phase/runs.tsv
+/nebulastream-Out-of-Core-Stream-Processing/.planning/eval-phase/nexmark-phase/figs/
 
 # Python
 __pycache__/

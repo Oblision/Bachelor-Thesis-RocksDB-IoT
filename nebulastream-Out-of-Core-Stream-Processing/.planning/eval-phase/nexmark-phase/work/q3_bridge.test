@@ -1,0 +1,26 @@
+# name: nexmark-phase/q3_bridge.test
+# description: Q3-bridge — same shape as phase0c/SpillSmokeVoid.test (single tumbling SUM agg, all-distinct keys,
+#   Void sink to skip the result-check OOM), but using the Nexmark `bid` schema and a *short* tumbling window
+#   (10 s instead of 100 s). Direct bridge to the 10k phase: comparing identical query+config at scale=2M between
+#   this file and SpillSmokeVoid quantifies the "window-flush frequency" axis that the 10k averaged away.
+#
+# Generator-driven; STATE_TUPLES is templated as ${STATE} at launch (run-cell.sh substitutes it). Window 10 s.
+# Schema matches nes-systests/benchmark/Nexmark.test `bid(timestamp,auctionId,bidder,datetime,price)`.
+# groups: [Spill, NexmarkPhase, ManualOnly]
+
+CREATE LOGICAL SOURCE bid(timestamp UINT64 NOT NULL, auctionId UINT64 NOT NULL, bidder UINT64 NOT NULL, datetime UINT64 NOT NULL, price UINT64 NOT NULL);
+CREATE PHYSICAL SOURCE FOR bid TYPE Generator SET(
+    1 AS `SOURCE`.SEED,
+    'ALL' AS `SOURCE`.STOP_GENERATOR_WHEN_SEQUENCE_FINISHES,
+    'emit_rate 50000000' AS `SOURCE`.GENERATOR_RATE_CONFIG,
+    'SEQUENCE UINT64 0 ${STATE} 1, SEQUENCE UINT64 0 ${STATE} 1, SEQUENCE UINT64 0 100 1, SEQUENCE UINT64 0 ${STATE} 1, SEQUENCE UINT64 0 100 1' AS `SOURCE`.GENERATOR_SCHEMA
+);
+
+CREATE SINK out(bid.start UINT64 NOT NULL, bid.end UINT64 NOT NULL, bid.auctionId UINT64 NOT NULL, bid.sumPrice UINT64 NOT NULL) TYPE Void;
+
+SELECT start, end, auctionId, SUM(price) AS sumPrice
+FROM bid
+GROUP BY auctionId
+WINDOW TUMBLING(timestamp, size 10000 ms)
+INTO out;
+----

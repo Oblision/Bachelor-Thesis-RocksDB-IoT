@@ -1,0 +1,34 @@
+# name: nexmark-phase/q8_variant.test
+# description: Nexmark Q8_Variant — tumbling 10 s INNER JOIN of `bid` and `auction` on auctionId=id, then
+#   GROUP BY auctionId with SUM(price) per window. Adapted from nes-systests/benchmark/Nexmark.test Q8_Variant
+#   (which itself swaps Person→Bid vs upstream Q8). This is the ONLY multi-operator query in this phase: it
+#   tests whether the OOC backend's spill cost compounds when state is split across a join *and* an aggregate.
+#
+# Generator-driven; bid is scaled by ${STATE} and auction by ${AUCTION_STATE} (typically 1/10 of bid).
+# Schema matches upstream Q8_Variant. Void sink to keep result-check OOM out of the measurement.
+# groups: [Spill, NexmarkPhase, ManualOnly]
+
+CREATE LOGICAL SOURCE bid(timestamp UINT64 NOT NULL, auctionId UINT64 NOT NULL, bidder UINT64 NOT NULL, datetime UINT64 NOT NULL, price UINT64 NOT NULL);
+CREATE PHYSICAL SOURCE FOR bid TYPE Generator SET(
+    1 AS `SOURCE`.SEED,
+    'ALL' AS `SOURCE`.STOP_GENERATOR_WHEN_SEQUENCE_FINISHES,
+    'emit_rate 50000000' AS `SOURCE`.GENERATOR_RATE_CONFIG,
+    'SEQUENCE UINT64 0 ${STATE} 1, SEQUENCE UINT64 0 ${STATE} 1, SEQUENCE UINT64 0 100 1, SEQUENCE UINT64 0 ${STATE} 1, SEQUENCE UINT64 0 100 1' AS `SOURCE`.GENERATOR_SCHEMA
+);
+
+CREATE LOGICAL SOURCE auction(timestamp UINT64 NOT NULL, id UINT64 NOT NULL, initialbid UINT64 NOT NULL, reserve UINT64 NOT NULL, expires UINT64 NOT NULL, seller UINT64 NOT NULL, category UINT64 NOT NULL);
+CREATE PHYSICAL SOURCE FOR auction TYPE Generator SET(
+    2 AS `SOURCE`.SEED,
+    'ALL' AS `SOURCE`.STOP_GENERATOR_WHEN_SEQUENCE_FINISHES,
+    'emit_rate 5000000' AS `SOURCE`.GENERATOR_RATE_CONFIG,
+    'SEQUENCE UINT64 0 ${AUCTION_STATE} 1, SEQUENCE UINT64 0 ${AUCTION_STATE} 1, SEQUENCE UINT64 0 100 1, SEQUENCE UINT64 0 1000 1, SEQUENCE UINT64 0 ${AUCTION_STATE} 1, SEQUENCE UINT64 0 100 1, SEQUENCE UINT64 0 10 1' AS `SOURCE`.GENERATOR_SCHEMA
+);
+
+CREATE SINK out(start UINT64 NOT NULL, end UINT64 NOT NULL, auctionId UINT64 NOT NULL, category UINT64 NOT NULL, sumPrice UINT64 NOT NULL) TYPE Void;
+
+SELECT start, end, auctionId, category, SUM(price) AS sumPrice
+FROM bid INNER JOIN auction ON auctionId = id
+GROUP BY auctionId, category
+WINDOW TUMBLING(bid.timestamp, size 10000 ms)
+INTO out;
+----

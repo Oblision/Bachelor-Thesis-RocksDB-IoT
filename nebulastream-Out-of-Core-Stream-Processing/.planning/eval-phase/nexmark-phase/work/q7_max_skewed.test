@@ -1,0 +1,28 @@
+# name: nexmark-phase/q7_max_skewed.test
+# description: Nexmark Q7 stand-in — "highest price per period" as MAX(price) per auctionId in a 10 s tumbling
+#   window, on a hot-keyed bid stream (binomial-distributed auctionId, hot near the centre). The canonical
+#   Q7 uses a self-join to retrieve the row holding the max; we use the simpler max-per-key form so we can
+#   compare the *aggregate operator* axis (MAX vs SUM) directly against q3_bridge.test under identical schema,
+#   window, and run-cell harness.
+#
+# Generator-driven; STATE_TUPLES is templated as ${STATE} at launch.
+# Key skew: NORMAL_DISTRIBUTION (binomial) — concentrated mass near ${STATE}/2, with a tail. This is hot-key,
+# narrow-skew (not Zipf long-tail) — same documented limitation as the 10k phase's skewed.test.
+# groups: [Spill, NexmarkPhase, ManualOnly]
+
+CREATE LOGICAL SOURCE bid(timestamp UINT64 NOT NULL, auctionId UINT64 NOT NULL, bidder UINT64 NOT NULL, datetime UINT64 NOT NULL, price UINT64 NOT NULL);
+CREATE PHYSICAL SOURCE FOR bid TYPE Generator SET(
+    1 AS `SOURCE`.SEED,
+    'ALL' AS `SOURCE`.STOP_GENERATOR_WHEN_SEQUENCE_FINISHES,
+    'emit_rate 50000000' AS `SOURCE`.GENERATOR_RATE_CONFIG,
+    'SEQUENCE UINT64 0 ${STATE} 1, NORMAL_DISTRIBUTION UINT64 ${STATE} 0.5, SEQUENCE UINT64 0 100 1, SEQUENCE UINT64 0 ${STATE} 1, SEQUENCE UINT64 0 100 1' AS `SOURCE`.GENERATOR_SCHEMA
+);
+
+CREATE SINK out(bid.start UINT64 NOT NULL, bid.end UINT64 NOT NULL, bid.auctionId UINT64 NOT NULL, bid.maxPrice UINT64 NOT NULL) TYPE Void;
+
+SELECT start, end, auctionId, MAX(price) AS maxPrice
+FROM bid
+GROUP BY auctionId
+WINDOW TUMBLING(timestamp, size 10000 ms)
+INTO out;
+----
