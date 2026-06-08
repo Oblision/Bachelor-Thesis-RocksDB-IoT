@@ -1,0 +1,28 @@
+# name: lag-validation/lagval.test
+# description: Lag-methodology validation workload. Synthetic lockstep generator (key = ts = SEQUENCE),
+#   so the distinct-key arrival rate is exactly rho = 1 key per event-time unit, INDEPENDENT of the window
+#   size. This is what lets us vary W (in the query) and L (emit_lag, worker config) orthogonally to rho,
+#   to test S_backlog = rho * L * e and its W-independence. Void sink (no result-check confounder).
+#
+# Templated at launch by run-cell.sh:
+#   ${TUPLES}     total tuples = event-time span (units). key,ts both SEQUENCE 0..TUPLES.
+#   ${WINDOW}     tumbling window size in ms (= event-time units, since ts steps by 1).
+#   ${EMIT_RATE}  Generator emit rate (tuples/sec wall-clock) — throttle knob for the rate constraint.
+# groups: [Spill, LagValidation, ManualOnly]
+
+CREATE LOGICAL SOURCE s(key UINT64 NOT NULL, val UINT64 NOT NULL, ts UINT64 NOT NULL);
+CREATE PHYSICAL SOURCE FOR s TYPE Generator SET(
+    1 AS `SOURCE`.SEED,
+    'ALL' AS `SOURCE`.STOP_GENERATOR_WHEN_SEQUENCE_FINISHES,
+    'emit_rate ${EMIT_RATE}' AS `SOURCE`.GENERATOR_RATE_CONFIG,
+    'SEQUENCE UINT64 0 ${TUPLES} 1, SEQUENCE UINT64 0 100 1, SEQUENCE UINT64 0 ${TUPLES} 1' AS `SOURCE`.GENERATOR_SCHEMA
+);
+
+CREATE SINK out(s.start UINT64 NOT NULL, s.end UINT64 NOT NULL, s.key UINT64 NOT NULL, s.sumVal UINT64 NOT NULL) TYPE Void;
+
+SELECT start, end, key, SUM(val) AS sumVal
+FROM s
+GROUP BY key
+WINDOW TUMBLING(ts, size ${WINDOW} ms)
+INTO out;
+----

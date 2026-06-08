@@ -1,0 +1,27 @@
+# name: lag-validation/genfile.test
+# description: Proposal-aligned SKEW workload driven by a pre-generated CSV (File source).
+#   The CSV (work/gen_skew.py) has Zipfian keys + out-of-order ts (lateness D) + optional bursts.
+#   emit_lag is set >= D (allowed lateness) so late rows land in their retained windows -> ~D/W
+#   tumbling windows stay concurrently open (breadth) -> cold-window state that OOC spills.
+#
+# Templated by run-cell.sh:
+#   ${WINDOW}   tumbling window size (event-time units / ms)
+#   ${FILECSV}  absolute in-container path to the generated CSV (repo is bind-mounted at /workspace)
+# groups: [Spill, SkewWorkload, ManualOnly]
+
+CREATE LOGICAL SOURCE s(key UINT64 NOT NULL, val UINT64 NOT NULL, ts UINT64 NOT NULL);
+CREATE PHYSICAL SOURCE FOR s TYPE File SET(
+    '${FILECSV}' AS `SOURCE`.FILE_PATH,
+    '${EMITBPS}' AS `SOURCE`.EMIT_RATE_BPS,
+    'CSV' AS PARSER.`TYPE`,
+    ',' AS PARSER.FIELD_DELIMITER
+);
+
+CREATE SINK out(s.start UINT64 NOT NULL, s.end UINT64 NOT NULL, s.key UINT64 NOT NULL, s.sumVal UINT64 NOT NULL) TYPE Void;
+
+SELECT start, end, key, SUM(val) AS sumVal
+FROM s
+GROUP BY key
+WINDOW TUMBLING(ts, size ${WINDOW} ms)
+INTO out;
+----
