@@ -177,13 +177,27 @@ AbstractHashMapEntry* ChainedHashMap::insertEntry(const HashFunction::HashValue:
     /// 1. Check if we need to allocate a new page
     if (numberOfTuples % entriesPerPage == 0)
     {
-        auto newPage = bufferProvider->getUnpooledBuffer(pageSize);
-        if (not newPage)
+        /// EXPERIMENT (ooc-pooled-state): if the page fits a POOLED buffer, rent it from the fixed pool
+        /// (recycled to the free-list when the slice is freed/spilled) instead of an UNPOOLED chunk
+        /// (which the chunk manager does not return to the OS until all its segments drain). This bounds
+        /// resident RAM at the fixed pool size so spilling actually reclaims memory. getBufferBlocking
+        /// applies back-pressure: it waits for the spiller to free a buffer when the pool is exhausted.
+        if (pageSize <= bufferProvider->getBufferSize())
         {
-            throw CannotAllocateBuffer("Could not allocate memory for new page in ChainedHashMap of size {}", std::to_string(pageSize));
+            auto newPage = bufferProvider->getBufferBlocking();
+            std::ranges::fill(newPage.getAvailableMemoryArea(), std::byte{0});
+            storageSpace.emplace_back(newPage);
         }
-        std::ranges::fill(newPage.value().getAvailableMemoryArea(), std::byte{0});
-        storageSpace.emplace_back(newPage.value());
+        else
+        {
+            auto newPage = bufferProvider->getUnpooledBuffer(pageSize);
+            if (not newPage)
+            {
+                throw CannotAllocateBuffer("Could not allocate memory for new page in ChainedHashMap of size {}", std::to_string(pageSize));
+            }
+            std::ranges::fill(newPage.value().getAvailableMemoryArea(), std::byte{0});
+            storageSpace.emplace_back(newPage.value());
+        }
     }
 
     /// 2. Finding the new entry
