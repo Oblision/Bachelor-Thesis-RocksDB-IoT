@@ -15,7 +15,9 @@
 #pragma once
 
 #include <atomic>
+#include <chrono>
 #include <cstddef>
+#include <cstdint>
 #include <fstream>
 #include <memory>
 #include <optional>
@@ -62,6 +64,12 @@ private:
     std::ifstream inputFile;
     std::string filePath;
     std::atomic<size_t> totalNumBytesRead;
+    /// Optional ingest-rate pacing: emit at most emitRateBytesPerSec bytes/sec (0 = unlimited).
+    /// Models a realistic edge sensor ingest rate so spill can keep up (otherwise file replay
+    /// runs at engine max speed and outpaces the out-of-core spill drain).
+    std::uint64_t emitRateBytesPerSec{0};
+    std::chrono::steady_clock::time_point pacingStart;
+    bool pacingStarted{false};
 };
 
 struct ConfigParametersCSV
@@ -71,8 +79,14 @@ struct ConfigParametersCSV
         std::nullopt,
         [](const std::unordered_map<std::string, std::string>& config) { return DescriptorConfig::tryGet(FILEPATH, config); }};
 
+    /// Ingest-rate pacing in bytes/sec (0 = unlimited). Set via systest `SOURCE`.EMIT_RATE_BPS.
+    static inline const DescriptorConfig::ConfigParameter<uint64_t> EMIT_RATE_BPS{
+        "emit_rate_bps",
+        0,
+        [](const std::unordered_map<std::string, std::string>& config) { return DescriptorConfig::tryGet(EMIT_RATE_BPS, config); }};
+
     static inline std::unordered_map<std::string, DescriptorConfig::ConfigParameterContainer> parameterMap
-        = DescriptorConfig::createConfigParameterContainerMap(SourceDescriptor::parameterMap, FILEPATH);
+        = DescriptorConfig::createConfigParameterContainerMap(SourceDescriptor::parameterMap, FILEPATH, EMIT_RATE_BPS);
 };
 
 }

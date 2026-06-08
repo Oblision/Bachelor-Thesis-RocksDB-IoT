@@ -1066,7 +1066,8 @@ void SpillableTimeBasedSliceStore::logMetrics() const
     {
         NES_INFO(
             "RocksDB stats: sst_footprint_bytes={} write_amp={:.4f} bytes_flushed={} bytes_compacted={} bytes_written={}"
-            " block_cache_hit={} block_cache_miss={} write_stall_micros={} write_stall_count={}",
+            " block_cache_hit={} block_cache_miss={} write_stall_micros={} write_stall_count={}"
+            " rss_memtable_bytes={} rss_block_cache_bytes={} rss_table_readers_bytes={} rss_block_cache_pinned_bytes={}",
             backendStats->sstFootprintBytes,
             backendStats->writeAmplification,
             backendStats->bytesFlushed,
@@ -1075,7 +1076,11 @@ void SpillableTimeBasedSliceStore::logMetrics() const
             backendStats->blockCacheHit,
             backendStats->blockCacheMiss,
             backendStats->writeStallMicros,
-            backendStats->writeStallCount);
+            backendStats->writeStallCount,
+            backendStats->memTableBytes,
+            backendStats->blockCacheBytes,
+            backendStats->tableReadersBytes,
+            backendStats->blockCachePinnedBytes);
     }
 }
 

@@ -199,6 +199,17 @@ std::optional<TupleBuffer> BufferManager::getBufferWithTimeout(const std::chrono
     {
         return std::nullopt;
     }
+    /// OOC mem_trace gauge: throttled, read-only pool-occupancy sample (POOLGAUGE) for component
+    /// attribution over time (e.g. detecting result-emission floods at stream close). One in 65536 rents.
+    {
+        static std::atomic<std::uint64_t> poolGaugeCtr{0};
+        if ((poolGaugeCtr.fetch_add(1, std::memory_order_relaxed) & 0xFFFFU) == 0)
+        {
+            const auto avail = getNumberOfAvailableBuffers();
+            const auto total = allBuffers.size();
+            NES_INFO("POOLGAUGE used_buf={} avail_buf={} total_buf={}", total - avail, avail, total);
+        }
+    }
     if (memSegment->controlBlock->prepare(shared_from_this()))
     {
         return TupleBuffer(memSegment->controlBlock.get(), memSegment->ptr, memSegment->size);

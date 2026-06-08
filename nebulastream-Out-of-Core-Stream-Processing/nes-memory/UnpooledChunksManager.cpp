@@ -16,6 +16,7 @@
 #include <Runtime/UnpooledChunksManager.hpp>
 
 #include <algorithm>
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -33,6 +34,59 @@
 
 namespace NES
 {
+
+/// OOC-INSTRUMENTATION (lag-validation): chunk-fragmentation counters. The unpooled allocator only frees a chunk when
+/// ALL its segments drain, so peakChunkBytes (total OS-resident chunk bytes) vs peak liveActiveBytes (bytes actually in
+/// live segments) quantifies the fragmentation+pre-alloc slack that ratchets RSS up under spill/unspill churn. File-static
+/// so no `this` capture leaks into the long-lived recycle callback; relaxed atomics — pure observability, no fences.
+namespace
+{
+std::atomic<int64_t> g_liveChunkBytes{0};
+std::atomic<int64_t> g_liveChunkCount{0};
+std::atomic<int64_t> g_liveActiveBytes{0};
+std::atomic<int64_t> g_peakChunkBytes{0};
+std::atomic<uint64_t> g_upoolGaugeCtr{0};
+
+/// OOC mem_trace gauge: throttled, read-only sample of resident unpooled (HashMap) bytes (UPOOLGAUGE)
+/// for component attribution over time. One in 64 chunk alloc/free events (chunk events are infrequent).
+void logUpoolGauge()
+{
+    if ((g_upoolGaugeCtr.fetch_add(1, std::memory_order_relaxed) & 0x3FU) == 0)
+    {
+        NES_INFO(
+            "UPOOLGAUGE live_chunk_bytes={} live_active_bytes={} live_chunks={}",
+            g_liveChunkBytes.load(std::memory_order_relaxed),
+            g_liveActiveBytes.load(std::memory_order_relaxed),
+            g_liveChunkCount.load(std::memory_order_relaxed));
+    }
+}
+
+void upoolOnSegmentAlloc(const int64_t bytes)
+{
+    g_liveActiveBytes.fetch_add(bytes, std::memory_order_relaxed);
+}
+void upoolOnSegmentFree(const int64_t bytes)
+{
+    g_liveActiveBytes.fetch_sub(bytes, std::memory_order_relaxed);
+}
+void upoolOnChunkAlloc(const int64_t chunkBytes)
+{
+    g_liveChunkCount.fetch_add(1, std::memory_order_relaxed);
+    const auto live = g_liveChunkBytes.fetch_add(chunkBytes, std::memory_order_relaxed) + chunkBytes;
+    auto peak = g_peakChunkBytes.load(std::memory_order_relaxed);
+    while (live > peak && !g_peakChunkBytes.compare_exchange_weak(peak, live, std::memory_order_relaxed))
+    {
+    }
+    logUpoolGauge();
+}
+void upoolOnChunkFree(const int64_t chunkBytes)
+{
+    g_liveChunkCount.fetch_sub(1, std::memory_order_relaxed);
+    g_liveChunkBytes.fetch_sub(chunkBytes, std::memory_order_relaxed);
+    logUpoolGauge();
+}
+}
+
 UnpooledChunksManager::UnpooledChunksManager(std::shared_ptr<std::pmr::memory_resource> memoryResource)
     : memoryResource(std::move(memoryResource))
 {
@@ -129,6 +183,7 @@ UnpooledChunksManager::allocateSpace(const std::thread::id threadId, const size_
     currentAllocatedChunk.totalSize = newAllocationSize;
     currentAllocatedChunk.usedSize += neededSize;
     currentAllocatedChunk.activeMemorySegments += 1;
+    upoolOnChunkAlloc(static_cast<int64_t>(newAllocationSize)); /// OOC-INSTRUMENTATION: a new OS-resident chunk
     NES_TRACE("Created new chunk {} for tuple buffer {} of {}B", currentAllocatedChunk, fmt::ptr(localMemoryForNewTupleBuffer), neededSize);
     return {localKeyForUnpooledBufferChunk, localMemoryForNewTupleBuffer};
 }
@@ -147,6 +202,7 @@ UnpooledChunksManager::getUnpooledBuffer(const size_t neededSize, size_t alignme
 
     /// Creating a new memory segment, and adding it to the unpooledMemorySegments
     const auto alignedBufferSize = alignBufferSize(neededSize, alignment);
+    upoolOnSegmentAlloc(static_cast<int64_t>(alignedBufferSize)); /// OOC-INSTRUMENTATION: balanced with the free path (memorySegment->size)
     const auto controlBlockSize = alignBufferSize(sizeof(detail::BufferControlBlock), alignment);
     const auto chunk = this->getChunk(threadId);
     auto memSegment = std::make_unique<detail::MemorySegment>(
@@ -164,16 +220,19 @@ UnpooledChunksManager::getUnpooledBuffer(const size_t neededSize, size_t alignme
                 "curUnpooledChunk.activeMemorySegments must be larger than 0 but is {}",
                 curUnpooledChunk.activeMemorySegments);
             curUnpooledChunk.activeMemorySegments -= 1;
+            upoolOnSegmentFree(static_cast<int64_t>(memorySegment->size)); /// OOC-INSTRUMENTATION: read size BEFORE the reset below
             memorySegment->size = 0;
             if (curUnpooledChunk.activeMemorySegments == 0)
             {
                 /// All memory segments have been removed, therefore, we can deallocate the unpooled chunk
                 const auto extractedChunk = lockedLocalUnpooledBufferData->chunks.extract(copyOLastChunkPtr);
                 const auto& extractedChunkControlBlock = extractedChunk.mapped();
+                const auto freedChunkBytes = extractedChunkControlBlock.totalSize; /// OOC-INSTRUMENTATION: capture before unlock/dealloc
                 lockedLocalUnpooledBufferData->lastAllocateChunkKey = nullptr;
                 lockedLocalUnpooledBufferData.unlock();
                 copyOfMemoryResource->deallocate(
                     extractedChunkControlBlock.startOfChunk, extractedChunkControlBlock.totalSize, copyOfAlignment);
+                upoolOnChunkFree(static_cast<int64_t>(freedChunkBytes)); /// OOC-INSTRUMENTATION: chunk returned to OS
             }
         });
 

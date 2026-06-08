@@ -15,6 +15,7 @@
 #include <FileSource.hpp>
 
 #include <cerrno>
+#include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <format>
@@ -25,6 +26,7 @@
 #include <ostream>
 #include <stop_token>
 #include <string>
+#include <thread>
 #include <unordered_map>
 #include <utility>
 #include <Configurations/Descriptor.hpp>
@@ -42,7 +44,9 @@
 namespace NES
 {
 
-FileSource::FileSource(const SourceDescriptor& sourceDescriptor) : filePath(sourceDescriptor.getFromConfig(ConfigParametersCSV::FILEPATH))
+FileSource::FileSource(const SourceDescriptor& sourceDescriptor)
+    : filePath(sourceDescriptor.getFromConfig(ConfigParametersCSV::FILEPATH))
+    , emitRateBytesPerSec(sourceDescriptor.getFromConfig(ConfigParametersCSV::EMIT_RATE_BPS))
 {
 }
 
@@ -70,6 +74,21 @@ Source::FillTupleBufferResult FileSource::fillTupleBuffer(TupleBuffer& tupleBuff
     if (numBytesRead == 0)
     {
         return FillTupleBufferResult::eos();
+    }
+    /// Ingest-rate pacing: throttle so the cumulative byte stream does not exceed emitRateBytesPerSec.
+    if (this->emitRateBytesPerSec > 0)
+    {
+        if (!this->pacingStarted)
+        {
+            this->pacingStart = std::chrono::steady_clock::now();
+            this->pacingStarted = true;
+        }
+        const double expectedSeconds = static_cast<double>(this->totalNumBytesRead.load()) / static_cast<double>(this->emitRateBytesPerSec);
+        const double actualSeconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - this->pacingStart).count();
+        if (actualSeconds < expectedSeconds)
+        {
+            std::this_thread::sleep_for(std::chrono::duration<double>(expectedSeconds - actualSeconds));
+        }
     }
     return FillTupleBufferResult::withBytes(numBytesRead);
 }

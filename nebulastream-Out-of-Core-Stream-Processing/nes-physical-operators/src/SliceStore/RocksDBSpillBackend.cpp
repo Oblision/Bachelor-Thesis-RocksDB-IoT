@@ -285,6 +285,30 @@ std::optional<BackendStats> RocksDBSpillBackend::getBackendStats() const
     statistics->histogramData(rocksdb::WRITE_STALL, &stallHist);
     stats.writeStallCount = stallHist.count;
 
+    /// --- RESIDENT memory components (RAM, not disk) ---
+    /// These are the canonical RocksDB in-RAM consumers; their sum is the backend's true resident footprint
+    /// (distinct from sstFootprintBytes above, which is on-disk SST size). GetIntProperty writes a uint64_t directly.
+    std::uint64_t memTableBytes = 0;
+    if (db->GetIntProperty("rocksdb.cur-size-all-mem-tables", &memTableBytes))
+    {
+        stats.memTableBytes = memTableBytes;
+    }
+    std::uint64_t blockCacheBytes = 0;
+    if (db->GetIntProperty("rocksdb.block-cache-usage", &blockCacheBytes))
+    {
+        stats.blockCacheBytes = blockCacheBytes;
+    }
+    std::uint64_t tableReadersBytes = 0;
+    if (db->GetIntProperty("rocksdb.estimate-table-readers-mem", &tableReadersBytes))
+    {
+        stats.tableReadersBytes = tableReadersBytes;
+    }
+    std::uint64_t blockCachePinnedBytes = 0;
+    if (db->GetIntProperty("rocksdb.block-cache-pinned-usage", &blockCachePinnedBytes))
+    {
+        stats.blockCachePinnedBytes = blockCachePinnedBytes;
+    }
+
     return stats;
 }
 

@@ -82,6 +82,13 @@ struct BackendStats
     /// distinguishing "many short stalls" from "one long stall".
     std::uint64_t writeStallMicros{0};  ///< Cumulative write-stall time (STALL_MICROS ticker; 0 = no stalls)
     std::uint64_t writeStallCount{0};   ///< Number of stall events (WRITE_STALL histogram count; 0 = no stalls)
+
+    /// RESIDENT-memory components (RAM, NOT disk). sstFootprintBytes above is on-disk; these four are the
+    /// canonical RocksDB in-RAM consumers, summed to attribute the backend's actual resident footprint.
+    std::uint64_t memTableBytes{0};        ///< rocksdb.cur-size-all-mem-tables (active+immutable memtables, RAM)
+    std::uint64_t blockCacheBytes{0};      ///< rocksdb.block-cache-usage (RAM held by the block cache)
+    std::uint64_t tableReadersBytes{0};    ///< rocksdb.estimate-table-readers-mem (index/filter/reader RAM)
+    std::uint64_t blockCachePinnedBytes{0};///< rocksdb.block-cache-pinned-usage (pinned cache RAM, subset of block-cache)
 };
 
 /// Partition index of a spilled blob within one (sliceEnd, workerThreadId) state.

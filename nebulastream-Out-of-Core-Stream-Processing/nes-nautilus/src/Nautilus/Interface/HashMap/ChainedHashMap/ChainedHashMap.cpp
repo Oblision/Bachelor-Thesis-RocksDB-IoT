@@ -14,6 +14,7 @@
 #include <Nautilus/Interface/HashMap/ChainedHashMap/ChainedHashMap.hpp>
 
 #include <algorithm>
+#include <atomic>
 #include <bit>
 #include <cstddef>
 #include <cstdint>
@@ -25,6 +26,7 @@
 #include <Nautilus/Interface/Hash/HashFunction.hpp>
 #include <Nautilus/Interface/HashMap/HashMap.hpp>
 #include <Runtime/AbstractBufferProvider.hpp>
+#include <Util/Logger/Logger.hpp>
 #include <ErrorHandling.hpp>
 
 namespace NES
@@ -110,6 +112,21 @@ ChainedHashMap::ChainedHashMap(const uint64_t keySize, const uint64_t valueSize,
 
 ChainedHashMap::~ChainedHashMap()
 {
+    /// OOC mem_trace: per-map structural gauge (HMGAUGE), read-only, throttled (1 in 4 maps, sampled at
+    /// end-of-life with final entry count). Lets the harness compute the exact header / key+value /
+    /// bucket-directory / page-slack split of the HashMap footprint instead of inferring it.
+    static std::atomic<std::uint64_t> hmGaugeCtr{0};
+    if ((hmGaugeCtr.fetch_add(1, std::memory_order_relaxed) & 0x3U) == 0)
+    {
+        NES_INFO(
+            "HMGAUGE entries={} entrySize={} hdr={} buckets={} entriesPerPage={} pageSize={}",
+            numberOfTuples,
+            entrySize,
+            sizeof(ChainedHashMapEntry),
+            numberOfChains,
+            entriesPerPage,
+            pageSize);
+    }
     clear();
 }
 
@@ -177,13 +194,26 @@ AbstractHashMapEntry* ChainedHashMap::insertEntry(const HashFunction::HashValue:
     /// 1. Check if we need to allocate a new page
     if (numberOfTuples % entriesPerPage == 0)
     {
-        auto newPage = bufferProvider->getUnpooledBuffer(pageSize);
-        if (not newPage)
+        /// BOUNDED variant (ooc-pooled-bounded): rent the page from the FIXED pool (recycled to the free
+        /// list when the slice is freed/spilled) instead of an unpooled chunk that the chunk manager does
+        /// not return to the OS until all its segments drain. This bounds resident RAM at the pool size so
+        /// spilling actually reclaims memory. getBufferBlocking applies back-pressure on pool exhaustion.
+        if (pageSize <= bufferProvider->getBufferSize())
         {
-            throw CannotAllocateBuffer("Could not allocate memory for new page in ChainedHashMap of size {}", std::to_string(pageSize));
+            auto newPage = bufferProvider->getBufferBlocking();
+            std::ranges::fill(newPage.getAvailableMemoryArea(), std::byte{0});
+            storageSpace.emplace_back(newPage);
         }
-        std::ranges::fill(newPage.value().getAvailableMemoryArea(), std::byte{0});
-        storageSpace.emplace_back(newPage.value());
+        else
+        {
+            auto newPage = bufferProvider->getUnpooledBuffer(pageSize);
+            if (not newPage)
+            {
+                throw CannotAllocateBuffer("Could not allocate memory for new page in ChainedHashMap of size {}", std::to_string(pageSize));
+            }
+            std::ranges::fill(newPage.value().getAvailableMemoryArea(), std::byte{0});
+            storageSpace.emplace_back(newPage.value());
+        }
     }
 
     /// 2. Finding the new entry
