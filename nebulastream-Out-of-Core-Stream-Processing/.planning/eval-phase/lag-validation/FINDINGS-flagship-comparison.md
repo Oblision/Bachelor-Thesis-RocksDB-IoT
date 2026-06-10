@@ -68,6 +68,12 @@ Pooled rho>=1: bounded-OOC 14/24, unpooled-OOC 13/24, in-mem 0/18.
 - DID fix reliability/teetering: 8/8 @rho0.69 (vs 4/8) and 8/8 @rho2.21 (vs 7/8) — transient near-cap OOM spikes removed.
 - Implication: the remaining capacity limits are the bucket directories (~30% of HashMap, still unpooled — a Nautilus structure), the fixed pool floor, and the un-spillable hot window. Widening the window needs Nautilus-side changes (bucket-dir layout, [[FINDINGS-hashmap-entry-vtable|entry header]]) + pool/hot-window handling; the JIT/codegen pipeline is needed for none of it.
 
+## BUCKET-TWEAK variant (branch ooc-bucket-tweak; numberOfBuckets = avg_keys/4 in getCreateNewSlicesFunction; same matrix, bt_ labels) — NEGATIVE
+Tried to shrink the ~30% bucket directory by targeting ~4 entries/bucket. Combined3 dataset: `results/combined3_dataset.csv`.
+- **Did not work:** bucket_dir stayed ~34% (HMGAUGE on bt_ binary). The maps show a MIX of bucket counts (16384/8192/4096 = tweaked, ~105 maps; but 32768/65536 = NOT tweaked, ~208 maps). ~2/3 of maps (the larger per-worker-build / unspill maps) size buckets via a DIFFERENT path the one-line change in getCreateNewSlicesFunction does not cover.
+- **No effect on completion:** bucket-tweak 10/24 vs bounded 14/24 @rho>=1, Fisher bt-vs-bounded p=0.31–1.0 (NOT significant); footprint @rho150/200 ~393–441MB ≈ bounded ~402–404MB.
+- Conclusion: a real directory reduction needs the sizing applied at ALL bucket-sizing call sites (slice-create + per-worker build + unspill/merge) — more invasive (still non-Nautilus) — and per the page-pooling evidence (bounded RAM without widening the window) it would likely cut footprint/cost, NOT the window. **bounded (pooled pages) remains the best variant; the bucket-tweak branch is NOT merged.**
+
 ## Caveats
 - Checksum coverage partial (correctness proven at rho0.69 & rho1.56; the uncapped checksum cells used
   pool=16000 and exhausted it, and 2 OOC checksum reps OOM'd). The rho1.56 MATCH (correct while spilling) is
