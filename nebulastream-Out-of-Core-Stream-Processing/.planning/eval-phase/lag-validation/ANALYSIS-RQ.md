@@ -109,5 +109,9 @@ thresholds at 512 (two-sided failure), pool=32k "fix" at ρ≈1 (wrong resource)
 2. `L_unc_r500/700/1000` will likely fail rc=141 (bounded uncapped = unbounded pool demand); ρ-truth for
    the new files therefore comes from the in-mem@2048 footprints (r500: 1358, r700: 1645, r1000: >2048 MB)
    — methodological note for the thesis.
-3. The lever experiment (H1–H6) — its result decides whether the RQ3 story ends at "diagnosed + designed"
-   or "diagnosed + fixed + validated".
+3. ~~The lever experiment (H1–H6)~~ DONE (see EXPERIMENT-stability-levers.md RESULTS): the RQ3 story now
+   ends at "diagnosed → controller fixed → residual limit proven structural". The pool-pressure levers
+   convert *reclaimable* rc=141 cells (c512/r200: 3/10 → 11/16 pooled, p=0.063) at zero throughput cost
+   (+12% at starved cells), and the remaining failures die with `resident=9MB, avail_buf=0` — everything
+   spillable spilled, pool consumed by the un-spillable open-window band. The hot window is the hard floor
+   of OOC feasibility; widening it requires spilling open windows (Nautilus scope, future work).

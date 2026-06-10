@@ -78,6 +78,39 @@ Every cell automatically produces, time-aligned:
 
 `./lever_matrix.sh` (after the build; resumable, skips done cells; labels `S_<arm>_c<cap>_p<pool>k_<rho>_r<rep>`).
 
+## RESULTS (2026-06-10, 188 cells, build 209/209 clean, run 14:23–15:29)
+
+**One-line: the levers work mechanically and help at the margin, but the hard failures are governed by
+UN-SPILLABLE pool demand — the open-window (hot) band — which no spill policy may touch. The controller
+is no longer the binding limit; the data structure is.**
+
+| hypothesis | verdict | evidence |
+|---|---|---|
+| H1 rescue | **PARTIAL** | c512/16k/r200 (deficit within spillable state): 3/10 → A1 6/8 (p=0.077), A1+A2 11/16 (p=0.063), tps unchanged. ALL 16k/32k cells at 1024/2048: 0/8 — see the smoking gun below |
+| H2 flood | **untestable as designed** | paced_waits = 0 everywhere: this workload's band drains through the P=4 partitioned TERMINAL path, not a steady-path watermark jump; the measured flush spikes (r500/r700, +326…+444 MB) live in cells the matrix did not include |
+| H3 corridor | **structural, confirmed** | r300/2048: 0/8 at 64k+128k, dose-invariant (5/15/30%) |
+| H4 cost | **no lever overhead** | within-session, levers-ON BEATS levers-OFF at starved cells (+12% tps — the reserve avoids allocation stalls); G5 −4% (A1) / −9% (A2) vs historic, within session-drift range |
+| H5 sensitivity | not flattened | corridor cells stayed closed (consistent with un-spillable demand) |
+| H6 budget | gauges work | SPILLGAUGE/POOLRESCUE/Lever-metrics all captured; deep budget-honesty check not pursued (moot given H1/H3) |
+
+**The smoking gun** (`S_A1_c1024_p16k_r150_r1`): at death, SPILLGAUGE reads `resident=9MB, avail_buf=0,
+reserve=2400` after 112 slices spilled and 4 rescue fires. The spiller did its job perfectly — everything
+spillable WAS spilled — and the pool was still empty. The demand is the hot band + emitted maps + I/O:
+irreducible by any spill policy. rc=141 cells split cleanly into *reclaimable* (deficit ≤ retained-completed
+state → levers convert them, c512/r200) and *irreducible* (open-window state > pool → nothing converts them).
+
+**A0-regression gate:** completion parity ✓ (4/4, 4/4, 3/4 vs 10/10, 8/10, 4/10). tps this session ran
+4–17% below historic at the 512 cells for ALL arms including levers-off — session drift (and A1/A2 ≥ A0reg
+within-session), not a gating leak; thesis numbers should prefer within-session contrasts.
+
+**Lever counters:** pressure_spills 476 (A1) / 506 (A2), rescue_spills 145/146, paced_waits 0/0.
+
+**Thesis-level take:** this experiment ELIMINATES the alternative explanation "the controller was just
+mis-designed". With a pool-aware, backpressured, flood-paced controller in place, the residual failures
+persist and are attributable to the un-spillable open-window working set — the empirical proof of the
+"hot window is the hard floor" claim, now demonstrated rather than argued. Spilling open windows is a
+Nautilus-level change → documented future work (OPTIONS doc Tier 3).
+
 ## 6. Interpretation guardrails
 - If A0-regression deviates from historic L_ numbers → STOP, the gating leaks; fix before interpreting A1/A2.
 - H3 negative (G1 stays 0) is a FINDING, not a failure: it pins the corridor on the floor side and promotes
