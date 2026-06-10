@@ -128,6 +128,13 @@ public:
     uint64_t registerPoolPressureListener(std::function<bool()> listener) override;
     void unregisterPoolPressureListener(uint64_t listenerId) override;
 
+    /// OOC stability lever N2 (allocation backpressure): when ms > 0, getBufferBlocking on an empty pool stalls
+    /// the allocating thread for up to ms total (re-firing the pressure listeners every wait slice) instead of
+    /// aborting after GET_BUFFER_TIMEOUT. A recycle-progress guard aborts early if no buffer is returned
+    /// pool-wide for two consecutive timeout rounds (gridlock: the would-be drainers are blocked too).
+    /// Call once at engine construction, before queries run. 0 (default) keeps the historic abort.
+    void setAllocationBackpressureMs(uint32_t ms) { allocationBackpressureMs = ms; }
+
     /// Explicitly shuts down the buffer manager: checks for leaked buffers (fires INVARIANT on leaks),
     /// deallocates all memory, and marks the manager as destroyed. The destructor calls this automatically
     /// if it has not already been called.
@@ -174,6 +181,18 @@ private:
     std::atomic<uint64_t> nextPressureListenerId{1};
     /// Count of fire invocations currently executing copied callbacks (unlocked). unregister waits on 0.
     std::atomic<uint32_t> pressureFiresInFlight{0};
+
+    /// N2 allocation backpressure (0 = off). Set once before queries run; read only on the empty-pool path.
+    uint32_t allocationBackpressureMs{0};
+    /// N2 progress guard: bumped on every pooled-buffer recycle; a stalled allocator that sees no epoch
+    /// movement across two full timeout rounds concludes gridlock and falls back to the historic abort.
+    std::atomic<uint64_t> recycleEpoch{0};
+    /// N2 observability (reported as "Backpressure metrics:" in destroy()):
+    std::atomic<uint64_t> bpStallCount{0}; /// allocations that entered the stall path
+    std::atomic<uint64_t> bpStallUsTotal{0}; /// total stalled wall time
+    std::atomic<uint64_t> bpResolved{0}; /// stalls that got a buffer (the lever working)
+    std::atomic<uint64_t> bpGridlockAborts{0}; /// stalls aborted by the progress guard
+    std::atomic<uint64_t> bpBudgetAborts{0}; /// stalls aborted by the total-budget ceiling
 };
 
 

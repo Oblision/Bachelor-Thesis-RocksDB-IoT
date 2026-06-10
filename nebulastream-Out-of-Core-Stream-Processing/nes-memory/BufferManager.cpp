@@ -72,6 +72,17 @@ void BufferManager::destroy()
     NES_DEBUG("Calling BufferManager::destroy()");
     if (isDestroyed.compare_exchange_strong(expected, true))
     {
+        if (allocationBackpressureMs > 0)
+        {
+            NES_INFO(
+                "Backpressure metrics: backpressure_ms={} stalls={} resolved={} gridlock_aborts={} budget_aborts={} stall_us_total={}",
+                allocationBackpressureMs,
+                bpStallCount.load(std::memory_order_relaxed),
+                bpResolved.load(std::memory_order_relaxed),
+                bpGridlockAborts.load(std::memory_order_relaxed),
+                bpBudgetAborts.load(std::memory_order_relaxed),
+                bpStallUsTotal.load(std::memory_order_relaxed));
+        }
         bool success = true;
         if (allBuffers.size() != getNumberOfAvailableBuffers())
         {
@@ -174,6 +185,62 @@ TupleBuffer BufferManager::getBufferBlocking()
     if (buffer.has_value())
     {
         return buffer.value();
+    }
+    /// OOC stability lever N2 (allocation backpressure): the pool stayed empty for a full timeout round.
+    /// Historic behavior (allocationBackpressureMs == 0): abort the query. With N2 enabled, stall this thread
+    /// in further timeout rounds — each round re-fires the pool-pressure listeners every wait slice — so an
+    /// ingest/emit burst that outruns the spiller is throttled to the drain rate instead of killed.
+    /// Guards: (a) gridlock — if no buffer is recycled pool-wide (recycleEpoch unmoved) for two consecutive
+    /// rounds, the would-be drainers are themselves blocked and waiting cannot help: fall back to the abort;
+    /// (b) budget — total stall per allocation is capped at allocationBackpressureMs.
+    if (allocationBackpressureMs > 0)
+    {
+        constexpr uint32_t GRIDLOCK_ROUNDS = 2;
+        const auto stallStart = std::chrono::steady_clock::now();
+        const auto budgetDeadline = stallStart + std::chrono::milliseconds(allocationBackpressureMs);
+        const auto stallUsSoFar = [&stallStart]
+        { return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - stallStart).count(); };
+        bpStallCount.fetch_add(1, std::memory_order_relaxed);
+        auto lastEpoch = recycleEpoch.load(std::memory_order_relaxed);
+        uint32_t roundsWithoutProgress = 0;
+        while (std::chrono::steady_clock::now() < budgetDeadline)
+        {
+            buffer = getBufferWithTimeout(GET_BUFFER_TIMEOUT);
+            if (buffer.has_value())
+            {
+                bpResolved.fetch_add(1, std::memory_order_relaxed);
+                bpStallUsTotal.fetch_add(stallUsSoFar(), std::memory_order_relaxed);
+                NES_INFO(
+                    "BPGAUGE resolved stall_us={} stalls={} resolved={} avail_buf={}",
+                    stallUsSoFar(),
+                    bpStallCount.load(std::memory_order_relaxed),
+                    bpResolved.load(std::memory_order_relaxed),
+                    getNumberOfAvailableBuffers());
+                return buffer.value();
+            }
+            const auto epochNow = recycleEpoch.load(std::memory_order_relaxed);
+            if (epochNow == lastEpoch)
+            {
+                if (++roundsWithoutProgress >= GRIDLOCK_ROUNDS)
+                {
+                    bpGridlockAborts.fetch_add(1, std::memory_order_relaxed);
+                    bpStallUsTotal.fetch_add(stallUsSoFar(), std::memory_order_relaxed);
+                    NES_WARNING("BPGAUGE gridlock abort stall_us={} (no recycle progress for {} rounds)", stallUsSoFar(), GRIDLOCK_ROUNDS);
+                    throw BufferAllocationFailure(
+                        "Global buffer pool gridlocked: no buffer recycled for {} rounds under backpressure", GRIDLOCK_ROUNDS);
+                }
+            }
+            else
+            {
+                roundsWithoutProgress = 0;
+                lastEpoch = epochNow;
+            }
+        }
+        bpBudgetAborts.fetch_add(1, std::memory_order_relaxed);
+        bpStallUsTotal.fetch_add(stallUsSoFar(), std::memory_order_relaxed);
+        NES_WARNING("BPGAUGE budget abort stall_us={} (backpressure budget {} ms exhausted)", stallUsSoFar(), allocationBackpressureMs);
+        throw BufferAllocationFailure(
+            "Global buffer pool could not allocate buffer within backpressure budget({} ms)", allocationBackpressureMs);
     }
     /// Throw exception if no buffer was returned allocated after timeout.
     throw BufferAllocationFailure("Global buffer pool could not allocate buffer before timeout({})", GET_BUFFER_TIMEOUT);
@@ -308,6 +375,8 @@ void BufferManager::recyclePooledBuffer(detail::MemorySegment* segment)
         segment->controlBlock->owningBufferRecycler == nullptr, "Buffer should not retain a reference to its parent while not in use");
     USED_IN_DEBUG const auto couldRecycleBuffer = availableBuffers.writeIfNotFull(segment);
     INVARIANT(couldRecycleBuffer, "should always succeed");
+    /// N2 progress guard: any recycle proves the pipeline is draining — stalled allocators may keep waiting.
+    recycleEpoch.fetch_add(1, std::memory_order_relaxed);
 }
 
 void BufferManager::recycleUnpooledBuffer(detail::MemorySegment*, const AllocationThreadInfo&)

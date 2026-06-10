@@ -73,6 +73,13 @@ public:
            std::to_string(DEFAULT_OPERATOR_BUFFER_SIZE),
            "Buffer size of a operator e.g. during scan",
            {std::make_shared<NumberValidation>()}};
+    UIntOption allocationBackpressureMs
+        = {"allocation_backpressure_ms",
+           "0",
+           "OOC stability lever N2: when > 0, an empty global buffer pool stalls the allocating thread for up to "
+           "this many milliseconds (with a recycle-progress deadlock guard) instead of aborting the query after "
+           "the 1s allocation timeout. 0 (default) keeps the historic abort behavior.",
+           {std::make_shared<NumberValidation>()}};
 
     SliceCacheConfiguration sliceCacheConfiguration = {"slice_cache", "Configuration for the slice cache"};
 
@@ -88,6 +95,7 @@ private:
             &numberOfRecordsPerKey,
             &maxNumberOfBuckets,
             &operatorBufferSize,
+            &allocationBackpressureMs,
             &sliceCacheConfiguration,
             &spill};
     }

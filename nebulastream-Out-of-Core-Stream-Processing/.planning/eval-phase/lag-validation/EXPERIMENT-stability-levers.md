@@ -239,3 +239,24 @@ converting that abort into block-until-headroom (with progress guard) is exactly
 note (from the design review): the wait must not block the thread that drains the emit queue.
 
 Run discipline note: i64 control replicating §7's 0/8 confirms cross-run comparability.
+
+## 9. N2 RUN (pre-registered 2026-06-11, runner `n2_matrix.sh`) — allocation backpressure
+
+N2 implemented on the branch: `allocation_backpressure_ms` (default 0 = historic abort, byte-identical).
+When on, an empty-pool allocation stalls in 1 s rounds (each round re-fires the pressure listeners every
+50 ms) until: buffer obtained (BPGAUGE "resolved"), no pool-wide recycle for 2 rounds (gridlock abort —
+the deadlock guard), or the total budget is exhausted. Plumbed QueryExecutionConfiguration →
+NodeEngineBuilder → BufferManager; env hook `BACKPRESSMS` in run-cell.sh; CELL_BPM + BPGAUGE captured.
+
+Arm **B3** = B2 (pooled, reserve 15, paced, soft=pool/3) + BACKPRESSMS=30000. 8 reps. Controls exist:
+§8 B2 (0/8 at every regime-3 cell), §7 B2 at the money cell (7/8). Money-cell check uses §7's soft=CAP/10.
+
+| id | hypothesis | decision rule |
+|---|---|---|
+| B-H1 | stalling converts the flood: regime-3 cells complete at drain-bound tps | B3 ≥6/8 where §8 B2 = 0/8 (1024/32k/r200; 2048/16k+32k/r200; 512/16k/r150) |
+| B-H2 | the 2048 corridor reopens | any B3 completions at 2048/64k/r300 |
+| B-H3 | free when not needed | money cell 1024/32k/r150 (§7 config + BP): ≥7/8, tps within noise of §7 B2, stalls ≈ 0 |
+| B-H4 | failures convert, not vanish | residual failures show gridlock/budget aborts in CELL_BPM (mechanism visible), not bare 1 s aborts |
+| B-H5 | the price is measurable | stall_us_total + tps deficit vs in-mem = the quantified cost of stability |
+
+G0 gate 512/16k/r075 must stay 8/8. 7 coordinates × 8 reps = 56 cells.
