@@ -205,3 +205,37 @@ All cells pooled (OPBUFSIZE=8192). SOFT/HARD now derive from POOL (pool_MB/3, 2�
 
 B0 ×4 at 2048/32k/r200 for attribution (backpressure alone vs levers under correct soft).
 68 cells ≈ 45–75 min sequential.
+
+### §8 RESULTS (2026-06-11, 68 cells, run 00:01–00:24) — all four hypotheses resolved, three NEGATIVE
+
+**One-line: the soft-threshold spec was NOT the binding cause, max_inflight is NOT the governor, and the
+2048 corridor stays closed — every failure shares one signature (store fully spilled, pool consumed by
+the ingest→partition→emit pipeline at uncapped speed), which isolates N2 (bound the emit flood /
+convert the 1000 ms allocation-timeout abort into sustained backpressure) as the one remaining lever.**
+
+| id | verdict | evidence |
+|---|---|---|
+| F-H1 soft-from-pool | **REFUTED** | 2048/r200: 0/8 at 16k AND 32k with soft=pool/3 (B0 attribution arm also 0/4) |
+| F-H2 corridor reopens | **NO** | 2048/64k/r300 0/8 rc141; 128k 0/8 rc137 (pool floor) — closed pending N2 |
+| F-H3 max_inflight governs the race | **REFUTED** | 512/16k/r150: i64 0/8 (replicates §7 ✓), i32 0/8, i16 0/8; POOLG_MAX still 15884/16000 at i16 — the knob does not reduce pipeline pool draw |
+| F-H4 cost at re-sited cell | **infeasible** | 1024/32k/r200 0/8 rc141 — no cost read; the flood kills it before steady state |
+
+**The unified mechanism (every rc=141 in §7+§8):** at death `resident_mb≈0, avail_buf=0` after 110+
+slices spilled and rescue fires — everything spillable IS spilled; the pool is full of non-store
+buffers. The three-regime feasibility law of the pooled architecture:
+
+1. **Fits**: pipeline + hot-band demand ≤ pool → completes at full ingest speed
+   (1024/32k/r150: 7/8 at 3.38M tps).
+2. **Throttled**: demand > pool but the cgroup cap is tight enough that memory pressure throttles
+   ingest to the spiller's pace → completes (512/16k/r200: 23/24 at 2.5M tps — same workload that
+   dies 0/8 at cap 1024 with DOUBLE the pool, dying at 3.2M tps).
+3. **Flood**: demand > pool and ingest unconstrained → rc=141 regardless of soft spec, lever dose,
+   or admission knob (all 2048 cells, 1024/32k/r200).
+
+Regime 2 is the accidental governor: the cgroup, not our controller, couples ingest to drain. The
+designed governor must live where the abort lives — `getBufferBlocking`'s 1000 ms timeout on the
+emit/work paths. When the store is empty the rescue listener has nothing to free and the abort fires;
+converting that abort into block-until-headroom (with progress guard) is exactly N2. Deadlock risk
+note (from the design review): the wait must not block the thread that drains the emit queue.
+
+Run discipline note: i64 control replicating §7's 0/8 confirms cross-run comparability.
