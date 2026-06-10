@@ -81,6 +81,8 @@ EXTRA_ARGS=""
 # OPBUFSIZE=8192 -> N1: engine pool buffer size >= page_size engages ChainedHashMap's POOLED branch
 # (default 4096 < 8192 left ALL map pages unpooled in every prior run — see OPTIONS doc §7)
 [ -n "${OPBUFSIZE:-}" ] && EXTRA_ARGS="$EXTRA_ARGS --worker.default_query_execution.operator_buffer_size=${OPBUFSIZE}"
+# MAXINFLIGHT=N -> N4: source admission bound (default 64) — caps ingest-side pool draw per source
+[ -n "${MAXINFLIGHT:-}" ] && EXTRA_ARGS="$EXTRA_ARGS --worker.default_max_inflight_buffers=${MAXINFLIGHT}"
 WORKER_ARGS="--worker.number_of_buffers_in_global_buffer_manager=${POOL} \
 --worker.query_engine.number_of_worker_threads=${WTHREADS} ${EXTRA_ARGS} ${SPILL_ARGS}"
 MEM_ARGS=""; [ "$CAP" != none ] && MEM_ARGS="--memory=${CAP}m --memory-swap=${CAP}m"

@@ -190,3 +190,18 @@ Open items from this run:
    fast-ingest race (r150 ingests ~3.4M tps vs r200's self-throttled 2.5M) remains the suspect — the
    N4 max_inflight knob is the designed answer.
 3. G5 cost cell must be re-sited to a pool-feasible point (1024/32k/r200).
+
+## 8. FOLLOW-UP RUN (pre-registered 2026-06-11, runner `followup_n3n4.sh`) — N3 + N4 + cost re-site
+
+All cells pooled (OPBUFSIZE=8192). SOFT/HARD now derive from POOL (pool_MB/3, 2×pool_MB/3), fixing the
+§7 mis-specification. New env hook `MAXINFLIGHT` → `--worker.default_max_inflight_buffers` (default 64).
+
+| id | hypothesis | decision rule |
+|---|---|---|
+| F-H1 | the N1 2048/r200 failures were spec error: soft=pool/3 converts them | B2 ≥6/8 at 16k or 32k ⇒ spec error; 0/8 ⇒ real closure (emit/in-flight demand at uncapped ingest) |
+| F-H2 | the 2048 corridor reopens at r300 with correct soft | any B2 completions at 64k (soft=176) |
+| F-H3 | N4 bounds the fast-ingest race: lower admission converts 512/16k/r150 | i32 or i16 ≥4/8 vs i64 control (expected 0/8, replicating §7) |
+| F-H4 | OOC cost at a pool-feasible cost cell | 1024/32k/r200 B2 vs in-mem (10/10, 3.25M tps, 111 µs): tps within −10%, p99 ratio reported |
+
+B0 ×4 at 2048/32k/r200 for attribution (backpressure alone vs levers under correct soft).
+68 cells ≈ 45–75 min sequential.
