@@ -78,6 +78,9 @@ fi
 EXTRA_ARGS=""
 [ -n "$MAXBUCKETS" ] && EXTRA_ARGS="$EXTRA_ARGS --worker.default_query_execution.max_number_of_buckets=${MAXBUCKETS}"
 [ -n "$PAGESIZE" ] && EXTRA_ARGS="$EXTRA_ARGS --worker.default_query_execution.page_size=${PAGESIZE}"
+# OPBUFSIZE=8192 -> N1: engine pool buffer size >= page_size engages ChainedHashMap's POOLED branch
+# (default 4096 < 8192 left ALL map pages unpooled in every prior run — see OPTIONS doc §7)
+[ -n "${OPBUFSIZE:-}" ] && EXTRA_ARGS="$EXTRA_ARGS --worker.default_query_execution.operator_buffer_size=${OPBUFSIZE}"
 WORKER_ARGS="--worker.number_of_buffers_in_global_buffer_manager=${POOL} \
 --worker.query_engine.number_of_worker_threads=${WTHREADS} ${EXTRA_ARGS} ${SPILL_ARGS}"
 MEM_ARGS=""; [ "$CAP" != none ] && MEM_ARGS="--memory=${CAP}m --memory-swap=${CAP}m"

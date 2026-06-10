@@ -121,3 +121,26 @@ on the maps-in-pool architecture.
   the Tier-0 maxBuckets probe + Tier-2 (pool the bucket dirs) as the remaining path.
 - Watch rescue_spills at G5: if >0 there, the reserve is mis-sized (it should never fire when A0 succeeds
   comfortably) — re-run G5 with RESERVEPCT=5 before concluding H4.
+
+## 7. N1 RE-RUN (pre-registered 2026-06-10, runner `lever_matrix_n1.sh`) — pooling ENGAGED
+
+Per the design review (OPTIONS doc §7): all runs above had `operator_buffer_size=4096` < page_size 8192,
+so the pooled branch never ran. This re-run adds the one flag (`OPBUFSIZE=8192` → run-cell.sh) and re-tests
+at the same pivots. Pool MB are now 2× the unpooled-era labels (16k=132, 32k=264, 64k=528, 128k=1056 MB);
+the pool is allocated upfront, so it is also the anon floor.
+
+Arms: **B0** pooling only (levers OFF — the architecture A/B vs historic heap-map A0),
+**B1** pooling + RESERVEPCT=15, **B2** pooling + RESERVEPCT=15 + PACED. 8 reps each.
+Cells: G0 correctness gate (512/r075/16k, historic 10/10) + G1–G5 as above. Labels `N_<arm>_…`.
+
+| id | hypothesis | decision rule |
+|---|---|---|
+| N-H1 | the flag engages pooling: SPILLGAUGE avail_buf tracks map growth; UPOOLG ≈ bucket dirs only | **CONFIRMED in smoke** (`N_smoke_c512_p16k_r075_r1`): avail 16000→11353 during build, pool_used peak 118/125 MB, rc=0 |
+| N-H2 | maps-in-pool alone changes the failure taxonomy | B0 vs historic A0 rc histograms at G2–G4 |
+| N-H3 | the levers are real now: rescue/pressure spills free pool buffers | B1/B2 > B0 completion at rc=141-dominated cells (Fisher) |
+| N-H4 | the corridor reopens at 2048/r300 | any arm ≥6/8 at G1 ⇒ the old failure was the unpooled architecture |
+| N-H5 | pooled allocation is not slower than heap | G0+G5 tps within −5%, p99 within +15% of historic A0 |
+| N-H6 | anon floor = pool: steady anon ≈ pool MB + unpooled dirs + base; the RQ3 anon advantage shrinks at small ρ, may grow at large ρ via recycling | mem_trace vs S_/L_ anon at identical cells |
+
+Guardrail: G0 must complete ≈8/8 per arm — it is the correctness gate for the pooled path
+(allocation, spill/unspill round-trip, emit). If G0 fails, stop and debug before interpreting G1–G5.
