@@ -118,6 +118,12 @@ thresholds at 512 (two-sided failure), pool=32k "fix" at ρ≈1 (wrong resource)
    at tps PARITY with in-mem (3.38M vs 3.44M) and **−25% steady anon** (517 vs 685 MB). Under the pooled
    architecture lean pools win both footprint AND survival (the old tradeoff dissolves: the pool is the
    anon floor, and pooled allocation is intrinsic backpressure — 512/16k/r200 flips 3/10 → 23/24 even
-   without levers). Residual opens: soft thresholds must derive from POOL not CAP (2048 cells were
-   mis-specified, corridor question still open), and one fast-ingest cell regressed (512/16k/r150,
-   0/24 vs 8/10 — the ingest-vs-drain race, N4's target).
+   without levers). Residual opens — CLOSED by §8+§9: the remaining
+   failure mode (regime 3) is a formally diagnosed role-blind allocation DEADLOCK (emitted window state
+   pins the pool; draining it needs the worker threads that are blocked allocating). Proven invariant to
+   threshold spec, source admission, task-queue bound, and bounded stalling (N2: 118/138 stalls ended in
+   gridlock aborts — zero pool-wide recycles for 2 s — only 10 resolved). The three-regime feasibility law
+   (fits / externally-throttled / deadlock) is the RQ3 capstone; role-aware allocation (drain-side reserve)
+   is the precisely-specified future work. Recommended operating config remains B2 (pooled + reserve 15 +
+   paced, no backpressure): the N2 stall costs −10% tps near the edge for no completion gain; N2's gridlock
+   guard ships as diagnostic instrumentation.

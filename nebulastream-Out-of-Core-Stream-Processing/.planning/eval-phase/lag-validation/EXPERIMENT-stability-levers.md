@@ -260,3 +260,33 @@ Arm **B3** = B2 (pooled, reserve 15, paced, soft=pool/3) + BACKPRESSMS=30000. 8 
 | B-H5 | the price is measurable | stall_us_total + tps deficit vs in-mem = the quantified cost of stability |
 
 G0 gate 512/16k/r075 must stay 8/8. 7 coordinates × 8 reps = 56 cells.
+
+### §9 RESULTS (2026-06-11, 60 cells + 4 probe, run 01:31–01:52)
+
+**One-line: backpressure does NOT convert regime 3 — and that negative is the proof. 138 stalls across
+the run: 118 ended in gridlock aborts (zero pool-wide recycles for 2 full seconds), only 10 resolved,
+0 hit the 30 s budget. The regime-3 failure is now formally a role-blind allocation DEADLOCK — a
+circular hold of pool buffers by emitted-but-unprocessed window state whose draining requires the very
+worker threads that sit blocked in allocation — not a throughput shortfall. Waiting cannot fix it,
+bounding the task queue cannot fix it (probe: admq 64 and 8 both still 0/2, still gridlock), throttled
+ingest (regime 2) and fitting demand (regime 1) remain the only working regimes.**
+
+| id | verdict | evidence |
+|---|---|---|
+| B-H1 stall converts the flood | **REFUTED** | all five regime-3 cells 0/8 rc141; stalls enter but gridlock-abort at ~2.07 s each (= exactly 2 rounds) |
+| B-H2 corridor reopens | **NO** | 2048/64k/r300 0/8; 22/24 stalls gridlocked |
+| B-H3 free when not needed | **PARTIAL** | money cell 6/8 vs §7 B2 7/8 (Fisher n.s.) but tps 3.05M vs 3.38M (−10%) and 8 stalls occurred — the cell sits near the deadlock edge; B2 (no BP) stays the recommended operating config |
+| B-H4 mechanism visible | **CONFIRMED** | uniform taxonomy: gridlock 118 / resolved 10 / budget 0 — every regime-3 death is the circular hold, none is a slow drain |
+| B-H5 price measurable | ✓ | ~2 s per gridlock fire; resolved stalls 7%; G0 gate 8/8 with stalls=0 (true zero-cost when demand fits comfortably) |
+
+**Exploratory queue probe NEGATIVE:** `admission_queue_size` 1000→64→8 changes nothing (0/2, 0/2,
+gridlock signature unchanged) — the pinned 17 k buffers live in emitted slice state referenced BY tasks,
+not in queue entries; bounding task COUNT does not bound buffer FOOTPRINT.
+
+**Closing the lever ledger (§7→§9):** the deadlock is invariant to threshold spec (§8), source admission
+(§8), waiting (§9), task-queue bound (§9), and lever dose (§7 A3). Its two true escapes are architectural:
+(a) role-aware allocation — a drain-side reserve the build path may not consume, so emit/probe always
+progresses (the precisely-specified future-work item; needs an allocation-role tag through
+AbstractBufferProvider); (b) closed-loop ingest admission keyed to pool headroom (what the cgroup does
+by accident in regime 2). N2's lasting value is diagnostic: the gridlock guard turned an opaque rc=141
+into a measured, classified deadlock — and its counters ship with the branch.
