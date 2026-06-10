@@ -144,3 +144,49 @@ Cells: G0 correctness gate (512/r075/16k, historic 10/10) + G1–G5 as above. La
 
 Guardrail: G0 must complete ≈8/8 per arm — it is the correctness gate for the pooled path
 (allocation, spill/unspill round-trip, emit). If G0 fails, stop and debug before interpreting G1–G5.
+
+### §7 RESULTS (2026-06-10, 264 cells, run 19:03–20:27)
+
+**One-line: pooling + levers IS the unlock at the right operating point — the attribution cell
+1024/32k/r150 goes 0/10 (historic) → 0/16 (levers, unpooled) → 0/8 (pooled, no levers) → 5/8 (B1) →
+7/8 (B2) — but the pooled architecture re-draws the whole feasibility map: the pool floor doubles,
+soft thresholds derived from CAP are wrong (must derive from POOL), and one fast-ingest cell regresses.**
+
+| contrast | result | Fisher |
+|---|---|---|
+| **N-H3 levers real** (1024/32k/r150): B2 vs B0 | 7/8 vs 0/8 | **p = 7.0×10⁻⁴** |
+| same, B1+B2 vs unpooled levers S_A1+A2 | 12/16 vs 0/16 | **p = 8.1×10⁻⁶** |
+| same, B1+B2 vs B0+historic A0 | 12/16 vs 0/18 | **p = 3.3×10⁻⁶** |
+| **pooling alone** (512/16k/r200): B0 vs historic A0 | 7/8 vs 3/10 | p = 2.3×10⁻² |
+| same, all pooled arms | 23/24 vs 3/10 | **p = 1.6×10⁻⁴** |
+| **regression** (512/16k/r150): pooled vs historic A0 | 0/24 vs 8/10 | p = 2.5×10⁻⁶ (less) |
+
+**The money cell** (1024 MB cap, pool 32k = 264 MB, r150, arm B2): completion 7/8 vs in-mem 10/10;
+tps 3.38M vs in-mem 3.44M (**−1.7%, parity**); steady anon 517 MB vs in-mem 685 MB (**−25%**);
+p99 215 µs vs 98 µs (2.2×). Working SPILLGAUGE: resident held ~26 MB ≪ soft 102, 14 pressure spills,
+0 rescues — the reserve absorbs the bursts, the regular spiller does the rest.
+
+Hypothesis verdicts:
+- **N-H1 engaged** ✓ (smoke + pool_used up to 248 MB at 32k pools).
+- **N-H2 taxonomy shift** ✓ both directions: G5 (1024/64k/r200, historic 10/10) and 1024/64k/r150 now
+  die rc=137 — the 528 MB upfront pool floor alone breaks the cap; 512/16k/r200 flips 3/10 → 23/24
+  (pooled allocation is intrinsic backpressure: blocking allocs throttle ingest to the spiller's pace).
+- **N-H3 confirmed** ✓ (table above) — with maps in the pool, pressure/rescue spills actually free
+  buffers; the lever architecture works as designed.
+- **N-H4 corridor NOT reopened** at 2048 — but the test was mis-specified: SOFT=CAP/10=204 MB exceeds
+  the 16k/32k pools (132/264 MB), so the regular spiller engaged too late everywhere at 2048; deaths
+  show resident=0, avail=0 after 106 pressure spills — everything spillable spilled, pool eaten by
+  non-store demand (emit/in-flight) at uncapped ingest speed. **Re-test needs soft ≈ pool/3, not cap/10.**
+- **N-H5 cost** ✓ at the money cell (tps parity); G5 infeasible under pooled (floor) — no clean read.
+- **N-H6 anon floor = pool** ✓: successful cells' steady anon ≈ pool + base + unpooled + RocksDB
+  (e.g. 264+124+78+RDB ≈ 517 measured); big pools now kill via rc=137 — pool sizing is THE knob, lean
+  pools win both footprint and survival under the pooled architecture (no longer a tradeoff).
+
+Open items from this run:
+1. **soft-from-pool re-derivation** (the N3 follow-up): re-test 2048 cells with SOFT≈POOL/3 — the
+   corridor question at 2048 is still open, now with a concrete mis-specification to fix.
+2. **512/16k/r150 regression**: dies rc=141 with avail_buf=3371 > reserve at the last spiller wake —
+   a sub-100ms burst kill between samples (or a second allocation path); needs finer sampling. The
+   fast-ingest race (r150 ingests ~3.4M tps vs r200's self-throttled 2.5M) remains the suspect — the
+   N4 max_inflight knob is the designed answer.
+3. G5 cost cell must be re-sited to a pool-feasible point (1024/32k/r200).

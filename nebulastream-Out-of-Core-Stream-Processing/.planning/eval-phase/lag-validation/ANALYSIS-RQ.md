@@ -109,9 +109,15 @@ thresholds at 512 (two-sided failure), pool=32k "fix" at ρ≈1 (wrong resource)
 2. `L_unc_r500/700/1000` will likely fail rc=141 (bounded uncapped = unbounded pool demand); ρ-truth for
    the new files therefore comes from the in-mem@2048 footprints (r500: 1358, r700: 1645, r1000: >2048 MB)
    — methodological note for the thesis.
-3. ~~The lever experiment (H1–H6)~~ DONE (see EXPERIMENT-stability-levers.md RESULTS): the RQ3 story now
-   ends at "diagnosed → controller fixed → residual limit proven structural". The pool-pressure levers
-   convert *reclaimable* rc=141 cells (c512/r200: 3/10 → 11/16 pooled, p=0.063) at zero throughput cost
-   (+12% at starved cells), and the remaining failures die with `resident=9MB, avail_buf=0` — everything
-   spillable spilled, pool consumed by the un-spillable open-window band. The hot window is the hard floor
-   of OOC feasibility; widening it requires spilling open windows (Nautilus scope, future work).
+3. ~~The lever experiment (H1–H6)~~ DONE, then **superseded by the N1 re-run** (EXPERIMENT doc §7): the
+   design review found `operator_buffer_size=4096` < page_size 8192 had left HashMap pages UNPOOLED in
+   every prior run (the levers defended a pool holding no state — the "hot-window hard floor" claim was
+   RETRACTED). With pooling engaged (one flag, 8192), the RQ3 story now ends at its strongest point:
+   **stability is unlocked by pooling + levers together** — 1024/32k/r150 goes 0/10 (historic) → 0/16
+   (levers, unpooled) → 0/8 (pooled, no levers) → 7/8 (B2), Fisher p = 8.1×10⁻⁶ vs unpooled levers,
+   at tps PARITY with in-mem (3.38M vs 3.44M) and **−25% steady anon** (517 vs 685 MB). Under the pooled
+   architecture lean pools win both footprint AND survival (the old tradeoff dissolves: the pool is the
+   anon floor, and pooled allocation is intrinsic backpressure — 512/16k/r200 flips 3/10 → 23/24 even
+   without levers). Residual opens: soft thresholds must derive from POOL not CAP (2048 cells were
+   mis-specified, corridor question still open), and one fast-ingest cell regressed (512/16k/r150,
+   0/24 vs 8/10 — the ingest-vs-drain race, N4's target).
