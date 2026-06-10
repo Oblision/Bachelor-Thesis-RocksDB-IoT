@@ -164,6 +164,46 @@ constraint (the cap), one knob.
    "with a pool-pressure-coupled spiller, OOC matches in-mem stability for ρ<1 and extends the operating
    window to ρ≈2 at every cap", which is exactly the RQ3 story.
 
+## 7. DESIGN REVIEW 2026-06-10 (post-lever-experiment) — a load-bearing discovery
+
+**The "bounded pooled-pages" mechanism never engaged in ANY experiment of this evaluation.**
+
+Evidence chain:
+1. `BufferManager::create(workerConfiguration.defaultQueryExecution.operatorBufferSize, …)`
+   (NodeEngineBuilder.cpp:38) with `DEFAULT_OPERATOR_BUFFER_SIZE = 4096` — never overridden by run-cell.sh.
+   **The engine's pool buffers are 4 KB**, not the assumed 8 KB.
+2. `ChainedHashMap::insertEntry` pools pages only when `pageSize <= bufferSize`; our runs use
+   `page_size=8192 > 4096` → **every HashMap page (slice maps, probe accumulators, unspill
+   re-materialization) was allocated UNPOOLED**, in all L_ cells, threshold sweeps, and the lever matrix.
+3. Measured proof: in `S_A1_c1024_p16k_r150_r1`, the pool sits at 15933/16000 free for the whole build
+   while slice-store resident grows to 110–213 MB and UPOOLG_MAX=364 MB. The maps live on the unpooled heap.
+
+**Consequences (errata):**
+- All pool-size labels are 2× too high: pool=16000 = **62.5 MB**, 64k = 256 MB, 128k = 512 MB.
+- The pageSize=1024 sweep disaster was 4× (not 8×) buffer waste — and it was the only configuration in the
+  whole eval where the pooled branch actually ran.
+- The bounded-vs-unpooled 512 comparison measured "8 KB unpooled pages + new spill code" vs "old code" —
+  its benefits (lower anon, stability, throughput) are real but attributable to allocation granularity and
+  code differences, NOT page recycling through the pool.
+- **The lever experiment's "un-spillable hot band floor" conclusion is retracted.** The pool the levers
+  defended contains NO map state, so rescue spills could not free pool buffers *by construction*. The
+  smoking-gun cell (`resident=9 MB, avail=0`) reads correctly as: state fully spilled (anon side healthy),
+  **I/O pool exhausted by the emit/ingest pipeline** — an independent failure axis the levers never touched.
+  The marginal c512/r200 improvement is likely noise (p=0.077, n=8).
+- The clean part that SURVIVES: the rc-taxonomy now means `rc=141 = I/O-pipeline flood` vs
+  `rc=137 = state overflow (anon)`. The completion windows, Fisher results, cost numbers, and the
+  anon-contrast win at cap=2048 are all unaffected (they never depended on the pooling mechanism).
+
+**Revised non-JIT lever list (supersedes Tiers above where they conflict):**
+| # | change | kind | note |
+|---|---|---|---|
+| N1 | `operator_buffer_size=8192` (one CLI flag) | config | **Engages the intended maps-in-pool architecture for the first time.** Re-running the lever matrix on top makes 1a/1b live for real (spills then DO free pool buffers). A/B maps-in-pool vs maps-on-heap = thesis-grade architecture comparison, ~1 flag + the existing harness |
+| N2 | bound the emit/output flood (cap un-drained chunks; bounded wait in emitChunk) | host code (~30 lines) | now clearly aimed at the REAL rc=141 killer: probe-output/trigger bursts through the unbounded task queue |
+| N3 | pool sizing per role | config | with maps on the heap, the pool is I/O-only: size it for queue depth (the 2048 cells wanting 128k=512 MB were buying QUEUE space, not state space) |
+| N4 | `default_max_inflight_buffers` (=64) sweep | config | source-side admission exists; verify semantics (alloc-to-release?) and whether the ingest-rate sensitivity (r300 vs r700) responds to it |
+| N5 | vtable removal (24→16 B header) | header + rebuild, no JIT-pipeline edit | anon-side −20%: helps the rc=137 class; JIT re-traces sizeof at query compile |
+| N6 | W-sweep at fixed L | config | causal test of the N_w model on the anon side |
+
 ## 6. Scope note
 
 1a/1b/1c/1d touch `nes-physical-operators` (slice store, handler) and one virtual on

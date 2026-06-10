@@ -105,11 +105,15 @@ within-session), not a gating leak; thesis numbers should prefer within-session 
 
 **Lever counters:** pressure_spills 476 (A1) / 506 (A2), rescue_spills 145/146, paced_waits 0/0.
 
-**Thesis-level take:** this experiment ELIMINATES the alternative explanation "the controller was just
-mis-designed". With a pool-aware, backpressured, flood-paced controller in place, the residual failures
-persist and are attributable to the un-spillable open-window working set — the empirical proof of the
-"hot window is the hard floor" claim, now demonstrated rather than argued. Spilling open windows is a
-Nautilus-level change → documented future work (OPTIONS doc Tier 3).
+**Thesis-level take:** ~~this experiment proves the un-spillable hot window is the hard floor~~
+**RETRACTED by the 2026-06-10 design review (OPTIONS doc §7):** `operator_buffer_size` defaults to 4096 <
+page_size 8192, so HashMap pages were UNPOOLED in every run — the pool the levers defended contains no map
+state, and rescue spills could not free pool buffers by construction. The smoking-gun cell reads correctly
+as "state fully spilled, **I/O pool exhausted by the emit/ingest pipeline**" — rc=141 is an I/O-pipeline
+flood, not a state-memory failure. The experiment's real findings: (a) the lever machinery functions
+mechanically end-to-end; (b) rc=141 and rc=137 are INDEPENDENT failure axes (I/O vs anon); (c) the levers
+must be re-tested with pooling actually engaged (`operator_buffer_size=8192`, one flag) before any verdict
+on the maps-in-pool architecture.
 
 ## 6. Interpretation guardrails
 - If A0-regression deviates from historic L_ numbers → STOP, the gating leaks; fix before interpreting A1/A2.
