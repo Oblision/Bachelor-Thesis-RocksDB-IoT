@@ -105,7 +105,9 @@ public:
         uint64_t softThresholdBytes,
         uint64_t hardThresholdBytes,
         uint64_t emitLag = 0,
-        uint64_t numberOfPartitions = 1);
+        uint64_t numberOfPartitions = 1,
+        uint64_t poolReservePct = 0,
+        bool pacedTriggerFlush = false);
 
     /// 2d: number of grace-hash partitions for the terminal partitioned-emit path. 1 (default) = no partitioning; the
     /// handler then delegates terminal emit to the byte-identical base path. P>1 routes the terminal flush through
@@ -304,6 +306,14 @@ private:
     void stopSpiller();
     void spillerLoop(std::stop_token stopToken);
 
+    /// Lever 1a: true when the pool-pressure levers are armed (reserve > 0) AND the stashed provider reports fewer
+    /// available pooled buffers than the reserve. With no provider stashed yet, reports false (never under pressure).
+    [[nodiscard]] bool poolUnderPressure() const;
+    /// Lever 1c: bounded wait (poll, kicking the spiller) until pool availability recovers above the reserve before
+    /// the next per-window unspill of a paced trigger flush. Proceeds after PACED_FLUSH_MAX_WAIT regardless — the
+    /// flush must always make progress (never deadlocks on a probe that cannot drain).
+    void waitForPoolHeadroom();
+
     std::unique_ptr<SpillBackend> backend;
     folly::Synchronized<std::shared_ptr<AbstractBufferProvider>> bufferProvider;
     const uint64_t entriesPerPage;
@@ -320,6 +330,19 @@ private:
     /// 2d: grace-hash partition count for the terminal partitioned-emit path (see getNumberOfPartitions). 1 = the base
     /// (byte-identical) terminal flush; P>1 routes terminal emit through claimWindowForPartitionedEmit + streamWindowPartition.
     const uint64_t numberOfPartitions;
+    /// Lever 1a/1b/1d master switch: % of the pool kept free as a spill-defended reserve. 0 = levers off (baseline).
+    const uint64_t poolReservePct;
+    /// Lever 1c: pace the steady-state trigger flush per-window against the pool reserve (only effective with reserve > 0).
+    const bool pacedTriggerFlush;
+    /// Reserve in BUFFERS, computed once in setBufferProvider from getNumOfPooledBuffers() × poolReservePct / 100.
+    std::atomic<uint64_t> poolReserveBuffers{0};
+    /// 1b: id of the pool-pressure rescue listener registered with the provider (0 = none). Unregistered in stopSpiller.
+    std::atomic<uint64_t> pressureListenerId{0};
+    /// Lever instrumentation (logged in the final Spill metrics line and SPILLGAUGE):
+    std::atomic<std::uint64_t> pressureSpillCount{0}; ///< spills initiated because availability < reserve (1a)
+    std::atomic<std::uint64_t> rescueSpillCount{0}; ///< spills initiated by the allocation-pressure listener (1b)
+    std::atomic<std::uint64_t> pacedWaitCount{0}; ///< paced-flush waits taken (1c)
+    std::atomic<std::uint64_t> pacedWaitUsTotal{0}; ///< total microseconds spent in paced-flush waits (1c)
     /// SliceEnds whose maps are currently spilled — drives isSliceResident() and GC backend-erase.
     folly::Synchronized<std::set<SliceEnd>> spilledKeys;
     /// SliceEnds returned by a trigger feeder (emitted to the async probe) — forceSpill refuses these.

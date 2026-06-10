@@ -249,16 +249,23 @@ LoweringRuleResultSubgraph LowerToPhysicalWindowedAggregation::apply(LogicalOper
             /// 2d: grace-hash partition count for the terminal partitioned-emit path. NOTE: this is the SPILL-config knob
             /// (conf.spill.numberOfPartitions), NOT the unrelated query-level bucket knob conf.numberOfPartitions used for
             /// numberOfBuckets above. 1 (default) keeps the byte-identical non-partitioned terminal flush.
-            conf.spill.numberOfPartitions.getValue());
+            conf.spill.numberOfPartitions.getValue(),
+            /// Stability levers (branch ooc-stability-levers): pool-pressure reserve % (1a/1b/1d; 0 = baseline) and
+            /// paced steady-state trigger flush (1c; effective only with reserve > 0).
+            conf.spill.poolReservePct.getValue(),
+            conf.spill.pacedTriggerFlush.getValue());
         NES_INFO(
             "Lowering windowed aggregation handlerId={} with out-of-core spill enabled (rocksdb at {}, emit_lag={}ms, "
-            "write_buffer={}MB, block_cache={}MB, number_of_partitions={}; 0=RocksDB default)",
+            "write_buffer={}MB, block_cache={}MB, number_of_partitions={}; 0=RocksDB default; pool_reserve_pct={}, "
+            "paced_trigger_flush={})",
             handlerId,
             conf.spill.rocksdbPath.getValue(),
             conf.spill.emitLag.getValue(),
             conf.spill.writeBufferSizeMB.getValue(),
             conf.spill.blockCacheSizeMB.getValue(),
-            conf.spill.numberOfPartitions.getValue());
+            conf.spill.numberOfPartitions.getValue(),
+            conf.spill.poolReservePct.getValue(),
+            conf.spill.pacedTriggerFlush.getValue());
     }
     else
     {

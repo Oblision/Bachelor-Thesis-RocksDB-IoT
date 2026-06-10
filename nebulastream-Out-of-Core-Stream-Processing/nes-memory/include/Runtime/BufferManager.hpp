@@ -121,7 +121,12 @@ public:
     size_t getBufferSize() const override;
     size_t getNumOfPooledBuffers() const override;
     size_t getNumOfUnpooledBuffers() const override;
-    size_t getNumberOfAvailableBuffers() const;
+    size_t getNumberOfAvailableBuffers() const override;
+
+    /// OOC stability lever 1b: pool-pressure listeners (see AbstractBufferProvider). Thread-safe; listeners fire
+    /// from getBufferWithTimeout on the allocating thread when the pool is empty, OUTSIDE any BufferManager lock.
+    uint64_t registerPoolPressureListener(std::function<bool()> listener) override;
+    void unregisterPoolPressureListener(uint64_t listenerId) override;
 
     /// Explicitly shuts down the buffer manager: checks for leaked buffers (fires INVARIANT on leaks),
     /// deallocates all memory, and marks the manager as destroyed. The destructor calls this automatically
@@ -155,6 +160,20 @@ private:
 
     std::shared_ptr<std::pmr::memory_resource> memoryResource;
     std::atomic<bool> isDestroyed{false};
+
+    /// 1b fire path: invoked from getBufferWithTimeout when a wait slice found the pool empty. Copies the
+    /// callbacks out under the lock, invokes them UNLOCKED on the allocating thread. Returns true if any
+    /// listener reported having freed something.
+    bool firePoolPressureListeners();
+
+    /// 1b listener registry. A plain mutex-guarded map (id → listener): registration/deregistration are rare
+    /// (query setup/teardown); the fire path copies the callbacks out under the lock and invokes them unlocked,
+    /// so a listener that itself touches the BufferManager (e.g. queries availability) cannot deadlock.
+    mutable std::mutex pressureListenersMutex;
+    std::vector<std::pair<uint64_t, std::function<bool()>>> pressureListeners;
+    std::atomic<uint64_t> nextPressureListenerId{1};
+    /// Count of fire invocations currently executing copied callbacks (unlocked). unregister waits on 0.
+    std::atomic<uint32_t> pressureFiresInFlight{0};
 };
 
 

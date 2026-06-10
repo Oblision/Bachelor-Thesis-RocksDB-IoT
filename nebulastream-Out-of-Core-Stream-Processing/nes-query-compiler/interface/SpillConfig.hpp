@@ -78,6 +78,29 @@ public:
            "Number of grace-hash partitions for spilled window state at terminal emit; 1 (default) = no partitioning "
            "(byte-identical to non-partitioned emit)."};
 
+    /// Stability lever 1a+1b+1d (pool-pressure defense). Percentage of the global buffer pool the spillable store
+    /// keeps FREE as a reserve: the background spiller additionally drains cold slices whenever availability drops
+    /// below the reserve (1a), the store registers a pool-pressure rescue listener with the BufferManager so an
+    /// allocation that finds the pool empty synchronously spills a cold slice instead of timing out into rc=141 (1b),
+    /// and bucket directories are counted in the resident budget (1d). 0 (default) disables all three — byte-identical
+    /// to the pre-lever store.
+    UIntOption poolReservePct
+        = {"pool_reserve_pct",
+           "0",
+           "Percentage [0-90] of the global buffer pool kept free as a spill-defended reserve; 0 (default) disables "
+           "the pool-pressure levers (baseline behavior)."};
+
+    /// Stability lever 1c (paced steady-state trigger flush). When true AND pool_reserve_pct > 0, the steady-state
+    /// emit path (getTriggerableWindowSlices) re-materialises triggerable windows ONE at a time and, before each
+    /// unspill, waits (bounded) for pool availability to recover above the reserve — so a watermark jump that turns
+    /// the whole retained band triggerable at once becomes a paced drain instead of a pool-exhausting flood. False
+    /// (default) keeps the historic batch unspill.
+    BoolOption pacedTriggerFlush
+        = {"paced_trigger_flush",
+           "false",
+           "Pace the steady-state trigger flush per-window against the pool reserve (requires pool_reserve_pct > 0); "
+           "false (default) = historic batch unspill."};
+
 private:
     std::vector<BaseOption*> getOptions() override
     {
@@ -90,7 +113,9 @@ private:
             &writeBufferSizeMB,
             &blockCacheSizeMB,
             &emitLag,
-            &numberOfPartitions};
+            &numberOfPartitions,
+            &poolReservePct,
+            &pacedTriggerFlush};
     }
 };
 

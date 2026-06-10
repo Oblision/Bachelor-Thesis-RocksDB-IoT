@@ -35,6 +35,7 @@
 #include <vector>
 #include <Aggregation/SpillableAggregationSlice.hpp>
 #include <Identifiers/Identifiers.hpp>
+#include <Nautilus/Interface/HashMap/ChainedHashMap/ChainedHashMap.hpp>
 #include <Nautilus/Interface/HashMap/HashMap.hpp>
 #include <Runtime/AbstractBufferProvider.hpp>
 #include <SliceStore/RocksDBSpillBackend.hpp>
@@ -55,6 +56,12 @@ namespace NES
 namespace
 {
 constexpr std::chrono::milliseconds SPILLER_POLL_INTERVAL{100};
+
+/// Lever 1c: upper bound on one paced-flush wait. The paced trigger flush must always make progress even if the
+/// probe cannot drain (e.g. all workers busy) — after this bound the next window is unspilled regardless.
+constexpr std::chrono::milliseconds PACED_FLUSH_MAX_WAIT{5000};
+/// Lever 1c: poll cadence while waiting for pool headroom (each poll also kicks the spiller).
+constexpr std::chrono::milliseconds PACED_FLUSH_POLL{10};
 
 /// Phase 0b: nearest-rank pXX (p in 0..100) of an already-SORTED ascending sample vector. Returns 0 if empty.
 /// rank = ceil(p*n/100) computed in integer arithmetic, clamped to [1, n]; the value is sorted[rank - 1].
@@ -119,7 +126,9 @@ SpillableTimeBasedSliceStore::SpillableTimeBasedSliceStore(
     const uint64_t softThresholdBytes,
     const uint64_t hardThresholdBytes,
     const uint64_t emitLag,
-    const uint64_t numberOfPartitions)
+    const uint64_t numberOfPartitions,
+    const uint64_t poolReservePct,
+    const bool pacedTriggerFlush)
     : DefaultTimeBasedSliceStore(windowSize, windowSlide, std::move(sliceCacheConfiguration))
     , backend(std::move(backend))
     , entriesPerPage(entriesPerPage)
@@ -128,7 +137,10 @@ SpillableTimeBasedSliceStore::SpillableTimeBasedSliceStore(
     , hardThresholdBytes(hardThresholdBytes)
     , emitLag(emitLag)
     , numberOfPartitions(numberOfPartitions)
+    , poolReservePct(poolReservePct)
+    , pacedTriggerFlush(pacedTriggerFlush)
 {
+    PRECONDITION(poolReservePct <= 90, "pool_reserve_pct must be in [0, 90], got {}", poolReservePct);
     PRECONDITION(this->backend != nullptr, "SpillableTimeBasedSliceStore requires a non-null SpillBackend");
     PRECONDITION(entriesPerPage > 0, "entriesPerPage must be > 0");
     PRECONDITION(pageSize > 0, "pageSize must be > 0");
@@ -170,6 +182,7 @@ std::unique_ptr<SpillBackend> SpillableTimeBasedSliceStore::makeRocksDBBackend(
 void SpillableTimeBasedSliceStore::setBufferProvider(std::shared_ptr<AbstractBufferProvider> provider)
 {
     PRECONDITION(provider != nullptr, "buffer provider must not be null");
+    bool newlyStashed = false;
     bufferProvider.withWLock(
         [&](auto& stashed)
         {
@@ -179,12 +192,83 @@ void SpillableTimeBasedSliceStore::setBufferProvider(std::shared_ptr<AbstractBuf
                 return;
             }
             stashed = std::move(provider);
+            newlyStashed = true;
             NES_DEBUG("Stashed buffer provider for spillable slice store");
         });
+    /// Levers 1a/1b: arm the pool-pressure defense once, on the first (real) stash. The reserve is a fraction of
+    /// the provider's TOTAL pooled buffers; providers without a fixed pool (getNumberOfAvailableBuffers() ==
+    /// SIZE_MAX) never report pressure, so arming is harmless there. The 1b listener deliberately spills exactly
+    /// ONE cold slice per fire (bounded work on the allocating thread); repeated fires drain further slices.
+    if (newlyStashed && poolReservePct > 0)
+    {
+        auto stashedProvider = bufferProvider.copy();
+        const auto totalBuffers = stashedProvider->getNumOfPooledBuffers();
+        poolReserveBuffers.store(totalBuffers * poolReservePct / 100, std::memory_order_relaxed);
+        const auto id = stashedProvider->registerPoolPressureListener(
+            [this]() -> bool
+            {
+                const bool spilled = spillOneColdSlice();
+                if (spilled)
+                {
+                    rescueSpillCount.fetch_add(1, std::memory_order_relaxed);
+                }
+                return spilled;
+            });
+        pressureListenerId.store(id, std::memory_order_relaxed);
+        NES_INFO(
+            "Pool-pressure levers armed: reserve={} of {} buffers ({}%), rescue listener id={}, paced_flush={}",
+            poolReserveBuffers.load(std::memory_order_relaxed),
+            totalBuffers,
+            poolReservePct,
+            id,
+            pacedTriggerFlush);
+    }
     /// PR-3: start the store-owned background spiller lazily once the buffer provider is available (unspill-on-spiller
     /// needs it only on the trigger path, but starting here keeps the lifecycle in one place). Idempotent: the
     /// "already stashed → return" branch above plus startSpiller's CAS guard prevent a double start.
     startSpiller();
+}
+
+bool SpillableTimeBasedSliceStore::poolUnderPressure() const
+{
+    const auto reserve = poolReserveBuffers.load(std::memory_order_relaxed);
+    if (reserve == 0)
+    {
+        return false;
+    }
+    const auto provider = bufferProvider.copy();
+    if (provider == nullptr)
+    {
+        return false;
+    }
+    return provider->getNumberOfAvailableBuffers() < reserve;
+}
+
+void SpillableTimeBasedSliceStore::waitForPoolHeadroom()
+{
+    /// Lever 1c: bounded wait for the pool to recover above the reserve before the next per-window unspill of a
+    /// paced trigger flush. Each poll kicks the spiller (it may still find cold candidates among the not-yet-
+    /// claimed windows of this very batch); the probe draining emitted chunks returns their pooled pages
+    /// asynchronously. Proceed after PACED_FLUSH_MAX_WAIT regardless — pacing must never deadlock the flush.
+    if (!pacedTriggerFlush || !poolUnderPressure())
+    {
+        return;
+    }
+    const auto waitStart = std::chrono::steady_clock::now();
+    const auto deadline = waitStart + PACED_FLUSH_MAX_WAIT;
+    pacedWaitCount.fetch_add(1, std::memory_order_relaxed);
+    while (poolUnderPressure() && std::chrono::steady_clock::now() < deadline)
+    {
+        spillerCv.notify_one();
+        std::this_thread::sleep_for(PACED_FLUSH_POLL);
+    }
+    const auto waitedUs
+        = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - waitStart).count();
+    pacedWaitUsTotal.fetch_add(static_cast<std::uint64_t>(waitedUs), std::memory_order_relaxed);
+    if (poolUnderPressure())
+    {
+        NES_WARNING("Paced trigger flush proceeding under pool pressure after {} us wait (headroom never recovered)", waitedUs);
+    }
 }
 
 std::vector<std::shared_ptr<Slice>> SpillableTimeBasedSliceStore::getSlicesOrCreate(
@@ -217,9 +301,11 @@ std::vector<std::shared_ptr<Slice>> SpillableTimeBasedSliceStore::getSlicesOrCre
         }
         /// PR-3 soft signal: only when NOT already over hard (the hard branch already spilled inline). A cheap compare
         /// that wakes the background spiller — it does NOT spill on the worker path, keeping the worker latency-bounded.
-        else if (resident > softThresholdBytes)
+        /// Lever 1a: pool pressure is an additional wake reason — the pool can be drained by maps the resident budget
+        /// does not count (unspilled-emitted windows, probe accumulators), so defend it independently of soft.
+        else if (resident > softThresholdBytes || poolUnderPressure())
         {
-            NES_TRACE("Soft threshold crossed (resident={} > soft={}); waking spiller", resident, softThresholdBytes);
+            NES_TRACE("Soft threshold or pool reserve crossed (resident={}, soft={}); waking spiller", resident, softThresholdBytes);
             spillerCv.notify_one();
         }
     }
@@ -243,8 +329,15 @@ void SpillableTimeBasedSliceStore::unspillAndMarkEmitted(
     /// ensureWindowSlicesResident so the steady path and the Phase-1 paced terminal flush share exactly ONE unspill+
     /// mark-emitted code path. The terminal path (triggerAllWindows) instead calls ensureWindowSlicesResident directly,
     /// one window at a time, so it never re-materialises the whole retained band at once.
+    ///
+    /// Lever 1c: when paced_trigger_flush is armed, gate EACH window's re-materialisation on pool headroom. A
+    /// watermark jump (e.g. the file source ending) turns the whole retained band triggerable in ONE batch; without
+    /// pacing every window is unspilled into the pool back-to-back while the async probe has drained nothing — the
+    /// measured anon_flush flood and the rc=141 trigger-flood failure mode. waitForPoolHeadroom blocks (bounded)
+    /// until the probe's chunk releases return enough pooled pages, converting the flood into a paced drain.
     for (auto& [windowInfo, slices] : windowSlices)
     {
+        waitForPoolHeadroom();
         ensureWindowSlicesResident(slices);
     }
 }
@@ -904,6 +997,16 @@ uint64_t SpillableTimeBasedSliceStore::residentBytesOf(const Slice& slice) const
         {
             const uint64_t tuples = map->getNumberOfTuples();
             bytes += ((tuples + entriesPerPage - 1) / entriesPerPage) * pageSize;
+            /// Lever 1d (gated with the pool levers so reserve=0 stays byte-identical to the baseline): count the
+            /// bucket directory — (chains+1) pointers, allocated unpooled at first insert and freed with the map on
+            /// spill — so the soft/hard budget tracks the slice's REAL resident cost (~12-15% more than data pages).
+            if (poolReservePct > 0)
+            {
+                if (const auto* chained = dynamic_cast<const ChainedHashMap*>(map); chained != nullptr && tuples > 0)
+                {
+                    bytes += (chained->getNumberOfChains() + 1) * sizeof(void*);
+                }
+            }
         }
     }
     return bytes;
@@ -1058,6 +1161,17 @@ void SpillableTimeBasedSliceStore::logMetrics() const
         m.restoreSampleCount,
         m.partitionRestoreCount);
 
+    /// Stability levers (branch ooc-stability-levers): one grep-stable line with the lever counters, emitted even
+    /// when the levers are disarmed (all zeros) so the harness can always parse it.
+    NES_INFO(
+        "Lever metrics: pool_reserve_pct={} reserve_buf={} pressure_spills={} rescue_spills={} paced_waits={} paced_wait_us={}",
+        poolReservePct,
+        poolReserveBuffers.load(std::memory_order_relaxed),
+        pressureSpillCount.load(std::memory_order_relaxed),
+        rescueSpillCount.load(std::memory_order_relaxed),
+        pacedWaitCount.load(std::memory_order_relaxed),
+        pacedWaitUsTotal.load(std::memory_order_relaxed));
+
     /// E1-PR2: emit a second stable one-liner with RocksDB internal I/O stats if the backend
     /// exposes them (RocksDBSpillBackend does; NullSpillBackend / InMemorySpillBackend return
     /// nullopt and produce no line here).  The tag "RocksDB stats:" is grep-stable for the
@@ -1109,13 +1223,38 @@ void SpillableTimeBasedSliceStore::spillerLoop(std::stop_token stopToken)
         /// evictionMutex and scans createdSlices, so calling it a second time only to format the trace line doubles the
         /// lock contention on the spiller path when trace logging is enabled. No behavior change (same authoritative
         /// value drives the condition and the message).
+        ///
+        /// Lever 1a: the pool reserve is a SECOND drain condition, independent of soft. The pool can be exhausted by
+        /// maps the resident budget does not count (unspilled-emitted windows, probe accumulators, I/O buffers), so
+        /// the spiller defends availability directly: drain while availability < reserve, even when resident <= soft.
         uint64_t resident = residentBytes();
-        while (resident > softThresholdBytes)
+        bool pressure = poolUnderPressure();
+        /// SPILLGAUGE: one line per spiller wake — resident vs soft, pool availability vs reserve, lever counters.
+        /// The harness plots this against the 0.2 s mem_trace to attribute anon movements to spiller activity.
+        if (const auto provider = bufferProvider.copy(); provider != nullptr)
+        {
+            NES_INFO(
+                "SPILLGAUGE resident_mb={} soft_mb={} avail_buf={} reserve_buf={} pressure={} pressure_spills={} rescue_spills={} "
+                "paced_waits={}",
+                resident / 1048576,
+                softThresholdBytes / 1048576,
+                provider->getNumberOfAvailableBuffers(),
+                poolReserveBuffers.load(std::memory_order_relaxed),
+                pressure,
+                pressureSpillCount.load(std::memory_order_relaxed),
+                rescueSpillCount.load(std::memory_order_relaxed),
+                pacedWaitCount.load(std::memory_order_relaxed));
+        }
+        while (resident > softThresholdBytes || pressure)
         {
             if (!spillOneColdSlice())
             {
-                NES_TRACE("Over soft ({} > {}) but no cold candidate; spiller sleeping", resident, softThresholdBytes);
+                NES_TRACE("Over soft ({} > {}) or pool pressure but no cold candidate; spiller sleeping", resident, softThresholdBytes);
                 break;
+            }
+            if (pressure)
+            {
+                pressureSpillCount.fetch_add(1, std::memory_order_relaxed);
             }
             if (stopToken.stop_requested())
             {
@@ -1125,6 +1264,7 @@ void SpillableTimeBasedSliceStore::spillerLoop(std::stop_token stopToken)
             /// the single authoritative read per iteration that L2 deduplicates; it replaces the original condition-only
             /// residentBytes() call so the loop still drains down to soft.
             resident = residentBytes();
+            pressure = poolUnderPressure();
         }
     }
 }
@@ -1141,6 +1281,16 @@ void SpillableTimeBasedSliceStore::startSpiller()
 
 void SpillableTimeBasedSliceStore::stopSpiller()
 {
+    /// Lever 1b teardown: unregister the pool-pressure rescue listener FIRST — BufferManager::unregister waits out
+    /// any in-flight fire, so after this returns no allocation-pressure callback can touch a store that is about to
+    /// quiesce/destruct. Idempotent (id swapped to 0 on the first call).
+    if (const auto id = pressureListenerId.exchange(0, std::memory_order_relaxed); id != 0)
+    {
+        if (const auto provider = bufferProvider.copy(); provider != nullptr)
+        {
+            provider->unregisterPoolPressureListener(id);
+        }
+    }
     /// Idempotent: callable from BOTH the dtor and deleteState. Setting `quiesced` first makes pickAndReserveColdSlice
     /// bail so the loop drains; then request_stop + notify wakes the wait_for, and join blocks until the loop exits.
     {

@@ -15,6 +15,9 @@
 
 #include <chrono>
 #include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <limits>
 #include <optional>
 #include <vector>
 #include <Runtime/TupleBuffer.hpp>
@@ -52,6 +55,21 @@ public:
 
     /// Returns an unpooled buffer of size bufferSize wrapped in an optional or an invalid option if an error
     virtual std::optional<TupleBuffer> getUnpooledBuffer(size_t bufferSize) = 0;
+
+    /// OOC stability lever 1a (pool-pressure spill trigger): number of currently rentable pooled buffers.
+    /// Providers without a fixed pool report SIZE_MAX, which reads as "never under pressure" — so consumers
+    /// (the spillable slice store) can poll this unconditionally without knowing the provider's concrete type.
+    virtual size_t getNumberOfAvailableBuffers() const { return std::numeric_limits<size_t>::max(); }
+
+    /// OOC stability lever 1b (allocation-pressure rescue): register a listener invoked by the provider when a
+    /// pooled-buffer rent finds the pool EMPTY, giving the owner of reclaimable pool memory (the spillable slice
+    /// store, which can spill a cold slice and thereby return its pages) a chance to free buffers BEFORE the
+    /// allocation times out and aborts the query. The listener runs on the ALLOCATING thread (deliberate
+    /// backpressure: the worker blocks while memory is freed) and MUST NOT rent pooled buffers itself (spilling
+    /// only frees them). Returns true if it (likely) freed at least one buffer. The returned id deregisters the
+    /// listener (mandatory before the listener's owner dies). Default implementation: no-op (id 0, nothing fires).
+    virtual uint64_t registerPoolPressureListener(std::function<bool()> /*listener*/) { return 0; }
+    virtual void unregisterPoolPressureListener(uint64_t /*listenerId*/) { }
 };
 
 }

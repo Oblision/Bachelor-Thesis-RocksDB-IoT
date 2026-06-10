@@ -66,6 +66,11 @@ if [ "$SPILL" = on ]; then
 --worker.default_query_execution.spill.number_of_partitions=${NPART} \
 --worker.default_query_execution.spill.compression=${COMP} \
 --worker.default_query_execution.spill.emit_lag=${EMIT_LAG}"
+  # Stability levers (branch ooc-stability-levers), env-gated so existing callers are unchanged:
+  #   RESERVEPCT=15  -> pool_reserve_pct (1a pool-pressure spiller + 1b allocation rescue + 1d dir accounting)
+  #   PACED=on       -> paced_trigger_flush (1c paced steady-state flush; needs RESERVEPCT>0)
+  [ -n "${RESERVEPCT:-}" ] && SPILL_ARGS="$SPILL_ARGS --worker.default_query_execution.spill.pool_reserve_pct=${RESERVEPCT}"
+  [ "${PACED:-}" = on ] && SPILL_ARGS="$SPILL_ARGS --worker.default_query_execution.spill.paced_trigger_flush=true"
 else
   SPILL_ARGS="--worker.default_query_execution.spill.enabled=false \
 --worker.default_query_execution.spill.emit_lag=${EMIT_LAG}"
@@ -108,6 +113,9 @@ docker run --rm $MEM_ARGS --cpus="${DCPUS}" --cpuset-cpus=${CPUSET} --workdir /w
   echo \"CELL_POOLG_MAX=\$(grep -h 'POOLGAUGE' \"\$NESLOG\" 2>/dev/null | grep -oE 'used_buf=[0-9]+' | cut -d= -f2 | sort -n | tail -1)\"
   echo \"CELL_POOLG_LAST=\$(grep -h 'POOLGAUGE' \"\$NESLOG\" 2>/dev/null | grep -oE 'used_buf=[0-9]+' | tail -1 | cut -d= -f2)\"
   echo \"CELL_UPOOLG_MAX=\$(grep -h 'UPOOLGAUGE' \"\$NESLOG\" 2>/dev/null | grep -oE 'live_chunk_bytes=[0-9]+' | cut -d= -f2 | sort -n | tail -1)\"
+  echo \"CELL_LEVERM=\$(grep -h 'Lever metrics:' \"\$NESLOG\" 2>/dev/null | sed 's/^.*Lever metrics:/Lever metrics:/' | tail -1)\"
+  echo \"CELL_RESCUES=\$(grep -hc 'POOLRESCUE' \"\$NESLOG\" 2>/dev/null || echo 0)\"
+  echo CELL_SPILLG_START; grep -h 'SPILLGAUGE' \"\$NESLOG\" 2>/dev/null | sed 's/^.*SPILLGAUGE //' | head -5000; echo CELL_SPILLG_END
   echo CELL_HMG_START; grep -h 'HMGAUGE' \"\$NESLOG\" 2>/dev/null | sed 's/^.*HMGAUGE //' | head -3000; echo CELL_HMG_END
   rm -rf ${SPILLDIR} 2>/dev/null
 " > "$RUN_LOG" 2>&1

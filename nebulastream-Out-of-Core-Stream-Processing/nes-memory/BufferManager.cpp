@@ -20,10 +20,12 @@
 #include <cstdio>
 #include <cstring>
 #include <deque>
+#include <functional>
 #include <memory>
 #include <memory_resource>
 #include <mutex>
 #include <optional>
+#include <thread>
 #include <utility>
 #include <unistd.h>
 #include <Runtime/AbstractBufferProvider.hpp>
@@ -195,15 +197,25 @@ std::optional<TupleBuffer> BufferManager::getBufferWithTimeout(const std::chrono
 {
     detail::MemorySegment* memSegment = nullptr;
     const auto deadline = std::chrono::steady_clock::now() + timeoutMs;
-    if (!availableBuffers.tryReadUntil(deadline, memSegment))
+    /// OOC stability lever 1b: wait in short slices instead of one full-timeout block. On every empty slice,
+    /// fire the registered pool-pressure listeners (the spillable slice store spills a cold slice, returning its
+    /// pooled pages to `availableBuffers`), then retry until the overall deadline. With no listener registered
+    /// this is just a timed-retry rendering of the historic single wait — same deadline, same outcome.
+    constexpr auto PRESSURE_SLICE = std::chrono::milliseconds(50);
+    while (!availableBuffers.tryReadUntil(std::min(std::chrono::steady_clock::now() + PRESSURE_SLICE, deadline), memSegment))
     {
-        return std::nullopt;
+        if (std::chrono::steady_clock::now() >= deadline)
+        {
+            return std::nullopt;
+        }
+        firePoolPressureListeners(); /// freed buffers (if any) are picked up by the next wait slice
     }
     /// OOC mem_trace gauge: throttled, read-only pool-occupancy sample (POOLGAUGE) for component
-    /// attribution over time (e.g. detecting result-emission floods at stream close). One in 65536 rents.
+    /// attribution over time (e.g. detecting result-emission floods at stream close). One in 4096 rents
+    /// (densified from 65536 for the stability-lever experiments; still amortized to noise).
     {
         static std::atomic<std::uint64_t> poolGaugeCtr{0};
-        if ((poolGaugeCtr.fetch_add(1, std::memory_order_relaxed) & 0xFFFFU) == 0)
+        if ((poolGaugeCtr.fetch_add(1, std::memory_order_relaxed) & 0xFFFU) == 0)
         {
             const auto avail = getNumberOfAvailableBuffers();
             const auto total = allBuffers.size();
@@ -215,6 +227,73 @@ std::optional<TupleBuffer> BufferManager::getBufferWithTimeout(const std::chrono
         return TupleBuffer(memSegment->controlBlock.get(), memSegment->ptr, memSegment->size);
     }
     throw InvalidRefCountForBuffer("[BufferManager] got buffer with invalid reference counter");
+}
+
+uint64_t BufferManager::registerPoolPressureListener(std::function<bool()> listener)
+{
+    const auto id = nextPressureListenerId.fetch_add(1, std::memory_order_relaxed);
+    {
+        const std::scoped_lock lock(pressureListenersMutex);
+        pressureListeners.emplace_back(id, std::move(listener));
+    }
+    NES_INFO("Registered pool-pressure listener id={}", id);
+    return id;
+}
+
+void BufferManager::unregisterPoolPressureListener(const uint64_t listenerId)
+{
+    {
+        const std::scoped_lock lock(pressureListenersMutex);
+        std::erase_if(pressureListeners, [&](const auto& entry) { return entry.first == listenerId; });
+    }
+    /// Wait out any in-flight fire so the caller may safely destroy the listener's owner after this returns
+    /// (the fire path invokes copied callbacks UNLOCKED, so erasing from the registry alone does not stop a
+    /// callback that is already running). Fires are short (one cold-slice spill); bound the wait defensively.
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+    while (pressureFiresInFlight.load(std::memory_order_acquire) > 0)
+    {
+        if (std::chrono::steady_clock::now() >= deadline)
+        {
+            NES_ERROR("unregisterPoolPressureListener: in-flight pressure fire did not drain within 30s; proceeding");
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+}
+
+bool BufferManager::firePoolPressureListeners()
+{
+    /// Copy the callbacks out under the lock; invoke them UNLOCKED on the allocating thread (deliberate
+    /// backpressure — the worker blocks while reclaimable memory is freed). POOLRESCUE is logged throttled
+    /// (1 in 8 fires) so a sustained stall cannot flood the log; the spill itself is visible in SPILLGAUGE.
+    std::vector<std::function<bool()>> callbacks;
+    {
+        const std::scoped_lock lock(pressureListenersMutex);
+        if (pressureListeners.empty())
+        {
+            return false;
+        }
+        callbacks.reserve(pressureListeners.size());
+        for (const auto& [id, cb] : pressureListeners)
+        {
+            callbacks.push_back(cb);
+        }
+    }
+    static std::atomic<std::uint64_t> rescueFireCtr{0};
+    if ((rescueFireCtr.fetch_add(1, std::memory_order_relaxed) & 0x7U) == 0)
+    {
+        NES_INFO("POOLRESCUE fired listeners={} avail_buf={} total_buf={}", callbacks.size(), getNumberOfAvailableBuffers(), allBuffers.size());
+    }
+    /// In-flight guard: unregisterPoolPressureListener waits for this to drain before returning, so a listener's
+    /// owner can be destroyed safely right after unregistering (the callbacks below run UNLOCKED).
+    pressureFiresInFlight.fetch_add(1, std::memory_order_acq_rel);
+    bool anyFreed = false;
+    for (const auto& cb : callbacks)
+    {
+        anyFreed = cb() || anyFreed;
+    }
+    pressureFiresInFlight.fetch_sub(1, std::memory_order_acq_rel);
+    return anyFreed;
 }
 
 std::optional<TupleBuffer> BufferManager::getUnpooledBuffer(const size_t bufferSize)
