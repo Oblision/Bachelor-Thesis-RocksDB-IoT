@@ -15,6 +15,20 @@
 
 #include <Runtime/UnpooledChunksManager.hpp>
 
+/// ASan manual poisoning for unpooled sub-allocations (mirrors BufferManager.cpp): chunks are single
+/// malloc'd slabs sub-divided by bump allocation, so overruns/stale writes BETWEEN sub-allocations are
+/// invisible to ASan without explicit poisoning. No-ops in non-sanitized builds.
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+extern "C" void __asan_poison_memory_region(void const volatile*, size_t);
+extern "C" void __asan_unpoison_memory_region(void const volatile*, size_t);
+#define NES_UPOOL_POISON(addr, size) __asan_poison_memory_region((addr), (size))
+#define NES_UPOOL_UNPOISON(addr, size) __asan_unpoison_memory_region((addr), (size))
+#else
+#define NES_UPOOL_POISON(addr, size) ((void)0)
+#define NES_UPOOL_UNPOISON(addr, size) ((void)0)
+#endif
+
+
 #include <algorithm>
 #include <atomic>
 #include <cstddef>
@@ -199,6 +213,7 @@ UnpooledChunksManager::getUnpooledBuffer(const size_t neededSize, size_t alignme
     /// Getting space from the unpooled chunks manager
     const auto& [localKeyForUnpooledBufferChunk, localMemoryForNewTupleBuffer]
         = this->allocateSpace(threadId, alignedBufferSizePlusControlBlock, alignment);
+    NES_UPOOL_UNPOISON(localMemoryForNewTupleBuffer, alignedBufferSizePlusControlBlock);
 
     /// Creating a new memory segment, and adding it to the unpooledMemorySegments
     const auto alignedBufferSize = alignBufferSize(neededSize, alignment);
@@ -221,6 +236,7 @@ UnpooledChunksManager::getUnpooledBuffer(const size_t neededSize, size_t alignme
                 curUnpooledChunk.activeMemorySegments);
             curUnpooledChunk.activeMemorySegments -= 1;
             upoolOnSegmentFree(static_cast<int64_t>(memorySegment->size)); /// OOC-INSTRUMENTATION: read size BEFORE the reset below
+            NES_UPOOL_POISON(memorySegment->ptr, memorySegment->size);
             memorySegment->size = 0;
             if (curUnpooledChunk.activeMemorySegments == 0)
             {

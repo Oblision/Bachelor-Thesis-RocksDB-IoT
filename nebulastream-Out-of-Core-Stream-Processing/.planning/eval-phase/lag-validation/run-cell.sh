@@ -87,6 +87,8 @@ EXTRA_ARGS=""
 [ -n "${BACKPRESSMS:-}" ] && EXTRA_ARGS="$EXTRA_ARGS --worker.default_query_execution.allocation_backpressure_ms=${BACKPRESSMS}"
 # SRCGATE=N -> ingest governor: source waits before renting while global pool free% < N (closed-loop admission)
 [ -n "${SRCGATE:-}" ] && EXTRA_ARGS="$EXTRA_ARGS --worker.source_admission_gate_pct=${SRCGATE}"
+# SLICECACHE=off -> disable the per-worker slice cache (raw map-pointer cache; spill-fence bypass suspect)
+[ "${SLICECACHE:-}" = off ] && EXTRA_ARGS="$EXTRA_ARGS --worker.default_query_execution.slice_cache.enable_slice_cache=false"
 # ADMQ=N -> exploratory: bound the query-engine admission queue (default 1000 tasks)
 [ -n "${ADMQ:-}" ] && EXTRA_ARGS="$EXTRA_ARGS --worker.query_engine.admission_queue_size=${ADMQ}"
 WORKER_ARGS="--worker.number_of_buffers_in_global_buffer_manager=${POOL} \

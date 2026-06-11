@@ -13,6 +13,20 @@
 */
 #include <Runtime/BufferManager.hpp>
 
+/// ASan manual poisoning for the pool slab: the pool is ONE allocation, so buffer recycle/rent are
+/// invisible to AddressSanitizer. Poisoning released buffers turns any stale-pointer write through a
+/// recycled page (the spill-vs-emit UAF family) into an immediate, precisely-attributed ASan report.
+/// No-ops in non-sanitized builds.
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+extern "C" void __asan_poison_memory_region(void const volatile*, size_t);
+extern "C" void __asan_unpoison_memory_region(void const volatile*, size_t);
+#define NES_POOL_POISON(addr, size) __asan_poison_memory_region((addr), (size))
+#define NES_POOL_UNPOISON(addr, size) __asan_unpoison_memory_region((addr), (size))
+#else
+#define NES_POOL_POISON(addr, size) ((void)0)
+#define NES_POOL_UNPOISON(addr, size) ((void)0)
+#endif
+
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -253,6 +267,7 @@ std::optional<TupleBuffer> BufferManager::getBufferNoBlocking()
     {
         return std::nullopt;
     }
+    NES_POOL_UNPOISON(memSegment->ptr, memSegment->size);
     if (memSegment->controlBlock->prepare(shared_from_this()))
     {
         return TupleBuffer(memSegment->controlBlock.get(), memSegment->ptr, memSegment->size);
@@ -277,6 +292,7 @@ std::optional<TupleBuffer> BufferManager::getBufferWithTimeout(const std::chrono
         }
         firePoolPressureListeners(); /// freed buffers (if any) are picked up by the next wait slice
     }
+    NES_POOL_UNPOISON(memSegment->ptr, memSegment->size);
     /// OOC mem_trace gauge: throttled, read-only pool-occupancy sample (POOLGAUGE) for component
     /// attribution over time (e.g. detecting result-emission floods at stream close). One in 4096 rents
     /// (densified from 65536 for the stability-lever experiments; still amortized to noise).
@@ -373,6 +389,7 @@ void BufferManager::recyclePooledBuffer(detail::MemorySegment* segment)
     INVARIANT(segment->isAvailable(), "Recycling buffer callback invoked on used memory segment");
     INVARIANT(
         segment->controlBlock->owningBufferRecycler == nullptr, "Buffer should not retain a reference to its parent while not in use");
+    NES_POOL_POISON(segment->ptr, segment->size);
     USED_IN_DEBUG const auto couldRecycleBuffer = availableBuffers.writeIfNotFull(segment);
     INVARIANT(couldRecycleBuffer, "should always succeed");
     /// N2 progress guard: any recycle proves the pipeline is draining — stalled allocators may keep waiting.
