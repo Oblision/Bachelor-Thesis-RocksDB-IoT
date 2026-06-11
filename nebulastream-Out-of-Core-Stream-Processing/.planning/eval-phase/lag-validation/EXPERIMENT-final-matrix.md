@@ -188,3 +188,13 @@ save them (U8's own rc137×8 at 512/r200 demonstrates heap state>cap dies regard
 **Practical recommendations (final):** big state / high ρ → heap allocation + the granularity flag
 (U8 config: one flag, dominates the shipped default everywhere tested); tight caps with footprint
 guarantees → bounded B2; the shipped 4096 default → recommend upstream change.
+
+## GAP-CLOSURE RUN (pre-registered 2026-06-11; runner gaps_run.sh)
+1. **U8 arm completion** (heap @8128, leverless, soft=CAP/10, 8 reps): 512/16k×{r100,r300},
+   1024/32k×{r200,r300}, 2048/16k×{r300,r500,r1000} — fills every "—" in the three-arm master table.
+   Predictions: r100@512 ≈ valley (fast ingest); r300@512, r200/r300@1024, r1000@2048 = rc137
+   (state>cap); r500@2048 ≈ 8/8 (mirrors default arch, +granularity).
+2. **W 2048 sliver probe** (B2, soft=CAP/10, 8 reps): pool 96k (792 MB — untested between 64k ✓ and
+   128k ✗floor) × {r200 control, r300, r500}. Predictions: r200 8/8 (control); r300 = THE open cell —
+   if its band ≤ 792 MB it completes and the 2048 bounded window extends; r500 likely rc141 (band too
+   big) or rc137 (unpooled+floor). Any r300 completions ⇒ the 2048 wall is pool-geometry, not deadlock.
