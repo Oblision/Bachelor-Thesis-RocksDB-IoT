@@ -209,3 +209,31 @@ r200 8/8, **r300 5/8 (bounded-ONLY: U8 0/8 rc141, default 0/10)**, **r500 8/8**.
 **Boundary run (pre-registered): pool ≈ 40% of cap geometry.** W@2048/96k × {r700, r1000};
 W@1024/48k (396 MB) × {r150, r200, r300}. Predictions: r700@96k = open decisive cell; r1000 rc137;
 1024/48k: r150 high, r200 marginal, r300 rc141.
+
+## BOUNDARY RESULTS + 512 GEOMETRY CLOSURE (pre-registered 2026-06-11)
+Boundary run (16:05–16:57): **W@2048/96k/r700 = 8/8** (0.85M tps — bounded pays 45% tps vs U8's
+1.55M but COMPLETES the former heap-flagship cell); r1000 0/8 rc141 (band > 792 MB = the true 2048
+edge); **1024/48k (39% of cap): r150 8/8, r200 3/8 (the valley, survivors at 2.73M), r300 8/8** —
+the geometry rule transplants. The complementarity largely DISSOLVES at geometry-correct pools:
+bounded covers everything heap covers at 1024/2048 plus the bounded-only 2048/r300; heap keeps the
+valley cells (fast-ingest, band≈pool) and the throughput edge at the heavy end. Footprint advantage
+inverts at big pools (r700: bounded 1437 vs heap 1072 MB).
+**512 closure (predictions):** 24k pool (198 MB ≈ 39%): r100 → unlock or valley; r150 → unlock
+(band ~150-200 MB ≤ 198); r200 → keeps 8/8 (throttled regime survives any pool ≥ demand).
+
+### 512 closure result + THE COMPLETED FEASIBILITY LAW (final form)
+512/24k (39% of cap): r100/r150/r200 ALL 0/8 **rc137** — not pool exhaustion: the pool floor plus its
+own induced overhead breaks the cap. Mechanism: a bigger pool retains more resident slices; every
+resident slice carries UNPOOLED bucket-directory bytes; so anon grows superlinearly with pool size at
+fixed cap. The bounded feasibility window is two-sided:
+  **band ≤ pool   AND   pool + dir_overhead(pool) + base + RocksDB ≤ cap**
+with two modifiers: the throttled regime rescues band>pool cells when the cap (or heap pressure)
+slows ingest, and fast-ingest valleys kill marginal cells where survivors would need >2.7 M tps drain.
+Per cap: 2048 → wide window (r200–r700 ✓ at 96k; r1000 = band > max pool); 1024 → 48k works
+(r150 ✓, r200 valley 3/8, r300 ✓); 512 → upper bound sits below r150's band (base = 24% of cap;
+only r075 (fits) and r200 (throttled) complete — an explained, permanent limit at the smallest cap.
+
+**Final deployment rule:** cap ≥ 1024 and completion/footprint-guarantee priority → bounded with
+pool ≈ 40% of cap (covers the heap window plus bounded-only cells like 2048/r300, at a throughput
+cost at the heavy end: r700 0.85M vs heap 1.55M); cap ≤ 512 or throughput priority → heap + 8K
+granularity. r1000@2048 fails under every configuration tested = the absolute edge of this engine.
