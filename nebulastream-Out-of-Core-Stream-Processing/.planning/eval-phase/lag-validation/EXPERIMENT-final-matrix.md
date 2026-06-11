@@ -198,3 +198,14 @@ guarantees → bounded B2; the shipped 4096 default → recommend upstream chang
    128k ✗floor) × {r200 control, r300, r500}. Predictions: r200 8/8 (control); r300 = THE open cell —
    if its band ≤ 792 MB it completes and the 2048 bounded window extends; r500 likely rc141 (band too
    big) or rc137 (unpooled+floor). Any r300 completions ⇒ the 2048 wall is pool-geometry, not deadlock.
+
+## GAP-RUN RESULTS + BOUNDARY RUN (2026-06-11)
+Gap run (14:59–16:03): **the 2048 bounded wall was pool geometry.** W@96k (792 MB ≈ 39% of cap):
+r200 8/8, **r300 5/8 (bounded-ONLY: U8 0/8 rc141, default 0/10)**, **r500 8/8**. U8 gaps: 512/r100
+7/8 @1.86M tps (cgroup throttles the heap arm too — regime 2 generalizes; explains the 512 U8 wins),
+512/r300 0/8 rc137, 1024/r200 6/8, 1024/r300 8/8, 2048/r300 0/8 rc141 (the heap valley at 2048),
+2048/r500 8/8 (anon 1072 < bounded@96k 1336 — big pools erase the footprint advantage), r1000 0/8 rc137.
+
+**Boundary run (pre-registered): pool ≈ 40% of cap geometry.** W@2048/96k × {r700, r1000};
+W@1024/48k (396 MB) × {r150, r200, r300}. Predictions: r700@96k = open decisive cell; r1000 rc137;
+1024/48k: r150 high, r200 marginal, r300 rc141.
