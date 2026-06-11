@@ -265,3 +265,30 @@ Arm GA = B2 + SRCGATE=30 (source waits while global pool free < 30%). Control = 
 | GF-H3 | free when not needed | gate_waits ≈ 0 AND tps within noise at r075, money cell, 2048/r500+r700 |
 | GF-H4 | binary regression gate | control (gate off) reproduces W-era results at 2 valley cells (~2/8, ~3/8) |
 | GF-H5 | the everything-on config | 512/24k/r150 + maxbuckets 4096 + gate: ≥6/8 (P4's unlock survives the governor) |
+
+## FULL-CIRCLE RESULTS (2026-06-11, 88 cells, 20:58–22:54) — governor v1 REFUTED, with mechanism
+
+**One-line: the pool-%-free source gate fails in BOTH directions — it never fires at the valley
+cells (the depletion is a fast transient between source-rent sampling points, driven by downstream
+amplification, not input rents) and it self-deadlocks the heavy cells (30% free is unsatisfiable
+against r700's legitimate steady-state occupancy: the source froze in the gate, watermarks stalled,
+the band never drained — 0/8 rc124, memory trace frozen at 1288 MB, zero SRCGATE lines = one
+infinite wait). The correct design requirement is now empirically derived: the admission credit
+must be MONOTONE IN SOURCE PROGRESS (window-lag credit) or role-aware at the allocator — a global
+%-free signal conflates legitimate occupancy with transient danger and cannot work.**
+
+| id | verdict | evidence |
+|---|---|---|
+| GF-H1 valleys convert | **REFUTED** | GA ≈ control at all four valleys (2/8, 0/8, 1/8, 5/8); gate_waits = 0 everywhere |
+| GF-H2 bug unreachable | untestable | gate never engaged; GA valleys died rc141 like W (no rc134 — unthrottled runs don't reach the churn) |
+| GF-H3 free when not needed | **REFUTED at heavy cells** | r075/r200/r500/money unharmed (8/8, 8/8, 8/8, 5/8) BUT r700: 8/8 → **0/8 rc124** — the gate breaks a winner |
+| GF-H4 binary regression | ✓ | controls reproduce W-era (2/4, 2/4) |
+| GF-H5 everything-on | ✓ | 512/24k/r150 + maxbuckets + gate: **8/8** (P4's unlock reproduces; gate idle) |
+
+Thesis value: a measured negative that derives the design constraint the literature states abstractly
+— Flink-style credit flow works because credits are granted per-exchange by the consumer (monotone in
+progress); Storm's max.spout.pending works because credits release on tuple-tree completion. A global
+resource gauge is the one signal that cannot distinguish "the pool is full because the system is
+working" from "the pool is full because the system is dying". Combined with §9: BOTH naive coupling
+points (allocation-time backpressure, source-time %-free gating) are refuted with mechanism, leaving
+window-lag credit / role-aware allocation as the precisely-specified, doubly-motivated future work.
