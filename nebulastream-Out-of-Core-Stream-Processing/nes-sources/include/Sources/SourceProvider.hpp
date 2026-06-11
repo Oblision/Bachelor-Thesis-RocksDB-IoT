@@ -32,10 +32,11 @@ class SourceProvider
 {
     size_t defaultMaxInflightBuffers;
     std::shared_ptr<AbstractBufferProvider> bufferPool;
+    size_t sourceAdmissionGatePct{0};
 
 public:
     /// Constructor that can be configured with various options
-    SourceProvider(size_t defaultMaxInflightBuffers, std::shared_ptr<AbstractBufferProvider> bufferPool);
+    SourceProvider(size_t defaultMaxInflightBuffers, std::shared_ptr<AbstractBufferProvider> bufferPool, size_t sourceAdmissionGatePct = 0);
 
     /// Returning a shared pointer, because sources may be shared by multiple executable query plans (qeps).
     [[nodiscard]] std::unique_ptr<SourceHandle>

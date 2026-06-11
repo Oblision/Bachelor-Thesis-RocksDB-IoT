@@ -57,6 +57,15 @@ public:
            "SourceDescriptor).",
            {std::make_shared<NumberValidation>()}};
 
+    /// OOC ingest governor (closed-loop source admission): when > 0, a source thread waits before
+    /// renting an input buffer while the global pool's availability is below this percentage of the
+    /// pool. Asymmetric backpressure: ONLY sources wait; drain-side work never does. 0 = off.
+    UIntOption sourceAdmissionGatePct
+        = {"source_admission_gate_pct",
+           "0",
+           "Source admission gate: minimum free-buffer percentage of the global pool required before a source rents an input buffer. 0 disables.",
+           {std::make_shared<NumberValidation>()}};
+
     EnumOption<DumpMode::Options> dumpQueryCompilationIR
         = {"dump_compilation_result",
            DumpMode::Options::NONE,
@@ -74,6 +83,7 @@ private:
             &network,
             &numberOfBuffersInGlobalBufferManager,
             &defaultMaxInflightBuffers,
+            &sourceAdmissionGatePct,
             &dumpQueryCompilationIR,
             &dumpGraph};
     }

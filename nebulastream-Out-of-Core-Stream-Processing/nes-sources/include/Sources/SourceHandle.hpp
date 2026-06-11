@@ -34,6 +34,8 @@ class SourceThread;
 struct SourceRuntimeConfiguration
 {
     size_t inflightBufferLimit;
+    /// OOC ingest governor: free-buffer percentage of the global pool required before renting (0 = off).
+    size_t admissionGatePct{0};
 };
 
 /// Interface class to handle sources.

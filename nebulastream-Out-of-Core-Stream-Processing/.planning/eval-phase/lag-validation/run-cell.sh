@@ -85,6 +85,8 @@ EXTRA_ARGS=""
 [ -n "${MAXINFLIGHT:-}" ] && EXTRA_ARGS="$EXTRA_ARGS --worker.default_max_inflight_buffers=${MAXINFLIGHT}"
 # BACKPRESSMS=N -> N2: empty-pool allocations stall up to N ms (recycle-progress guarded) instead of aborting
 [ -n "${BACKPRESSMS:-}" ] && EXTRA_ARGS="$EXTRA_ARGS --worker.default_query_execution.allocation_backpressure_ms=${BACKPRESSMS}"
+# SRCGATE=N -> ingest governor: source waits before renting while global pool free% < N (closed-loop admission)
+[ -n "${SRCGATE:-}" ] && EXTRA_ARGS="$EXTRA_ARGS --worker.source_admission_gate_pct=${SRCGATE}"
 # ADMQ=N -> exploratory: bound the query-engine admission queue (default 1000 tasks)
 [ -n "${ADMQ:-}" ] && EXTRA_ARGS="$EXTRA_ARGS --worker.query_engine.admission_queue_size=${ADMQ}"
 WORKER_ARGS="--worker.number_of_buffers_in_global_buffer_manager=${POOL} \
@@ -125,6 +127,7 @@ docker run --rm $MEM_ARGS --cpus="${DCPUS}" --cpuset-cpus=${CPUSET} --workdir /w
   echo \"CELL_LEVERM=\$(grep -h 'Lever metrics:' \"\$NESLOG\" 2>/dev/null | sed 's/^.*Lever metrics:/Lever metrics:/' | tail -1)\"
   echo \"CELL_RESCUES=\$(grep -hc 'POOLRESCUE' \"\$NESLOG\" 2>/dev/null || echo 0)\"
   echo \"CELL_BPM=\$(grep -h 'Backpressure metrics:' \"\$NESLOG\" 2>/dev/null | sed 's/^.*Backpressure metrics:/Backpressure metrics:/' | tail -1)\"
+  echo \"CELL_SRCG=\$(grep -h 'Source admission metrics:' \"\$NESLOG\" 2>/dev/null | sed 's/^.*Source admission metrics:/Source admission metrics:/' | tail -1)\"
   echo CELL_BPG_START; grep -h 'BPGAUGE' \"\$NESLOG\" 2>/dev/null | sed 's/^.*BPGAUGE //' | head -2000; echo CELL_BPG_END
   echo CELL_SPILLG_START; grep -h 'SPILLGAUGE' \"\$NESLOG\" 2>/dev/null | sed 's/^.*SPILLGAUGE //' | head -5000; echo CELL_SPILLG_END
   echo CELL_HMG_START; grep -h 'HMGAUGE' \"\$NESLOG\" 2>/dev/null | sed 's/^.*HMGAUGE //' | head -3000; echo CELL_HMG_END

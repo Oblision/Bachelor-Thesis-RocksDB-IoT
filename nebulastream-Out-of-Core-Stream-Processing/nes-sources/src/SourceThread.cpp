@@ -22,6 +22,7 @@
 #include <memory>
 #include <stop_token>
 #include <string>
+#include <thread>
 #include <utility>
 #include <variant>
 #include <Identifiers/Identifiers.hpp>
@@ -44,9 +45,11 @@ SourceThread::SourceThread(
     BackpressureListener backpressureListener,
     OriginId originId,
     std::shared_ptr<AbstractBufferProvider> poolProvider,
-    std::unique_ptr<Source> sourceImplementation)
+    std::unique_ptr<Source> sourceImplementation,
+    const size_t admissionGatePct)
     : originId(originId)
     , localBufferManager(std::move(poolProvider))
+    , admissionGatePct(admissionGatePct)
     , sourceImplementation(std::move(sourceImplementation))
     , backpressureListener(std::move(backpressureListener))
 {
@@ -83,9 +86,30 @@ SourceImplementationTermination dataSourceThreadRoutine(
     BackpressureListener backpressureListener,
     Source& source,
     std::shared_ptr<AbstractBufferProvider> bufferProvider,
-    const EmitFn& emit)
+    const EmitFn& emit,
+    const size_t admissionGatePct)
 {
     source.open(bufferProvider);
+    /// OOC ingest governor (closed-loop source admission): before renting an input buffer, wait until
+    /// the global pool has at least gateBuffers free. Asymmetric by construction: only this source
+    /// thread ever waits; spill/emit/sink threads never do, so the role-blind allocation deadlock
+    /// cannot form through this path. The spiller replenishes the very signal being waited on.
+    const size_t totalPooled = bufferProvider->getNumOfPooledBuffers();
+    const size_t gateBuffers = (admissionGatePct > 0 && totalPooled > 0) ? (totalPooled * admissionGatePct) / 100 : 0;
+    uint64_t gateWaits = 0;
+    uint64_t gateWaitUsTotal = 0;
+    SCOPE_EXIT
+    {
+        if (gateBuffers > 0)
+        {
+            NES_INFO(
+                "Source admission metrics: gate_pct={} gate_buffers={} gate_waits={} gate_wait_us={}",
+                admissionGatePct,
+                gateBuffers,
+                gateWaits,
+                gateWaitUsTotal);
+        }
+    };
     SCOPE_EXIT
     {
         source.close();
@@ -106,6 +130,22 @@ SourceImplementationTermination dataSourceThreadRoutine(
         std::optional<TupleBuffer> emptyBuffer;
         while (!emptyBuffer && !stopToken.stop_requested())
         {
+            if (gateBuffers > 0 && bufferProvider->getNumberOfAvailableBuffers() < gateBuffers)
+            {
+                const auto gateStart = std::chrono::steady_clock::now();
+                while (!stopToken.stop_requested() && bufferProvider->getNumberOfAvailableBuffers() < gateBuffers)
+                {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(5));
+                }
+                const auto waitedUs
+                    = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - gateStart).count();
+                ++gateWaits;
+                gateWaitUsTotal += waitedUs;
+                if ((gateWaits & 0xFFU) == 1)
+                {
+                    NES_INFO("SRCGATE wait_us={} waits={} avail={} gate={}", waitedUs, gateWaits, bufferProvider->getNumberOfAvailableBuffers(), gateBuffers);
+                }
+            }
             emptyBuffer = bufferProvider->getBufferWithTimeout(std::chrono::milliseconds(25));
         }
         if (stopToken.stop_requested())
@@ -143,7 +183,8 @@ void dataSourceThread(
     SourceReturnType::EmitFunction emit,
     const OriginId originId,
     ///NOLINTNEXTLINE(performance-unnecessary-value-param) `jthread` does not allow references
-    std::shared_ptr<AbstractBufferProvider> bufferProvider)
+    std::shared_ptr<AbstractBufferProvider> bufferProvider,
+    const size_t admissionGatePct)
 {
     size_t sequenceNumberGenerator = SequenceNumber::INITIAL;
     const EmitFn dataEmit = [&](TupleBuffer&& buffer, bool shouldAddMetadata)
@@ -158,7 +199,7 @@ void dataSourceThread(
     try
     {
         result.set_value_at_thread_exit(
-            dataSourceThreadRoutine(stopToken, std::move(backpressureListener), *source, std::move(bufferProvider), dataEmit));
+            dataSourceThreadRoutine(stopToken, std::move(backpressureListener), *source, std::move(bufferProvider), dataEmit, admissionGatePct));
         if (!stopToken.stop_requested())
         {
             emit(originId, SourceReturnType::EoS{}, stopToken);
@@ -193,7 +234,8 @@ bool SourceThread::start(SourceReturnType::EmitFunction&& emitFunction)
         sourceImplementation.get(),
         std::move(emitFunction),
         originId,
-        localBufferManager);
+        localBufferManager,
+        admissionGatePct);
     thread = std::move(sourceThread);
     return true;
 }

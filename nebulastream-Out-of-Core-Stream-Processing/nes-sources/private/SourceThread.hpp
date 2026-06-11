@@ -62,7 +62,8 @@ public:
         BackpressureListener backpressureListener,
         OriginId originId, /// Todo #241: Rethink use of originId for sources, use new identifier for unique identification.
         std::shared_ptr<AbstractBufferProvider> bufferManager,
-        std::unique_ptr<Source> sourceImplementation);
+        std::unique_ptr<Source> sourceImplementation,
+        size_t admissionGatePct = 0);
 
     SourceThread() = delete;
     SourceThread(const SourceThread& other) = delete;
@@ -91,6 +92,8 @@ public:
 protected:
     OriginId originId;
     std::shared_ptr<AbstractBufferProvider> localBufferManager;
+    /// OOC ingest governor: free-buffer percentage of the global pool required before renting (0 = off).
+    size_t admissionGatePct{0};
     std::unique_ptr<Source> sourceImplementation;
     std::atomic_bool started;
     BackpressureListener backpressureListener;
