@@ -109,3 +109,16 @@ Derived design constraint (the thesis's closing insight): admission credit must 
 dying-full. Both naive coupling points (N2 alloc-time, v1 source-time) now refuted with mechanism — doubly
 motivating the specified future work. GF-H5: B2+maxbuckets4096 = 8/8 at formerly-locked cell (everything-on
 config validated). Eval is COMPLETE — no open cells, all arms attributed, ~3000 cells total.
+
+**PHASE-1 BUG HUNT COMPLETE (2026-06-12 ~00:15, cfc3702+): TWIN-DEFECT verdict.** Corruption root-caused via
+ASan + manual arena poisoning (pool slab + unpooled chunks — both invisible to ASan without poisoning; hooks
+retained, no-ops in normal builds): double-free = two concurrent insertEntry on one ChainedHashMap. Cause:
+per-worker SliceCache (default ON, "unless weird behavior happens") hands JIT raw map pointers that bypass ALL
+spill fences (pin/claim/spillInProgress guard only the cache-MISS path). Falsified both ways: cache-on 3/3 crash,
+cache-off 4/4 clean. BUT cache-off gauntlet: 0/8 rc141 at ALL 10 groups incl. winners — every late write then
+pins its slice till emit, and with jitter D = retention L the WHOLE band pins → spilling impossible. The defects
+interlock: cache masks pins, pins exist for the cache. Headline data unaffected (corruption confined to already-
+failing cells, ~20/3000). Upstream fix precisely specified: epoch-stamped cache invalidation on spill (JIT-
+boundary = out of thesis scope). Architectural lesson for thesis: unmediated raw pointers into evictable state
+need an invalidation protocol — Flink avoids it by mediating every access. SLICECACHE=off hook exists in
+run-cell.sh. Paced-valley conversion at tight caps blocked behind the upstream fix.

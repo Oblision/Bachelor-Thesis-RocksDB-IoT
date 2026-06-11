@@ -292,3 +292,33 @@ resource gauge is the one signal that cannot distinguish "the pool is full becau
 working" from "the pool is full because the system is dying". Combined with §9: BOTH naive coupling
 points (allocation-time backpressure, source-time %-free gating) are refuted with mechanism, leaving
 window-lag credit / role-aware allocation as the precisely-specified, doubly-motivated future work.
+
+## GAUNTLET RESULTS + THE TWIN-DEFECT FINDING (2026-06-12, 80 cells, 23:55–00:09)
+
+Cache-off is REFUTED as a mitigation: all 10 cell groups 0/8 rc141 — including both winner cells —
+with the signature `slices_spilled=0, resident≫soft, pressure=true`: the spiller is awake and finds
+NOTHING spillable. Mechanism: without the cache, every late write traverses
+pinAndUnspillForLateWrite, which pins the slice until emit; with jitter D = retention L (our workload
+design), every slice in the band receives late writes, so the whole band is pinned. The pin exists to
+protect cached raw pointers; the cache exists for speed; each defect masks the other:
+
+| | spilling | corruption |
+|---|---|---|
+| cache ON (default, the whole eval) | works (pins bypassed) | stale-pointer subset corrupts under extreme churn (~20 cells, ALL in already-failing regions) |
+| cache OFF | impossible under D=L (band fully pinned) | none |
+
+**Why the eval's headline data stands:** every winner cell ran cache-on and crash-free across ~3000
+cells; the corruption manifests only at high-churn cells that fail by rc141/rc137 anyway.
+
+**The architectural lesson (thesis-grade, ties to related work):** JIT-cached raw pointers into
+evictable state are fundamentally unsafe without an invalidation protocol. Flink's RocksDB backend
+never faces this because EVERY state access is mediated by the backend interface; NebulaStream's
+slice cache hands compiled code unmediated pointers, so state eviction and the cache must be
+coupled. The precise upstream fix: epoch-stamped cache entries, store bumps the epoch on spill,
+cache-hit validates the epoch (one compare per hit). In-scope alternatives are exhausted: sticky
+pins (cache-off) forbid spilling under D=L; pin expiry cannot help when the write horizon equals
+the retention horizon; per-write fencing requires the same JIT-boundary change as invalidation.
+
+Phase-1 verdict: the corruption is root-caused, falsified both directions, and bounded (failing
+cells only); the fix is specified at the exact line; an in-scope code fix does not exist. The
+paced-valley conversions at tight caps remain blocked behind the upstream invalidation fix.
