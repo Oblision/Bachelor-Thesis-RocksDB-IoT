@@ -57,6 +57,18 @@ admission_queue_size (probe 64/8 negative), waiting, lever dose. Escapes are arc
 (drain-side reserve via AbstractBufferProvider role tag) or closed-loop ingest admission on pool headroom — future
 work, precisely specified. SHIP CONFIG = B2 (pooled+reserve15+paced, BP off): money cell B3 6/8 ≈ B2 7/8 but
 tps −10%; N2's gridlock guard stays as instrumentation. Lever ledger CLOSED; remaining unexplored: N5 vtable
-−20% (entry-inheritance refactor), N6 W-sweep. Thesis story complete: unlock proven at money cell, residual
-boundary formally characterized.
+−20% (entry-inheritance refactor), N6 W-sweep.
+
+**FINAL MATRIX DONE (2026-06-11, V 282 cells + W 282 cells + arbitration): COMPLEMENTARY-WINDOWS verdict.**
+V (soft=pool/3) DEMOTED — understates arch (V2 arbitration: CAP/10 8/8 vs pool/3 3/8 at 512/16k/r200, p=0.026);
+headline = W (soft=CAP/10). W windows (pooled B2): 512→r200 8/8 (ρ≈2, p=2.3e-5 vs in-mem, beats default arch's
+3/10 at p=3.8e-3); 1024→r150 11/16 pooled; 2048→NOTHING above ρ≈0.5 (default arch owns r300-r700 there).
+Non-monotone in ρ at 512/16k (r075 8/8, r100 2/8, r150 1/8, r200 8/8) = race-model proof (fast light maps outrun
+drain; heavy maps self-throttle). Cost: pooled −3..−12% tps but p99 2-5× in-mem everywhere (tail-latency tax) vs
+~1.2× default arch at low ρ; 2048/64k/r200 = 528MB pool does what default needed 1GB-class pool for, +5% tps,
+−11% anon. Checksum MATCH 4/4 under pooled spilling (6620446084; rc141 teardown wart belongs to checksum
+TEMPLATE — in-mem ref also exits 141). NEW BUG: pooled restore path not exception-safe (rc134 bad_function_call
+/ rc11, ~20 cells, churn-dependent, only in already-failing cells). Lean-pool rule REFUTED (bigger feasible pool
+better; interior optimum). Thesis headline = two-architecture complementarity; role-aware allocation = the one
+mechanism that would merge the windows. Data: results/V_*, W_*, V2_*; EXPERIMENT-final-matrix.md.
 [[project-ooc-mechanics]] [[feedback-match-baseline-config]]

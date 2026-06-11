@@ -192,26 +192,45 @@ backpressure/gridlock guard→5.10, feasibility corridor→7.6a, three regimes�
   sanity-checked per run; Chapter 8 reports the incident that taught us this rule.
 
 ### 7.2 RQ1 — effectiveness
-- 7.2.1 At 512 MB, the backend completed 14/24 runs where the in-memory engine completed 0/18
-  [E: Fisher p=4.1×10⁻⁵, flagship].
-- 7.2.2 Output checksums match the reference while spilling is active [E: checksum cell ρ=1.56].
-- 7.2.3 Each cap has an operating window in ρ: 512 MB covers ρ≈1.2–2.2; 1024 MB reaches ρ≥1.54;
-  both with p=3.6×10⁻⁴ [E: L-matrix per-cap tables].
-- 7.2.4 At 2048 MB no completion above ρ≈1 was demonstrated; the upper edge there is open [E: r1000
-  cells].
-- 7.2.5 ρ alone does not decide completion: a workload at ρ≈0.74 that ingests at 2.9 M tuples/s
-  fails where a heavier workload at ρ≈0.80 that ingests at 1.1 M tuples/s completes 10/10
-  [E: r300 vs r700 at 2048].
-- 7.2.6 Completion is therefore a race between ingest rate and spill-drain rate; this reframing
-  drives the rest of the evaluation.
+*(Two architectures are evaluated: the engine-default configuration (maps on the heap) and the
+corrected configuration (maps in the pool, Chapter 5 iterations two onward, config W). Why there
+are two is the subject of 7.6; here the windows of both are reported.)*
+- 7.2.1 At 512 MB under the default architecture, the backend completed 14/24 runs where the
+  in-memory engine completed 0/18 [E: Fisher p=4.1×10⁻⁵, flagship].
+- 7.2.2 Output checksums match the in-memory reference while spilling is active, under both
+  architectures [E: default arch ρ=1.56; corrected arch 4/4 identical, checksum 6620446084].
+- 7.2.3 The default architecture has cap-dependent operating windows: 512 MB covers ρ≈1.2–2.2;
+  1024 MB reaches ρ≥1.54; both p=3.6×10⁻⁴ [E: L-matrix]; at 2048 MB it completes heavy workloads
+  (r500, r700 10/10) below ρ≈1 [E: corrected high-ρ cells].
+- 7.2.4 The corrected architecture has narrower, lower-ρ windows — and new completions inside
+  them: at 512 MB it completes ρ≈2.0 with 8/8 where the default managed 3/10 (p=3.8×10⁻³ for the
+  improvement; p=2.3×10⁻⁵ vs in-mem) [E: W 512/16k/r200]; at 1024 MB it holds ρ≈1.4 (11/16 pooled
+  vs 0/10, p=5.7×10⁻⁴) [E: W+N1]; at 2048 MB it completes nothing above ρ≈0.5 [E: W r300+].
+- 7.2.5 Neither architecture dominates: the default owns the high-ρ territory, the corrected
+  architecture wins inside its window; the windows are complementary [E: W-vs-L window tables].
+- 7.2.6 ρ alone does not decide completion: under the default architecture a ρ≈0.74 workload at
+  2.9 M tuples/s fails where a ρ≈0.80 workload at 1.1 M tuples/s completes 10/10 [E: r300 vs r700
+  at 2048]; under the corrected architecture completion at 512/16k is non-monotone in ρ
+  (r075 8/8, r100 2/8, r150 1/8, r200 8/8) because fast ingest outruns the drain while heavy maps
+  self-throttle into the pool's backpressure [E: W 512 column, survivor tps 3.33 vs 1.98 M].
+- 7.2.7 Completion is therefore a race between ingest rate and drain rate in both architectures;
+  this reframing drives the rest of the evaluation.
 
 ### 7.3 RQ2 — cost
-- 7.3.1 Where both variants complete, the backend costs 3–22% throughput [E: both-arms table].
-- 7.3.2 The cost grows with state size and shrinks with memory headroom [E: same table, trend].
-- 7.3.3 Tail latency grows from microseconds to milliseconds at ten-million-key working sets
-  (460 µs → 2509 µs p99), which is the spill-restore round trip surfacing in the tail [E: r700].
-- 7.3.4 Spill and restore latencies are reported as distributions [E: spill metrics lines].
-- 7.3.5 The cost is configuration-point dependent; we report the range, not one number.
+- 7.3.1 Where both variants complete, the default architecture costs 3–22% throughput [E:
+  both-arms table]; the corrected architecture costs 3–12% at its comfortable cells [E: W table].
+- 7.3.2 The cost grows with state size and shrinks with memory headroom [E: same tables, trend].
+- 7.3.3 Under the default architecture, tail latency grows from microseconds to milliseconds at
+  ten-million-key working sets (460 µs → 2509 µs p99) — the spill-restore round trip in the tail
+  [E: r700].
+- 7.3.4 The corrected architecture adds a tail-latency tax everywhere: p99 runs 2–5× the in-memory
+  engine even at comfortable cells (allocation-path contention), versus ~1.2× for the default
+  architecture at low ρ [E: W 485/358/238 µs vs in-mem 95/96/109 µs].
+- 7.3.5 The corrected architecture is more pool-efficient: 2048/64k/r200 completes with a 528 MB
+  pool where the default needed a 1 GB-class pool, at +5% throughput and −11% resident memory vs
+  in-mem [E: W vs historic 128k cell].
+- 7.3.6 Spill and restore latencies are reported as distributions [E: spill metrics lines].
+- 7.3.7 The cost is configuration-point dependent; we report ranges, not single numbers.
 
 ### 7.4 RQ4 — CPU and I/O *(analysis pass over existing columns; no new runs)*
 - 7.4.1 CPU utilization of the backend vs the in-memory engine across ρ.
@@ -274,6 +293,14 @@ backpressure/gridlock guard→5.10, feasibility corridor→7.6a, three regimes�
 - 7.6m The recommended operating configuration is pooling + reserve + paced restore with
   backpressure off; backpressure costs 10% throughput near the edge and converts nothing, but its
   gridlock guard ships as diagnostic instrumentation.
+- 7.6n The full-grid confirmation run (config W) adds three closing findings: soft thresholds must
+  stay at the cap-derived rule — the pool-derived rule loses 8/8 → 3/8 at the decisive cell
+  [E: V2 arbitration, p=0.026]; the pooled restore path is not exception-safe — an allocation
+  failure mid-restore leaves a half-restored slice that crashes on next use (≈20 cells, only in
+  cells failing anyway) [E: rc134/rc11 cluster, bad_function_call]; and the two architectures'
+  windows are complementary (7.2.5), with the role-blind deadlock (7.6k) as the proven reason the
+  pooled window cannot widen — making role-aware allocation the single mechanism that would merge
+  the two windows.
 
 ### 7.7 Summary
 - 7.7.1 One table: each RQ → verdict → strongest single number.

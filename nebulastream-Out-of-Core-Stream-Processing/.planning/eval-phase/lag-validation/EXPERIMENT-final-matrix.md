@@ -70,3 +70,60 @@ threshold-sensitivity + robustness arm. The headline grid re-runs as W_* with th
    completion 3/8 → 8/8 (p = 0.026).
 3. Checksum template adds emit-side pool demand (historic caveat confirmed under pooling) —
    checksum cells re-sited to headroom-rich coordinates (1024/32k/r100).
+
+## W RESULTS (2026-06-11, 282 cells 08:19–10:04 + checksum refs)
+
+**One-line: the corrected architecture and the default architecture have COMPLEMENTARY operating
+windows — pooled wins quality (parity tps, lower anon, new completions) inside a narrower, lower-ρ
+window governed by the pool; the default arch owns the high-ρ territory; correctness under pooled
+spilling is confirmed (checksum MATCH 4/4); the regime model explains every row, including a
+non-monotonicity in ρ that no state-size model can.**
+
+### Beyond-memory wins under W (in-mem capped = 0/10 at these cells)
+| cap | cell | W | Fisher vs in-mem | vs default arch |
+|---|---|---|---|---|
+| 512 | 16k/r200 (ρ≈2.0) | **8/8** | **p=2.3×10⁻⁵** | default 3/10 → **p=3.8×10⁻³ improvement** |
+| 1024 | 32k/r150 (ρ≈1.4) | 4/8 (+N1 7/8 → 11/16) | p=5.7×10⁻⁴ pooled | default 0/10 @32k |
+| 2048 | — | none (r300+ all 0/8) | — | default owns r300–r700 |
+
+### The non-monotonicity that proves the race model (V-H3 ✓)
+At 512/16k: r075 8/8, **r100 2/8, r150 1/8, r200 8/8**, r300 0/8. Completion is NOT monotone in ρ.
+Survivor tps explains it: r100 ingests at 3.33 M tps (outruns the drain), r200 self-throttles to
+1.98 M (pool backpressure couples ingest to drain). Same pattern at 1024 (r100 8/8 fast-and-fits,
+r150 4/8 edge, r200 0/8 too big to fit + too fast to throttle).
+
+### Cost under pooled (both-arms cells, W vs in-mem)
+| cell | W tps | in-mem tps | Δ | W p99 | in-mem p99 |
+|---|---|---|---|---|---|
+| 512/16k/r075 | 2.77M | 3.15M | −12% | 485 µs | 95 µs |
+| 1024/32k/r100 | 3.04M | 3.14M | −3% | 358 µs | 96 µs |
+| 2048/64k/r200 | 3.06M | 3.25M | −6% | 238 µs | 109 µs |
+Δtps matches or beats the default arch's 3–22% band; the new cost axis is TAIL LATENCY: pooled p99
+runs 2–5× in-mem even at comfortable cells (allocation-path contention), vs ~1.2× for the default
+arch at low ρ. 2048/64k/r200 completes with a 528 MB pool where the default arch needed a 1 GB-class
+pool (128k), at +5% tps over that historic cell and −11% anon vs in-mem (924 vs ~1034 MB).
+
+### Hypothesis scorecard
+| id | verdict |
+|---|---|
+| V-H1 windows | ✓ per-cap windows exist but are NARROWER and shifted down vs default arch; 512/r150 regression confirmed (1/8 vs 8/10, p=7.6×10⁻³) |
+| V-H2 lean pools | **REFUTED**: completion is better at the LARGER feasible pool at every cap (16k>8k @512, 32k≥16k @1024, 64k>32k>16k @2048) — the binding side is demand ≤ pool; the floor only bites when pool MB ≈ cap. Interior optimum, not monotone rule |
+| V-H3 regime model | ✓ every row classified: fits → ok at parity; throttled (heavy maps at small cap) → ok at reduced tps; demand>pool + fast ingest → rc141 deadlock; pool≈cap or state≈cap → rc137 |
+| V-H4 cost | ✓ −3…−12% tps; NEW finding: p99 2–5× (the pooled tail-latency tax) |
+| V-H5 correctness | ✓ **MATCH**: OOC-pooled (spilling) and in-mem reference produce identical checksum 6620446084 / 5 505 091 tuples, 4/4 runs; the rc141 teardown wart is the checksum TEMPLATE's (reference exits 141 too) |
+
+### Threshold arbitration (V vs W, same grid)
+CAP/10 ≥ pool/3 at every coordinate where either completes; at the decisive cell the gap is 8/8 vs
+3/8. The restore-path crash cluster (rc134/rc11, bad_function_call) appears under BOTH rules at
+high-churn under-provisioned cells (512/8k heavy, */16k/r300) — it is churn-dependent, not
+rule-dependent: ~20 crashed cells total, all in cells that fail anyway.
+
+### Thesis consequence
+The headline RQ1 narrative becomes two-architecture: the DEFAULT architecture (maps-on-heap) offers
+wide ρ-windows (up to ρ≈2.2 @512, r700 @2048) with knife-edge pool sensitivity and heap-growth
+footprint; the CORRECTED architecture (maps-in-pool, B2) offers in-mem-parity throughput, bounded
+footprint (pool = floor AND ceiling), intrinsic backpressure, and NEW completions at ρ≈2 on the
+smallest cap — but its window is bounded by the pool and closes entirely at 2048 high-ρ, where the
+role-blind allocation deadlock (§9) is the proven, invariant cause. Neither dominates; the choice is
+a deployment decision (state size vs latency/footprint requirements), and the deadlock fix
+(role-aware allocation) is the precisely-specified path to merging the two windows.
