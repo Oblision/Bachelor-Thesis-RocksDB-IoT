@@ -71,4 +71,17 @@ TEMPLATE — in-mem ref also exits 141). NEW BUG: pooled restore path not except
 / rc11, ~20 cells, churn-dependent, only in already-failing cells). Lean-pool rule REFUTED (bigger feasible pool
 better; interior optimum). Thesis headline = two-architecture complementarity; role-aware allocation = the one
 mechanism that would merge the windows. Data: results/V_*, W_*, V2_*; EXPERIMENT-final-matrix.md.
+
+**U8/I8 DISAMBIGUATION DONE (2026-06-11): THREE-FACTOR attribution.** The one-flag fix confounds allocation
+type + I/O granularity (4096→8192). U8 arm = OPBUFSIZE=8128 (<page 8192 → maps stay heap, 99.2% matched
+granularity); I8 = in-mem@8128. Verdicts: (1) GRANULARITY is engine-wide and hidden: in-mem +10-13% tps
+(3.25→3.62M), per-task p99 SCALES with buffer size (96→219µs in-mem); heavy OOC r700 +36% tps, p99 −64%;
+money cell 0/10→3/8 (p=0.069); 4096 default DOMINATED everywhere → upstream rec. (2) POOLING causal:
+512/r200 W 8/8 vs U8 0/8 (p=7.8e-5); 512/r150 regression pooling-caused (U8 7/8 vs W 1/8, p=5.1e-3);
+high-ρ r700 heap-owned (U8 8/8 vs W 0/8, p=7.8e-5); footprint −33% vs matched in-mem (924 vs 1387MB).
+(3) LEVERS stand within-granularity (B0 0/8→B2 7/8, p=7e-4). Money-cell pooled-vs-U8 NOT separable (11/16
+vs 3/8, p=0.15) — report 5-point ladder 0/10→3/8→0/8→5/8→7/8 honestly. **RETRACTED: "pooled tail-latency
+tax 2-5×"** — was granularity; at matched ~8K, OOC p99 = 1.1-1.6× in-mem, cost band −11..−15% tps.
+Corrected RQ2 table in EXPERIMENT-final-matrix.md (U8+I8 RESULTS). U8 (heap+8128) = best config for big
+state; B2 = best for bounded footprint.
 [[project-ooc-mechanics]] [[feedback-match-baseline-config]]

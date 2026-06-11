@@ -220,20 +220,26 @@ W). Why there are two is the subject of 7.6; here the windows of both are report
   this reframing drives the rest of the evaluation.
 
 ### 7.3 RQ2 — cost
-- 7.3.1 Where both variants complete, the default architecture costs 3–22% throughput [E:
-  both-arms table]; the corrected architecture costs 3–12% at its comfortable cells [E: W table].
-- 7.3.2 The cost grows with state size and shrinks with memory headroom [E: same tables, trend].
-- 7.3.3 Under the default architecture, tail latency grows from microseconds to milliseconds at
-  ten-million-key working sets (460 µs → 2509 µs p99) — the spill-restore round trip in the tail
-  [E: r700].
-- 7.3.4 The corrected architecture adds a tail-latency tax everywhere: p99 runs 2–5× the in-memory
-  engine even at comfortable cells (allocation-path contention), versus ~1.2× for the default
-  architecture at low ρ [E: W 485/358/238 µs vs in-mem 95/96/109 µs].
-- 7.3.5 The corrected architecture is more pool-efficient: 2048/64k/r200 completes with a 528 MB
-  pool where the default needed a 1 GB-class pool, at +5% throughput and −11% resident memory vs
-  in-mem [E: W vs historic 128k cell].
-- 7.3.6 Spill and restore latencies are reported as distributions [E: spill metrics lines].
-- 7.3.7 The cost is configuration-point dependent; we report ranges, not single numbers.
+*(All headline cost comparisons are made at MATCHED I/O granularity (~8 K buffers in every variant,
+including the in-memory reference); 7.3.5 explains why.)*
+- 7.3.1 At matched granularity, out-of-core costs 11–15% throughput where both variants complete,
+  under either allocation type [E: I8/U8/W table].
+- 7.3.2 The cost grows with state size and shrinks with memory headroom [E: tables, trend].
+- 7.3.3 Under unbounded allocation, tail latency grows into milliseconds at ten-million-key working
+  sets — the spill-restore round trip in the tail — but matched I/O granularity cuts it sharply
+  (r700: p99 2509 → 899 µs, throughput +36%) [E: r700 default vs U8].
+- 7.3.4 At matched granularity, out-of-core p99 is 1.1–1.6× the in-memory engine; an apparent 2–5×
+  gap in earlier comparisons was the granularity, not the architecture — per-task latency scales
+  with buffer size in every variant, including in-memory (96 → 219 µs) [E: I8 vs historic in-mem].
+- 7.3.5 I/O buffer granularity is an engine-wide performance factor in its own right: raising the
+  default 4096-byte buffers to ~8 K speeds up even the in-memory engine by up to 13% (3.25 → 3.62 M
+  tuples/s) and dominates the shipped default at every tested cell — an actionable finding for the
+  engine itself [E: I8 vs in-mem@4096; U8 vs default OOC].
+- 7.3.6 Bounded allocation's footprint advantage is confirmed at matched granularity and is larger
+  than any earlier estimate: −33% resident memory vs the in-memory engine (924 vs 1387 MB) and
+  −27% vs heap-allocated out-of-core at the same cell [E: 2048/r200 across I8/U8/W].
+- 7.3.7 Spill and restore latencies are reported as distributions [E: spill metrics lines].
+- 7.3.8 The cost is configuration-point dependent; we report ranges, not single numbers.
 
 ### 7.4 RQ4 — CPU and I/O *(analysis pass over existing columns; no new runs)*
 - 7.4.1 CPU utilization of the backend vs the in-memory engine across ρ.
@@ -304,6 +310,19 @@ W). Why there are two is the subject of 7.6; here the windows of both are report
   windows are complementary (7.2.5), with the role-blind deadlock (7.6k) as the proven reason the
   pooled window cannot widen — making role-aware allocation the single mechanism that would merge
   the two windows.
+- 7.6o The one-flag correction changes two things at once — allocation type AND I/O buffer
+  granularity — so a dedicated disambiguation arm separates them: unbounded allocation at
+  99.2%-matched granularity (buffer 8128 < page 8192 keeps maps on the heap) [E: U8 arm, smoke
+  signature pool≈empty/maps 136 MB unpooled].
+- 7.6p The disambiguation confirms the pooling attributions where it matters: the ρ≈2 win at 512 MB
+  is allocation-type-causal (pooled 8/8 vs matched-granularity heap 0/8, p=7.8×10⁻⁵); the 512/r150
+  regression is pooling's cost (heap keeps 7/8, pooled drops to 1/8, p=5.1×10⁻³); the high-ρ
+  territory belongs to heap allocation (r700: heap 8/8 vs pooled 0/8, p=7.8×10⁻⁵); and the lever
+  effect stands unchanged within fixed granularity (0/8 → 7/8, p=7.0×10⁻⁴).
+- 7.6q One attribution is honestly mixed: at the money cell, granularity alone recovers 3/8 from
+  0/10 (p=0.069) by eliminating the I/O-flood deaths, and pooling+levers reach 11/16 — the pairwise
+  edge over matched-granularity heap is directionally positive but not separable at this sample
+  size (p=0.15). The five-point ladder is reported in full: 0/10 → 3/8 → 0/8 → 5/8 → 7/8.
 
 ### 7.7 Summary
 - 7.7.1 One table: each RQ → verdict → strongest single number.
@@ -313,7 +332,9 @@ W). Why there are two is the subject of 7.6; here the windows of both are report
 - 8.1 Threats to validity, one point each: one physical machine and one SD card; synthetic workloads
   only (in scope by design); 4–17% between-session throughput drift, so all key contrasts are
   within-session; ρ for the largest workloads is derived from in-memory footprints at 2048 MB;
-  checksum coverage is partial (two ρ points).
+  checksum coverage is partial (two workload points per architecture); the allocation-type vs
+  granularity confound existed in early cross-flag comparisons and was RESOLVED by the dedicated
+  disambiguation arm (7.6o–7.6q) rather than left as a caveat.
 - 8.2 The configuration-pinning lesson: an early sweep produced a fake optimum because one binary
   default (page size) differed from the baseline; the rule from 7.1.7 exists because of this.
 - 8.3 Generalizability: the three-regime law and the deadlock pattern plausibly apply to any engine
@@ -327,8 +348,13 @@ W). Why there are two is the subject of 7.6; here the windows of both are report
 - 9.1 One conclusion sentence per contribution C1–C6.
 - 9.2 Future work in order of precision: role-aware allocation (a drain-side reserve that build
   allocations cannot consume — the one mechanism the deadlock diagnosis isolates); closed-loop
-  ingest admission keyed to pool headroom; the 20% header reduction; open-window spilling (requires
-  Nautilus changes, explicitly out of scope here); sliding windows and Nexmark.
+  ingest admission keyed to pool headroom; the 20% header reduction; exception-safe restore;
+  open-window spilling (requires Nautilus changes, explicitly out of scope here); sliding windows
+  and Nexmark.
+- 9.3 Upstream recommendations to NebulaStream, one sentence each: raise the 4096-byte
+  operator-buffer default toward the page size (dominated at every tested cell, +13% even
+  in-memory); make the pooled/unpooled allocation boundary explicit and observable instead of an
+  implicit size comparison; ship the pool-pressure levers config-gated.
 
 ## Back matter
 - Per OUTLINE.md: bibliography [1–14] + AI-tool citations; Further Use of AI Tools section

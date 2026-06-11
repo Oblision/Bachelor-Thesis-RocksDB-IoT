@@ -144,3 +144,47 @@ soft=CAP/10, 8 reps.
 | 512/16k/r150 (regression) | 8/10 | 1/8 | ≈8/8 (regression = pooling) | low |
 | 2048/16k/r700 | 10/10 | 0/8 | ≈8/8 | — |
 | cost cells r075/512, r100/1024, r200/2048-64k | −12%/−9%/−11% tps | −12%/−3%/−6% | Δtps ≈ default | Δtps ≈ bounded |
+
+### U8 + I8 RESULTS (2026-06-11, 56+24 cells, 12:22–13:15) — the three-factor attribution
+
+**One-line: the disambiguation splits the credit three ways — I/O granularity is a real, engine-wide,
+previously hidden factor (it speeds up EVERYTHING, including in-mem by 10–13%); allocation type
+(pooling) is cleanly causal for the 512/r200 win, the bounded footprint, the 512/r150 regression and
+the loss of the high-ρ territory; the levers remain causal within pooling. One prior claim is
+RETRACTED: the "pooled tail-latency tax" was the granularity, not the architecture.**
+
+Five-point money-cell ladder (1024/32k/r150): default(4096,heap) 0/10 → U8(8128,heap) 3/8 →
+B0(8192,pool,no levers) 0/8 → B1 5/8 → B2 7/8 (+W 4/8).
+
+| attribution claim | evidence | p |
+|---|---|---|
+| pooling causal at 512/r200 | W 8/8 vs U8 0/8 (granularity alone: 0/8, ≤ default 3/10) | **7.8×10⁻⁵** |
+| 512/r150 regression is pooling-caused | U8 7/8 vs W 1/8 (granularity does NOT cause it) | 5.1×10⁻³ |
+| high-ρ territory belongs to heap allocation | 2048/r700: U8 8/8 vs W 0/8 | **7.8×10⁻⁵** |
+| granularity helps the money cell | U8 3/8 vs default 0/10 (removes I/O-flood deaths; rc141→rc137 shift) | 0.069 (marginal) |
+| pooling+levers > granularity at money cell | 11/16 vs 3/8 — direction positive, NOT separable at this n | 0.15 (n.s.) |
+| levers causal within pooling (unchanged) | B0 0/8 → B2 7/8, same binary, same granularity | 7.0×10⁻⁴ |
+
+**Granularity as an engine-wide factor (I8 = in-mem at 8128):** in-mem tps 3.15→3.22 (r075@512),
+3.14→3.56 (r100@1024), 3.25→3.62 M (r200@2048) = +2…+13%; in-mem p99 95→427, 96→219, 109→203 µs
+(per-TASK latency scales with buffer size — affects every variant equally). Heavy default-arch OOC:
+r700 tps 1.14→1.55 M (+36%), p99 2509→899 µs (−64%). The engine's 4096 default is dominated at every
+tested cell — an actionable upstream finding.
+
+**Corrected cost table (all variants at ~8 K granularity — the honest RQ2 numbers):**
+| cell | in-mem (I8) | heap OOC (U8) | bounded OOC (W) |
+|---|---|---|---|
+| 512/r075 | 3.22M / 427 µs / 340 MB | 2.31M (−28%*) / 429 µs / 381 | 2.77M (−14%) / 485 µs / 308 |
+| 1024/r100 | 3.56M / 219 µs / 601 | 3.04M (−15%) / 339 µs / 621 | 3.04M (−15%) / 358 µs / 502 |
+| 2048/r200 | 3.62M / 203 µs / 1387 | 3.22M (−11%) / 231 µs / 1264 | 3.06M (−15%) / 238 µs / **924** |
+(*r075 U8 outlier on 3–4 s cells; report as measured.) OOC cost at matched granularity: **−11…−15%
+tps, p99 1.1–1.6× in-mem** (the earlier 2–5× tail-latency claim is retracted — it compared across
+granularities). Bounded footprint advantage CONFIRMED and larger than reported: **−33% vs matched
+in-mem** (924 vs 1387 MB) and −27% vs heap OOC at 2048/r200.
+
+**RQ1 in-mem baselines stand:** capped in-mem failures are state>cap OOM kills; granularity cannot
+save them (U8's own rc137×8 at 512/r200 demonstrates heap state>cap dies regardless of buffers).
+
+**Practical recommendations (final):** big state / high ρ → heap allocation + the granularity flag
+(U8 config: one flag, dominates the shipped default everywhere tested); tight caps with footprint
+guarantees → bounded B2; the shipped 4096 default → recommend upstream change.
