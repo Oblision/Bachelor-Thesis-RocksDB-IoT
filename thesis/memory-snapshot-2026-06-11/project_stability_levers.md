@@ -95,3 +95,17 @@ locked at 512 under bounded). Valley recurs at every cap (~9 sightings): survivo
 Footprint advantage inverts at big pools (r700: bounded 1437 vs heap 1072MB). FINAL deployment rule: cap≥1024 +
 completion/footprint-guarantee → bounded@40%cap; cap≤512 or throughput → heap+8K granularity. Master table
 complete, all three arms, all coordinates. WRITING-POINTS 7.2.4/7.2.5/7.2.5b/7.6r-t hold the final form.
+
+**FULL CIRCLE CLOSED (2026-06-11 night, branch ooc-ingest-governor, 8aa7131):** PROBES: P1 race causally
+proven (2048/96k/r300 5/8→8/8 paced) BUT pacing exposes restore bug at tight caps (rc134 — bug is now
+LOAD-BEARING, blocks throttle fixes; fix = exception-safe restore, future work); P2 U8@512 = pool-floor error
+(lean 8k pool → 7/8); P4 maxbuckets=4096 MOVES the right wall (512/24k/r150 0/8→8/8 — "permanent 512 lock"
+RETRACTED); P5 r1000 edge real; P6 pool-throttle refuted. GOVERNOR v1 (source_admission_gate_pct, pool-%-free
+gate in SourceThread) IMPLEMENTED then REFUTED with mechanism: (A) never fires at valleys — depletion is a
+fast transient between rent-time samples, driven by downstream amplification; (B) SELF-DEADLOCKS heavy cells —
+30% free unsatisfiable vs legitimate steady occupancy (r700 8/8→0/8 rc124, source frozen in gate, trace flat).
+Derived design constraint (the thesis's closing insight): admission credit must be MONOTONE IN SOURCE PROGRESS
+(window-lag credit) or role-aware at the allocator; global resource gauges cannot distinguish working-full from
+dying-full. Both naive coupling points (N2 alloc-time, v1 source-time) now refuted with mechanism — doubly
+motivating the specified future work. GF-H5: B2+maxbuckets4096 = 8/8 at formerly-locked cell (everything-on
+config validated). Eval is COMPLETE — no open cells, all arms attributed, ~3000 cells total.
