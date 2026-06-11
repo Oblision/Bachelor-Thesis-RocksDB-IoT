@@ -312,9 +312,9 @@ including the in-memory reference); 7.3.5 explains why.)*
   gridlock guard ships as diagnostic instrumentation.
 - 7.6n The full-grid confirmation run (config W) adds three closing findings: soft thresholds must
   stay at the cap-derived rule — the pool-derived rule loses 8/8 → 3/8 at the decisive cell
-  [E: V2 arbitration, p=0.026]; the pooled restore path is not exception-safe — an allocation
-  failure mid-restore leaves a half-restored slice that crashes on next use (≈20 cells, only in
-  cells failing anyway) [E: rc134/rc11 cluster, bad_function_call]; and the two architectures'
+  [E: V2 arbitration, p=0.026]; a memory-corruption crash cluster appears at high-churn
+  cells (≈20 cells, only in cells failing anyway) [E: rc134/rc11, bad_function_call, malloc
+  corruption] — root-caused in 7.6u; and the two architectures'
   windows are complementary (7.2.5), with the role-blind deadlock (7.6k) as the proven reason the
   pooled window cannot widen — making role-aware allocation the single mechanism that would merge
   the two windows.
@@ -340,6 +340,20 @@ including the in-memory reference); 7.3.5 explains why.)*
 - 7.6t The fast-ingest valley recurs at every cap and pool (512: r100–r150; 1024: r200 3/8;
   2048: r300 5/8): survivors complete below ~2.5 M tuples/s ingest; sprinters above ~2.7 M die —
   the race model's signature, now observed nine times across three caps and both architectures.
+- 7.6u The crash cluster is root-caused by sanitizer instrumentation (manual arena poisoning, since
+  both custom allocators are invisible to ASan): the per-worker slice cache — an engine default —
+  hands compiled code raw map pointers that bypass every spill fence; a stale cached pointer races a
+  legitimate restore into the same map (double-free, falsified both directions: cache-on 3/3 crash,
+  cache-off 4/4 clean) [E: ASan report + falsification runs].
+- 7.6v The obvious mitigation fails for a structural reason: with the cache off, every late write
+  pins its slice until emission, and with jitter equal to the retention lag the entire band is
+  pinned — spilling becomes impossible (0/8 at every cell including former winners, zero slices
+  spilled). The two defects mask each other; the headline data (cache on) is unaffected because the
+  corruption manifests only in cells that fail regardless [E: gauntlet run].
+- 7.6w The architectural conclusion: unmediated pointers into evictable state require an
+  invalidation protocol — Flink's backend mediates every state access, NebulaStream's slice cache
+  does not; the precise upstream fix is epoch-stamped cache entries invalidated on spill (one
+  compare per cache hit).
 
 ### 7.7 Summary
 - 7.7.1 One table: each RQ → verdict → strongest single number.
