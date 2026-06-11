@@ -237,3 +237,14 @@ only r075 (fits) and r200 (throttled) complete — an explained, permanent limit
 pool ≈ 40% of cap (covers the heap window plus bounded-only cells like 2048/r300, at a throughput
 cost at the heavy end: r700 0.85M vs heap 1.55M); cap ≤ 512 or throughput priority → heap + 8K
 granularity. r1000@2048 fails under every configuration tested = the absolute edge of this engine.
+
+## FAILURE-ATTRIBUTION PROBES (pre-registered 2026-06-11; runner probe_failures.sh, labels P_*)
+Investigating every failure class of the two best configs (U8, W/B2) for config-attribution errors.
+| probe | cell (prior result) | fix hypothesis | prediction if attribution error |
+|---|---|---|---|
+| P1a–d valley = race | W 512/16k/r100 (2/8), 512/16k/r150 (1/8), 1024/48k/r200 (3/8), 2048/96k/r300 (5/8) + EMITBPS=30MB/s (≈2.0M tps) | valley deaths are pure ingest-sprint; pacing to survivor speed converts them | ≥6/8 each ⇒ race CAUSALLY proven + rate-limit = practical fix |
+| P2 U8 floor | U8 512/8k/r200 (0/8 rc137 @16k) | U8's 127MB pool floor pushed heap arm over the cap (default@62MB got 3/10) | ≥3/8 ⇒ U8's 512 loss was pool-floor attribution error |
+| P3 U8 flood | U8 2048/64k/r300 (0/8 rc141 @16k) | heap-arm rc141 is an I/O-pool flood; 508MB pool absorbs it | ≥6/8 ⇒ heap valley at 2048 is pool-sizing, not fundamental |
+| P4 right wall | W 512/24k/r150 + MAXBUCKETS=4096 (0/8 rc137) | dir overhead is the right-wall term; ÷4 dirs moves the wall right | any completion ⇒ overhead term causally confirmed + r150@512 unlockable |
+| P5 r1000 sliver | W 2048/112k/r1000 (rc141 @96k) | band ∈ (792, 917]? | any completion ⇒ absolute edge moves |
+| P6 U8 pool-throttle | U8 1024/8k/r150 (3/8 @32k) | tiny I/O pool throttles the source = heap-arm governor | ≥6/8 ⇒ heap valley fixable by pool sizing |
