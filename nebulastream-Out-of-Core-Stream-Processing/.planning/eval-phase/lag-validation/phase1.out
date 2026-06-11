@@ -1,0 +1,17 @@
+PHASE1_PID=596813
+[done] p1_Nw40_pool48k status=ok rc=0 peak=582MB spill_dir=56MB store_peak=9MB N_w=40 slices=49
+[done] p1_Nw40_pool24k status=ok rc=0 peak=398MB spill_dir=56MB store_peak=9MB N_w=40 slices=49
+[done] p1_Nw40_pool32k status=ok rc=0 peak=463MB spill_dir=56MB store_peak=9MB N_w=40 slices=49
+[done] p1_Nw40_pool16k status=ok rc=0 peak=324MB spill_dir=56MB store_peak=9MB N_w=40 slices=49
+[done] p1_Nw40_pool64k status=ok rc=0 peak=718MB spill_dir=56MB store_peak=9MB N_w=40 slices=49
+[done] p1_Nw80_pool16k status=err rc=141 peak=517MB spill_dir=83MB store_peak=9MB N_w=80 slices=99
+[done] p1_Nw80_pool32k status=ok rc=0 peak=542MB spill_dir=83MB store_peak=9MB N_w=80 slices=99
+[done] p1_Nw80_pool24k status=ok rc=0 peak=467MB spill_dir=83MB store_peak=9MB N_w=80 slices=99
+[done] p1_Nw80_pool48k status=ok rc=0 peak=672MB spill_dir=83MB store_peak=9MB N_w=80 slices=99
+[done] p1_Nw80_pool64k status=ok rc=0 peak=806MB spill_dir=83MB store_peak=9MB N_w=80 slices=99
+[done] p1_Nw160_pool24k status=err rc=141 peak=818MB spill_dir=138MB store_peak=9MB N_w=160 slices=199
+[done] p1_Nw160_pool16k status=err rc=141 peak=930MB spill_dir=138MB store_peak=9MB N_w=160 slices=199
+[done] p1_Nw160_pool32k status=err rc=141 peak=851MB spill_dir=138MB store_peak=9MB N_w=160 slices=199
+[done] p1_Nw160_pool48k status=ok rc=0 peak=753MB spill_dir=137MB store_peak=9MB N_w=160 slices=199
+[done] p1_Nw160_pool64k status=ok rc=0 peak=878MB spill_dir=137MB store_peak=9MB N_w=160 slices=199
+PHASE1_DONE Sat Jun  6 06:05:28 PM CEST 2026

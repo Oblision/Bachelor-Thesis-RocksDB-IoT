@@ -1,0 +1,6 @@
+DEC_PID=654524
+[done] dec_on_P8 status=oom rc=137 peak=512MB spill_dir=258MB store_peak=0MB N_w=40 slices=0
+[done] dec_on_P16 status=oom rc=137 peak=512MB spill_dir=280MB store_peak=0MB N_w=40 slices=0
+[done] dec_on_P4 status=oom rc=137 peak=512MB spill_dir=278MB store_peak=0MB N_w=40 slices=0
+[done] dec_off_L16M status=ok rc=0 peak=426MB spill_dir=0MB store_peak=0MB N_w=40 slices=0
+DEC_DONE Sun Jun  7 02:26:08 AM CEST 2026

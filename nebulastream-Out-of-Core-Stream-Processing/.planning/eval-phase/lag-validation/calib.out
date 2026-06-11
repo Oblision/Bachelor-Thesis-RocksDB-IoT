@@ -1,0 +1,20 @@
+CALIB_PID=593161
+=== calib soft=4 pool=16000 Sat Jun  6 04:42:45 PM CEST 2026 ===
+[done] cal_L4M_soft4_pool16000 status=err rc=141 peak=513MB spill_dir=83MB store_peak=9MB N_w=80 slices=99
+=== calib soft=96 pool=16000 Sat Jun  6 04:47:07 PM CEST 2026 ===
+[done] cal_L4M_soft96_pool16000 status=err rc=141 peak=631MB spill_dir=31MB store_peak=97MB N_w=80 slices=54
+=== calib soft=182 pool=16000 Sat Jun  6 04:51:30 PM CEST 2026 ===
+[done] cal_L4M_soft182_pool16000 status=err rc=141 peak=601MB spill_dir=0MB store_peak=164MB N_w=80 slices=0
+=== calib soft=4 pool=32000 Sat Jun  6 04:55:53 PM CEST 2026 ===
+[done] cal_L4M_soft4_pool32000 status=ok rc=0 peak=530MB spill_dir=83MB store_peak=9MB N_w=80 slices=99
+=== calib soft=96 pool=32000 Sat Jun  6 05:00:19 PM CEST 2026 ===
+[done] cal_L4M_soft96_pool32000 status=ok rc=0 peak=684MB spill_dir=31MB store_peak=97MB N_w=80 slices=54
+=== calib soft=182 pool=32000 Sat Jun  6 05:04:45 PM CEST 2026 ===
+[done] cal_L4M_soft182_pool32000 status=ok rc=0 peak=625MB spill_dir=0MB store_peak=164MB N_w=80 slices=0
+=== calib soft=4 pool=64000 Sat Jun  6 05:09:11 PM CEST 2026 ===
+[done] cal_L4M_soft4_pool64000 status=ok rc=0 peak=808MB spill_dir=83MB store_peak=9MB N_w=80 slices=99
+=== calib soft=96 pool=64000 Sat Jun  6 05:13:37 PM CEST 2026 ===
+[done] cal_L4M_soft96_pool64000 status=ok rc=0 peak=943MB spill_dir=31MB store_peak=97MB N_w=80 slices=54
+=== calib soft=182 pool=64000 Sat Jun  6 05:18:03 PM CEST 2026 ===
+[done] cal_L4M_soft182_pool64000 status=ok rc=0 peak=891MB spill_dir=0MB store_peak=164MB N_w=80 slices=0
+=== calib done Sat Jun  6 05:22:32 PM CEST 2026 ===

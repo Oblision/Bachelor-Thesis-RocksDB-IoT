@@ -1,0 +1,11 @@
+PHASE2_PID=600739
+[done] p2_L2M_off status=ok rc=0 peak=196MB spill_dir=0MB store_peak=0MB N_w=40 slices=0
+[done] p2_L2M_on status=ok rc=0 peak=344MB spill_dir=0MB store_peak=86MB N_w=40 slices=0
+[done] p2_L4M_off status=ok rc=0 peak=333MB spill_dir=0MB store_peak=0MB N_w=80 slices=0
+[done] p2_L4M_on status=ok rc=0 peak=629MB spill_dir=0MB store_peak=164MB N_w=80 slices=0
+[done] p2_L12M_on status=err rc=137c peak=0MB spill_dir=0MB store_peak=0MB N_w=240 slices=0
+[done] p2_L16M_on status=oom rc=137 peak=1024MB spill_dir=0MB store_peak=0MB N_w=320 slices=0
+[done] p2_L8M_on status=oom rc=137 peak=1024MB spill_dir=68MB store_peak=0MB N_w=160 slices=0
+[done] p2_L8M_off status=ok rc=0 peak=603MB spill_dir=0MB store_peak=0MB N_w=160 slices=0
+[done] p2_L12M_off status=ok rc=0 peak=874MB spill_dir=0MB store_peak=0MB N_w=240 slices=0
+PHASE2_DONE Sat Jun  6 06:26:15 PM CEST 2026

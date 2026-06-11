@@ -1,0 +1,10 @@
+GROUP1_PID=588328
+=== Group1 L=1000000 TUPLES=1500000 Sat Jun  6 03:52:46 PM CEST 2026 ===
+[done] g1_L1M_w50k_r200k_c1024 status=ok rc=0 peak=272MB spill_dir=0MB store_peak=46MB N_w=20 slices=0
+=== Group1 L=2000000 TUPLES=3000000 Sat Jun  6 03:54:04 PM CEST 2026 ===
+[done] g1_L2M_w50k_r200k_c1024 status=ok rc=0 peak=348MB spill_dir=0MB store_peak=86MB N_w=40 slices=0
+=== Group1 L=3000000 TUPLES=4500000 Sat Jun  6 03:56:43 PM CEST 2026 ===
+[done] g1_L3M_w50k_r200k_c1024 status=ok rc=0 peak=426MB spill_dir=0MB store_peak=125MB N_w=60 slices=0
+=== Group1 L=4000000 TUPLES=6000000 Sat Jun  6 04:00:41 PM CEST 2026 ===
+[done] g1_L4M_w50k_r200k_c1024 status=err rc=141 peak=615MB spill_dir=0MB store_peak=164MB N_w=80 slices=0
+=== Group1 done Sat Jun  6 04:05:55 PM CEST 2026 ===

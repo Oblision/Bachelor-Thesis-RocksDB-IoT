@@ -1,0 +1,8 @@
+ATTR_PID=613769
+[done] a_t1_L2M status=ok rc=0 peak=828MB spill_dir=56MB store_peak=9MB N_w=40 slices=49
+[done] a_t2_L2M status=ok rc=0 peak=773MB spill_dir=56MB store_peak=9MB N_w=40 slices=49
+[done] a_t2_L4M status=ok rc=0 peak=922MB spill_dir=84MB store_peak=9MB N_w=80 slices=99
+[done] a_t1_L4M status=ok rc=0 peak=1024MB spill_dir=82MB store_peak=7MB N_w=80 slices=99
+[done] a_t4_L2M status=ok rc=0 peak=718MB spill_dir=56MB store_peak=9MB N_w=40 slices=49
+[done] a_t4_L4M status=ok rc=0 peak=812MB spill_dir=83MB store_peak=9MB N_w=80 slices=99
+ATTR_DONE Sat Jun  6 08:04:37 PM CEST 2026

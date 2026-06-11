@@ -1,0 +1,13 @@
+- [Solar + home battery powers the workstation](user_solar_battery.md) — always-on services have effectively zero marginal energy cost
+- [Self-hosted GitHub Actions runner on this machine](project_self_hosted_runner.md) — Oblision/QuoteX runner registered as systemd service; all workflows run locally
+- [QuoteX self-healing incident loop](project_quotex_incident_loop.md) — Vercel error → backend → GH workflow_dispatch → investigator agent → PR → Vercel deploy → deployment-status reporter → backend writeback
+- [Bachelor thesis lives in private wrapper repo](project_thesis_repo.md) — Bachelor-Thesis-RocksDB-IoT vendors NES OOC; public fork is retired, never push to it
+- [OOC sweep status=err policy](project_ooc_err_policy.md) — rc=141 (NES buffer-pool exhaustion) at s=5M/cap=512/p∈{2,4,8} is data, not a defect
+- [No survivorship-bias tuning](feedback_no_survivorship_tuning.md) — never sweep for "best config" on the same workloads you then evaluate; pick configs from independent prior work + theory
+- [Thesis scope anchor](project_thesis_scope_anchor.md) — signed proposal scopes eval to SYNTHETIC skewed/bursty + tumbling windows; submission 2026-07-17; RQ1-3 core, RQ4/5 additional; Nexmark a stretch
+- [Verify background kills](feedback_verify_background_kills.md) — always pgrep/docker-ps to confirm a sweep died; kill $(cat pidfile) mismatched a nohup fork and ran 5 days phantom
+- [OOC mechanics + option set](project_ooc_mechanics.md) — ρe≈39B/key, floor≈195MB, POOL≈300·N_w, break-even W*≈62s; options A(config)/D(small)/B(large); graphify installed
+- [Release eval setup](project_release_eval_setup.md) — release build (base 124MB, ~80× tput); rate-limit abandoned→CPU-cap; 2-core sweet spot; working RQ1/RQ2 contrast; tmpfs-in/SD-out
+- [OOC memory measurement](project_ooc_memory_measurement.md) — MEASURED anon breakdown: OOC working set 656≈in-mem 673MB; spilling frees logical store but NOT resident RAM (chunk-retention) → no contrast until fixed
+- [Match baseline config when sweeping](feedback_match_baseline_config.md) — never trust binary defaults; explicitly pin every knob the baseline used, sanity-check one gauge before trusting results
+- [OOC stability levers](project_stability_levers.md) — root cause: spiller defends residentBytes not the pool; Tier-1 (1a-1d) on branch ooc-stability-levers, config-gated; experiment designed, BUILD PENDING, runs after L_ rerun

@@ -1,0 +1,6 @@
+RECON_PID=633811
+[done] recon_on_research status=oom rc=137 peak=512MB spill_dir=228MB store_peak=0MB N_w=30 slices=0
+[done] recon_on_tiny status=oom rc=137 peak=512MB spill_dir=284MB store_peak=0MB N_w=30 slices=0
+[done] recon_on_min status=oom rc=137 peak=512MB spill_dir=358MB store_peak=0MB N_w=30 slices=0
+[done] recon_off status=ok rc=0 peak=390MB spill_dir=0MB store_peak=0MB N_w=30 slices=0
+RECON_DONE Sun Jun  7 01:51:46 AM CEST 2026
