@@ -53,3 +53,20 @@ RQ1 window table per cap (completion + Fisher vs in-mem 0/10 where applicable); 
 both-arms cells; V-H2 monotonicity check; rc-taxonomy map (which failures are floor/137 vs
 deadlock/141) overlaid on the regime model; anon footprint vs in-mem and vs the unpooled arm at
 matched cells.
+
+## AMENDMENT (2026-06-11, pre-registered before the W run)
+The V run (282 cells, 06:29–08:10) used soft=pool/3 — a rule validated in §8 only on cells that fail
+under either rule. Arbitration at 512/16k/r200 (V2 cells): soft=CAP/10 → **8/8**; soft=pool/3 → 3/8
+with a new crash mode. The V grid therefore UNDERSTATES the architecture and is demoted to a
+threshold-sensitivity + robustness arm. The headline grid re-runs as W_* with the validated rule
+(SOFT=CAP/10, HARD=CAP/5), identical otherwise.
+
+**V-arm findings that stand on their own:**
+1. **Restore-path robustness bug**: under tight thresholds + pooled pages, cells die rc=134
+   (`std::bad_function_call`) and once rc=11 (SIGSEGV) — an allocation failure mid-restore leaves a
+   half-restored slice whose creation callback is empty; next invocation crashes. The pooled restore
+   path is not exception-safe. Documented as implementation finding; fix is future work.
+2. **Threshold sensitivity is steep near the corridor edge**: soft 41→51 at 512/16k/r200 moves
+   completion 3/8 → 8/8 (p = 0.026).
+3. Checksum template adds emit-side pool demand (historic caveat confirmed under pooling) —
+   checksum cells re-sited to headroom-rich coordinates (1024/32k/r100).

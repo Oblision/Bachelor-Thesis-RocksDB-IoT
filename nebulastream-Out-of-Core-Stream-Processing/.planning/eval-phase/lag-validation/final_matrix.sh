@@ -17,9 +17,9 @@ echo "OK: binary is the lever branch build."
 cell() {
   local CAP=$1 POOL=$2 RHO=$3 CSV=$4 ROWS=$5 REPS=$6
   local POOL_MB=$((POOL * 8192 / 1048576))
-  local SOFT=$((POOL_MB / 3)) HARD=$((2 * POOL_MB / 3))
+  local SOFT=$((CAP / 10)) HARD=$((CAP / 5))   # validated rule (V2 arbitration: CAP/10 8/8 vs pool/3 3/8)
   for r in $(seq 1 "$REPS"); do
-    local LBL="V_c${CAP}_p$((POOL/1000))k_${RHO}_r$r"
+    local LBL="W_c${CAP}_p$((POOL/1000))k_${RHO}_r$r"
     echo "[$(date +%H:%M:%S)] $LBL (soft=$SOFT hard=$HARD)"
     OPBUFSIZE=$OPB RESERVEPCT=15 PACED=on TEMPLATE=genfile.test FILECSV="$CSV" DCPUS=2 \
       ./run-cell.sh "$LBL" "$ROWS" $W 0 $L "$CAP" on on "$SOFT" "$HARD" "$POOL" $CPUSET $WTH "" "$PAGESIZE" 16 8 4 >/dev/null 2>&1
@@ -49,10 +49,10 @@ done; done
 
 echo "== checksum correctness under active spilling (V-H5) =="
 for r in 1 2; do
-  LBL="V_chk_c512_p16k_r150_r$r"
+  LBL="W_chk_c1024_p32k_r100_r$r"
   echo "[$(date +%H:%M:%S)] $LBL"
-  OPBUFSIZE=$OPB RESERVEPCT=15 PACED=on TEMPLATE=genfile_checksum.test FILECSV="$D/rho_r150.csv" DCPUS=2 \
-    ./run-cell.sh "$LBL" 31000000 $W 0 $L 512 on on 41 83 16000 $CPUSET $WTH "" "$PAGESIZE" 16 8 4 >/dev/null 2>&1
+  OPBUFSIZE=$OPB RESERVEPCT=15 PACED=on TEMPLATE=genfile_checksum.test FILECSV="$D/rho_r100.csv" DCPUS=2 \
+    ./run-cell.sh "$LBL" 15000000 $W 0 $L 1024 on on 102 204 32000 $CPUSET $WTH "" "$PAGESIZE" 16 8 4 >/dev/null 2>&1
 done
 
 echo "==== FINAL MATRIX COMPLETE $(date +%F_%T) ===="
