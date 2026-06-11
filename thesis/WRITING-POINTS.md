@@ -70,10 +70,12 @@ backpressure/gridlock guard→5.10, feasibility corridor→7.6a, three regimes�
   interval.
 - 2.9 Each slice's state is a hash map (ChainedHashMap): entries live on fixed-size pages; a bucket
   directory indexes them; each entry has a 24-byte header and the aggregate payload.
-- 2.10 Map pages can be pooled (taken from the global buffer pool and returned on release) or
-  unpooled (allocated on the process heap); which one happens depends on the configured page size
-  relative to the engine's buffer size. *(Stated here as an engine property; its consequences appear
-  in Chapter 7.)*
+- 2.10 Map pages come from one of two allocation types: **bounded allocation** (pages taken from
+  the fixed global buffer pool and returned on release — the standard discipline of database buffer
+  managers) or **unbounded allocation** (pages from the general-purpose process heap, limited only
+  by the external memory cap); which one happens depends on the configured page size relative to
+  the engine's buffer size. These two terms are used consistently for the rest of the thesis.
+  *(Stated here as an engine property; its consequences appear in Chapter 7.)*
 - 2.11 Streams arrive out of order; a lateness bound defines how late a tuple may be; the watermark
   is the time up to which results may be finalized.
 - 2.12 Completed windows are retained for a configured emit lag before their results are emitted;
@@ -192,9 +194,10 @@ backpressure/gridlock guard→5.10, feasibility corridor→7.6a, three regimes�
   sanity-checked per run; Chapter 8 reports the incident that taught us this rule.
 
 ### 7.2 RQ1 — effectiveness
-*(Two architectures are evaluated: the engine-default configuration (maps on the heap) and the
-corrected configuration (maps in the pool, Chapter 5 iterations two onward, config W). Why there
-are two is the subject of 7.6; here the windows of both are reported.)*
+*(Two architectures are evaluated, named by their allocation type from point 2.10: the
+engine-default configuration uses UNBOUNDED allocation (maps on the heap); the corrected
+configuration uses BOUNDED allocation (maps in the pool, Chapter 5 iterations two onward, config
+W). Why there are two is the subject of 7.6; here the windows of both are reported.)*
 - 7.2.1 At 512 MB under the default architecture, the backend completed 14/24 runs where the
   in-memory engine completed 0/18 [E: Fisher p=4.1×10⁻⁵, flagship].
 - 7.2.2 Output checksums match the in-memory reference while spilling is active, under both
