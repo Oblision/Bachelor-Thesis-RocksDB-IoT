@@ -205,12 +205,20 @@ W). Why there are two is the subject of 7.6; here the windows of both are report
 - 7.2.3 The default architecture has cap-dependent operating windows: 512 MB covers ρ≈1.2–2.2;
   1024 MB reaches ρ≥1.54; both p=3.6×10⁻⁴ [E: L-matrix]; at 2048 MB it completes heavy workloads
   (r500, r700 10/10) below ρ≈1 [E: corrected high-ρ cells].
-- 7.2.4 The corrected architecture has narrower, lower-ρ windows — and new completions inside
-  them: at 512 MB it completes ρ≈2.0 with 8/8 where the default managed 3/10 (p=3.8×10⁻³ for the
-  improvement; p=2.3×10⁻⁵ vs in-mem) [E: W 512/16k/r200]; at 1024 MB it holds ρ≈1.4 (11/16 pooled
-  vs 0/10, p=5.7×10⁻⁴) [E: W+N1]; at 2048 MB it completes nothing above ρ≈0.5 [E: W r300+].
-- 7.2.5 Neither architecture dominates: the default owns the high-ρ territory, the corrected
-  architecture wins inside its window; the windows are complementary [E: W-vs-L window tables].
+- 7.2.4 Bounded allocation's window is governed by a two-sided geometry law, not by ρ: the pool must
+  hold the hot band (lower bound), and the pool plus its own induced overhead must fit under the cap
+  (upper bound — every resident slice carries unpooled directory bytes, so anon grows superlinearly
+  with pool size) [E: 96k unlock vs 128k floor death vs 512/24k rc137 closure].
+- 7.2.5 At geometry-correct pools (≈40% of cap), bounded allocation covers nearly the full heap
+  window at the larger caps and adds cells no heap variant completes: 2048 → r200–r700 all complete
+  (r700 8/8 at 45% throughput cost vs heap; r300 5/8 is bounded-ONLY — both heap arms 0/8); 1024 →
+  r150 and r300 8/8; 512 → the upper bound sits below r150's band (base = 24% of cap), so only
+  fits-cells and the throttled ρ≈2 cell complete — a permanent, explained small-cap limit
+  [E: 96k/48k/24k runs].
+- 7.2.5b The architectures' residual division: heap keeps the smallest cap, the fast-ingest valley
+  cells, the throughput edge at the heavy end, and the lean-footprint case at big bands; bounded
+  keeps the footprint guarantee, the bounded-only cells, and graceful degradation. r1000 at 2048
+  fails under every configuration tested — the absolute edge [E: master table].
 - 7.2.6 ρ alone does not decide completion: under the default architecture a ρ≈0.74 workload at
   2.9 M tuples/s fails where a ρ≈0.80 workload at 1.1 M tuples/s completes 10/10 [E: r300 vs r700
   at 2048]; under the corrected architecture completion at 512/16k is non-monotone in ρ
@@ -323,6 +331,15 @@ including the in-memory reference); 7.3.5 explains why.)*
   0/10 (p=0.069) by eliminating the I/O-flood deaths, and pooling+levers reach 11/16 — the pairwise
   edge over matched-granularity heap is directionally positive but not separable at this sample
   size (p=0.15). The five-point ladder is reported in full: 0/10 → 3/8 → 0/8 → 5/8 → 7/8.
+- 7.6r The initial all-zero bounded column at 2048 was pool geometry, not the deadlock: the tested
+  pools bracketed but missed the working range, and the untested 96k point (39% of cap) completes
+  r200 through r700 [E: sliver + boundary runs].
+- 7.6s The geometry rule transplants across caps until the base footprint forbids it: 48k at 1024
+  unlocks r150/r300; 24k at 512 dies rc137 because pool-induced directory overhead breaks the cap —
+  the two-sided law of 7.2.4 in its final form.
+- 7.6t The fast-ingest valley recurs at every cap and pool (512: r100–r150; 1024: r200 3/8;
+  2048: r300 5/8): survivors complete below ~2.5 M tuples/s ingest; sprinters above ~2.7 M die —
+  the race model's signature, now observed nine times across three caps and both architectures.
 
 ### 7.7 Summary
 - 7.7.1 One table: each RQ → verdict → strongest single number.

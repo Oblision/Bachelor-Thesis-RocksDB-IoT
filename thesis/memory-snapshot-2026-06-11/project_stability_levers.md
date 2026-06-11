@@ -85,3 +85,13 @@ tax 2-5×"** — was granularity; at matched ~8K, OOC p99 = 1.1-1.6× in-mem, co
 Corrected RQ2 table in EXPERIMENT-final-matrix.md (U8+I8 RESULTS). U8 (heap+8128) = best config for big
 state; B2 = best for bounded footprint.
 [[project-ooc-mechanics]] [[feedback-match-baseline-config]]
+
+**GEOMETRY SAGA COMPLETE (2026-06-11, sliver+boundary+512-closure runs):** the W all-zero 2048 column was
+POOL GEOMETRY. W@96k(39% cap): r200 8/8, r300 5/8 (bounded-ONLY — heap arms 0/8 rc141), r500 8/8, **r700 8/8**
+(0.85M vs U8 1.55M = 45% tps cost), r1000 0/8 rc141 (absolute edge). 1024/48k: r150 8/8, r200 3/8 valley,
+r300 8/8. 512/24k: ALL rc137 — TWO-SIDED LAW: band ≤ pool AND pool + dir_overhead(pool) + base ≤ cap
+(resident slices carry unpooled dirs → anon superlinear in pool size; base=24% of cap at 512 → r150 permanently
+locked at 512 under bounded). Valley recurs at every cap (~9 sightings): survivors <2.5M tps, sprinters >2.7M die.
+Footprint advantage inverts at big pools (r700: bounded 1437 vs heap 1072MB). FINAL deployment rule: cap≥1024 +
+completion/footprint-guarantee → bounded@40%cap; cap≤512 or throughput → heap+8K granularity. Master table
+complete, all three arms, all coordinates. WRITING-POINTS 7.2.4/7.2.5/7.2.5b/7.6r-t hold the final form.
