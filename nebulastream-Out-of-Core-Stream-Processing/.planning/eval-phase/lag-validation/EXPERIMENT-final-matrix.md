@@ -248,3 +248,20 @@ Investigating every failure class of the two best configs (U8, W/B2) for config-
 | P4 right wall | W 512/24k/r150 + MAXBUCKETS=4096 (0/8 rc137) | dir overhead is the right-wall term; ÷4 dirs moves the wall right | any completion ⇒ overhead term causally confirmed + r150@512 unlockable |
 | P5 r1000 sliver | W 2048/112k/r1000 (rc141 @96k) | band ∈ (792, 917]? | any completion ⇒ absolute edge moves |
 | P6 U8 pool-throttle | U8 1024/8k/r150 (3/8 @32k) | tiny I/O pool throttles the source = heap-arm governor | ≥6/8 ⇒ heap valley fixable by pool sizing |
+
+## FULL-CIRCLE RUN (pre-registered 2026-06-11; branch ooc-ingest-governor, runner fullcircle_run.sh)
+Probe results folded in: P1 proved the race causally where headroom exists (2048/96k/r300 5/8→8/8
+paced) and exposed the restore bug as the binding obstacle at tight caps (rc134 under pacing);
+P2 fixed U8@512 (lean pool, 7/8); P4 moved the right wall (maxbuckets 4096 → r150@512 8/8).
+DECISION: the restore-bug fix is NOT attempted tonight (invariant-dense concurrency code); instead
+GF-H2 tests whether the governor's headroom guarantee makes the bug unreachable — closed-loop
+maintains the free-buffer floor the restore path implicitly needs, which static pacing does not.
+
+Arm GA = B2 + SRCGATE=30 (source waits while global pool free < 30%). Control = same binary, gate off.
+| id | hypothesis | decision rule |
+|---|---|---|
+| GF-H1 | the governor converts the valleys adaptively | GA ≥6/8 at the four valley cells; tps ≥ paced oracle (1.61M at 2048/r300) |
+| GF-H2 | headroom guarantee makes the restore bug unreachable | zero rc134/rc11 in GA valley cells (vs rc134×6/4/3 under pacing) |
+| GF-H3 | free when not needed | gate_waits ≈ 0 AND tps within noise at r075, money cell, 2048/r500+r700 |
+| GF-H4 | binary regression gate | control (gate off) reproduces W-era results at 2 valley cells (~2/8, ~3/8) |
+| GF-H5 | the everything-on config | 512/24k/r150 + maxbuckets 4096 + gate: ≥6/8 (P4's unlock survives the governor) |
