@@ -127,3 +127,20 @@ smallest cap — but its window is bounded by the pool and closes entirely at 20
 role-blind allocation deadlock (§9) is the proven, invariant cause. Neither dominates; the choice is
 a deployment decision (state size vs latency/footprint requirements), and the deadlock fix
 (role-aware allocation) is the precisely-specified path to merging the two windows.
+
+## U8 DISAMBIGUATION ARM (pre-registered 2026-06-11 before the run; runner u8_arm.sh, labels U_*)
+
+The one-flag correction changes TWO things at once: allocation type (maps heap→pool) AND I/O buffer
+granularity (4096→8192). Every cross-flag contrast is therefore confounded. The U8 arm isolates it:
+`operator_buffer_size=8128` (64-aligned, < page 8192) keeps maps UNBOUNDED (heap) at 99.2%-matched
+I/O granularity. Smoke confirmed the signature: pool_used peak 1 MB (empty), unpooled maps 136 MB.
+Three-point design: default(4096,heap) / U8(8128,heap) / W,B2(8192,pool). U8 runs leverless,
+soft=CAP/10, 8 reps.
+
+| cell | default(4096) | bounded(8192) | U8 prediction if POOLING is causal | if BUFFER SIZE is causal |
+|---|---|---|---|---|
+| 512/16k/r200 | 3/10 | 8/8 | ≈3/8 | ≈8/8 |
+| 1024/32k/r150 (money) | 0/10 | 11/16 | 0/8 | high |
+| 512/16k/r150 (regression) | 8/10 | 1/8 | ≈8/8 (regression = pooling) | low |
+| 2048/16k/r700 | 10/10 | 0/8 | ≈8/8 | — |
+| cost cells r075/512, r100/1024, r200/2048-64k | −12%/−9%/−11% tps | −12%/−3%/−6% | Δtps ≈ default | Δtps ≈ bounded |
