@@ -56,3 +56,12 @@ Grid: {q3, q7} × {NX-A@512, NX-A@1024, NX-B@512, NX-B@1024} × {inm, B2, U8} ×
 | RQ5 storage | device-level WA on realistic bid streams vs synthetic (lz4 on Nexmark payloads) | 7.5 |
 Scope note: Nexmark was the proposal's stretch goal; it enters the thesis as SUPPORTING evidence
 (external validity), never replacing the pre-registered synthetic grid as the primary basis.
+
+## AMENDMENT (pre-launch): Generator source abandoned, file source adopted; sizing re-measured
+The prior phase's Generator source crawls (~3 k rows/s) on the current engine — smoke rc=124. Adopted
+the file-source route the prior phase itself proposed: gen_nexmark.py bid CSV (31M rows, in-order
+1 ms, auctionId = 70% Zipf(1.1) hot head + 30% uniform tail over 20M auctions). File smoke: rc=0,
+16 s, 1.9M tps, 465 MB steady @W=50k (Zipf head saturates distinct/window ≈ 17k — below estimate).
+Revised workloads by window breadth: A=W50k (~465 MB, fits/edge@512), B=W100k (~0.9 GB est,
+beyond@512 + edge@1024), C=W200k (~1.5 GB est, beyond@1024). Refs measure the truth per query.
+Grid: 2q × {A@512, B@512, B@1024, C@1024} × {inm,B2,U8} × 8 + 18 refs = 210 cells.

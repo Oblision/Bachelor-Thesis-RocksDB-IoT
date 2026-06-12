@@ -1,0 +1,17 @@
+# Nexmark Q7 file-source (tumbling per-auction MAX); bid CSV: ts,auctionId,bidder,datetime,price
+# groups: [Spill, Nexmark, ManualOnly]
+CREATE LOGICAL SOURCE bid(ts UINT64 NOT NULL, auctionId UINT64 NOT NULL, bidder UINT64 NOT NULL, datetime UINT64 NOT NULL, price UINT64 NOT NULL);
+CREATE PHYSICAL SOURCE FOR bid TYPE File SET(
+    '${FILECSV}' AS `SOURCE`.FILE_PATH,
+    '${EMITBPS}' AS `SOURCE`.EMIT_RATE_BPS,
+    'CSV' AS PARSER.`TYPE`,
+    ',' AS PARSER.FIELD_DELIMITER
+);
+CREATE SINK out(bid.start UINT64 NOT NULL, bid.end UINT64 NOT NULL, bid.auctionId UINT64 NOT NULL, bid.maxPrice UINT64 NOT NULL) TYPE Void;
+SELECT start, end, auctionId, MAX(price) AS maxPrice
+FROM bid
+GROUP BY auctionId
+WINDOW TUMBLING(ts, size ${WINDOW} ms)
+INTO out;
+----
+1
