@@ -20,7 +20,8 @@ The generator scales key count and rows per window together, so a target state s
 
 % [7.1.2]
 The state pressure $\rho$ (Section~\ref{sec:bg-metrics}) is measured, not assumed.
-Each workload runs once uncapped in memory; its steady footprint divided by the cap under test gives $\rho$.
+Each workload runs once uncapped in memory; its steady anonymous-memory footprint divided by the cap under test gives $\rho$.
+Steady means the mean over the middle 20 to 80 percent of the run, which excludes startup and the terminal emission flush; the flush peak is tracked as its own quantity.
 
 % [7.1.3]
 Three variants run on identical workloads.

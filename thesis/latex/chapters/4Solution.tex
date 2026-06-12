@@ -107,7 +107,9 @@ The backpressure loop uses a recycle counter as its progress signal.
 
 % [6.4]
 Six gauges instrument the memory system.
-A sampler reads the cgroup memory statistics every 0.2 seconds.
+A sampler reads the cgroup memory statistics every 0.2 seconds and splits them into anonymous memory, page cache, and shared memory (Section~\ref{sec:bg-metrics}).
+The process-level anonymous set from the kernel's per-process status is read alongside as a cross-check on the cgroup accounting.
+The split is what makes the memory numbers of Chapter~\ref{cha:evaluation} trustworthy: a spilling backend inflates the page cache by design, and an early measurement round that reported undifferentiated totals produced footprint numbers that moved with the spill volume rather than with the working set.
 A pool gauge records pool occupancy at buffer rent time.
 An unpooled gauge tracks live bytes outside the pool.
 A map gauge records the exact composition of every hash map at its destruction.

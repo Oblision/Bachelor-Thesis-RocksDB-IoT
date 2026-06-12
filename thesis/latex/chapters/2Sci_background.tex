@@ -165,9 +165,18 @@ A process group that exceeds its limit triggers the kernel's out-of-memory kille
 The out-of-memory killer terminates the process.
 This thesis writes OOM for out of memory.
 
+% [2.17b] — how memory is measured, and why the distinction is load-bearing.
+The kernel accounts a cgroup's memory in two kinds.
+Anonymous memory holds the working data of the processes; the kernel cannot reclaim it, and it is the quantity that triggers the OOM killer.
+File-backed memory is the page cache for file reads and writes; the kernel reclaims it under pressure, so it never kills a run.
+This distinction is load-bearing for measuring a spilling backend.
+A backend that spills to disk inflates the page cache as a by-product of working correctly: every spilled and restored byte passes through it.
+A naive total, such as the resident set size or the cgroup's current consumption, therefore charges the backend for its own spill traffic and overstates its footprint in proportion to how much it spills.
+Every memory footprint reported in this thesis is anonymous memory, read from the cgroup's memory statistics; the page cache is recorded separately and never counted as pressure.
+
 % [2.18]
 State pressure is measured as the ratio $\rho$.
-$\rho$ is the steady-state memory footprint of a workload divided by the memory cap.
+$\rho$ is the steady-state anonymous-memory footprint of a workload divided by the memory cap.
 A workload with $\rho > 1$ does not fit into the allowed memory.
 
 % [2.19]
