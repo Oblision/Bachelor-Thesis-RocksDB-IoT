@@ -1,0 +1,18 @@
+# Nexmark Q7 (tumbling per-auction MAX) — adapted from .planning/eval-phase/nexmark-phase
+# Generator bid stream: in-order event time (1 ms/row), hot-skewed auctionId. ${TUPLES} rows, ${WINDOW} ms windows.
+# groups: [Spill, Nexmark, ManualOnly]
+CREATE LOGICAL SOURCE bid(timestamp UINT64 NOT NULL, auctionId UINT64 NOT NULL, bidder UINT64 NOT NULL, datetime UINT64 NOT NULL, price UINT64 NOT NULL);
+CREATE PHYSICAL SOURCE FOR bid TYPE Generator SET(
+    1 AS `SOURCE`.SEED,
+    'ALL' AS `SOURCE`.STOP_GENERATOR_WHEN_SEQUENCE_FINISHES,
+    'emit_rate 50000000' AS `SOURCE`.GENERATOR_RATE_CONFIG,
+    'SEQUENCE UINT64 0 ${TUPLES} 1, NORMAL_DISTRIBUTION UINT64 ${TUPLES} 0.5, SEQUENCE UINT64 0 100 1, SEQUENCE UINT64 0 ${TUPLES} 1, SEQUENCE UINT64 0 100 1' AS `SOURCE`.GENERATOR_SCHEMA
+);
+CREATE SINK out(bid.start UINT64 NOT NULL, bid.end UINT64 NOT NULL, bid.auctionId UINT64 NOT NULL, bid.maxPrice UINT64 NOT NULL) TYPE Void;
+SELECT start, end, auctionId, MAX(price) AS maxPrice
+FROM bid
+GROUP BY auctionId
+WINDOW TUMBLING(timestamp, size ${WINDOW} ms)
+INTO out;
+----
+1
