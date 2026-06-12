@@ -44,9 +44,11 @@ a single dominant configuration.
 4. Submission anchor: 2026-07-17
 
 ## Repo facts
-- `main` = canonical, complete history (this merge). Variant branches kept for provenance:
-  ooc-stability-levers (superseded by main), ooc-bucket-tweak / ooc-pooled-* (historical,
-  bucket-tweak explicitly NOT merged — negative result).
+- `main` = the ONLY branch; canonical, complete history. Historical lines preserved as tags:
+  archive/ooc-stability-levers and archive/ooc-ingest-governor (ancestors of main),
+  archive/ooc-pooled-state, archive/ooc-pooled-bounded, archive/ooc-bucket-tweak (early
+  prototypes/negative results, deliberately NOT merged — they conflict with main by design,
+  being obsolete versions of code main evolved further).
 - NEVER push to the retired public fork. This private repo is the only remote.
 - Raw workload CSVs are NOT in git (size; regenerable): `work/gen_skew.py` + `work/gen_nexmark.py`
   with parameters recorded in the experiment docs; tmpfs (`/dev/shm/nes-input`) clears on reboot.
