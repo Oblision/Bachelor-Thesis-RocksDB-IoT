@@ -62,7 +62,12 @@ AggregationOperatorHandler::getCreateNewSlicesFunction(const CreateNewSlicesArgu
     PRECONDITION(
         numberOfWorkerThreads > 0, "Number of worker threads not set for window based operator. Was setWorkerThreads() being called?");
     auto newHashMapArgs = dynamic_cast<const CreateNewHashMapSliceArgs&>(newSlicesArguments);
-    newHashMapArgs.numberOfBuckets = std::clamp(rollingAverageNumberOfKeys.rlock()->getAverage(), 1UL, maxNumberOfBuckets);
+    /// BUCKET-TWEAK (ooc-bucket-tweak): size for ~TARGET_ENTRIES_PER_BUCKET entries/bucket instead of ~1,
+    /// shrinking the per-map bucket directory (measured ~30% of resident HashMap memory) ~TARGET-fold, at
+    /// the cost of slightly longer hash chains (probe cost). Cheap, config-side, non-Nautilus right-sizing.
+    static constexpr uint64_t TARGET_ENTRIES_PER_BUCKET = 4;
+    newHashMapArgs.numberOfBuckets
+        = std::clamp(rollingAverageNumberOfKeys.rlock()->getAverage() / TARGET_ENTRIES_PER_BUCKET, 1UL, maxNumberOfBuckets);
     return std::function(
         [outputOriginId = outputOriginId,
          numberOfWorkerThreads = numberOfWorkerThreads,
