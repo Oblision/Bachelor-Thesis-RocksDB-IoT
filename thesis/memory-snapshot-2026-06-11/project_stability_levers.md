@@ -122,3 +122,15 @@ failing cells, ~20/3000). Upstream fix precisely specified: epoch-stamped cache 
 boundary = out of thesis scope). Architectural lesson for thesis: unmediated raw pointers into evictable state
 need an invalidation protocol — Flink avoids it by mediating every access. SLICECACHE=off hook exists in
 run-cell.sh. Paced-valley conversion at tight caps blocked behind the upstream fix.
+
+**NEXMARK V2 DONE (2026-06-12 overnight, 210 cells, NX_*): realism transfer CONFIRMED at the beyond-memory
+coordinate.** C@1024 (in-mem 0/8 rc137 both queries): B2 8/8 (q3, p=7.8e-5) / 7/8 (q7, p=7e-4), genuine OOC
+(610MB spilled, 234MB DEVICE restores — first heavy SD-read exercise); U8 6/8 / 3/8 (complementarity mirrors
+synthetic 1024). Twin-defect OOD prediction EXACT: 0 corruption in 210 in-order cells; every B2 rc137 at
+fits-cells = pool-floor (two-sided law placement correct OOD). HONEST: NX-H3 refuted — in-order pays full
+spill+restore round trip (jitter masked restore costs: hot slices never spilled in synthetic): fits-cells
+over-spill at soft=CAP/10 (−42..−54% tps, CPU 59% I/O-bound, 682MB writes for a FITS workload); win cell
+−46..−59% vs uncapped. State-aware threshold = documented future work (no tuning done). Ref-inflation finding:
+uncapped refs' band grows at full speed (in-order race form) — capped-inm anon is fits-truth. Generator source
+crawls on current engine (~3k rows/s) → file-source route (gen_nexmark.py, 70% Zipf head + 30% tail). MAX≈SUM
+broadly (one edge discrepancy). WRITING-POINTS 7.2.8-10 added. Eval FINAL state: ~3300 cells.

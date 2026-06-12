@@ -65,3 +65,41 @@ the file-source route the prior phase itself proposed: gen_nexmark.py bid CSV (3
 Revised workloads by window breadth: A=W50k (~465 MB, fits/edge@512), B=W100k (~0.9 GB est,
 beyond@512 + edge@1024), C=W200k (~1.5 GB est, beyond@1024). Refs measure the truth per query.
 Grid: 2q × {A@512, B@512, B@1024, C@1024} × {inm,B2,U8} × 8 + 18 refs = 210 cells.
+
+## RESULTS (2026-06-12, 210 cells, 02:35–03:49)
+
+**One-line: the beyond-memory claim TRANSFERS to realistic workloads — at the one coordinate where
+the in-memory engine genuinely cannot fit (C@1024: 0/8 OOM), bounded OOC completes 8/8 (q3,
+p=7.8×10⁻⁵) and 7/8 (q7, p=7.0×10⁻⁴) doing real out-of-core work (153 slices, 610 MB written,
+234 MB device restores); the twin-defect model's out-of-distribution prediction holds exactly
+(zero rc134/rc11 in 210 in-order cells); and the honest news is the cost — in-order data pays the
+full spill+restore round trip, and the pre-committed thresholds over-spill fits-cells.**
+
+Footprint truth: uncapped refs inflate (688/784/956 MB — at full speed the open-window band grows
+beyond nominal retention; the in-order form of the race); capped in-mem anon is the fits-truth
+(325/433/785 MB). By that measure A@512, B@512, B@1024 are fits/edge cells; C@1024 is the one true
+beyond-memory coordinate (in-mem 0/8 rc137, both queries).
+
+| hypothesis | verdict | evidence |
+|---|---|---|
+| NX-H1 windows transfer | **MET at the beyond-memory coordinate** | C@1024: in-mem 0/8; B2 8/8 (q3) / 7/8 (q7); U8 6/8 / 3/8 — bounded wins decisively, heap partially: mirrors the synthetic 1024 complementarity |
+| NX-H2 in-order is safe (model prediction) | **CONFIRMED** | zero rc134/rc11 across 210 cells; AND the two-sided law correctly explains every bounded rc137 at fits-cells (the 396 MB pool floor at 1024 / 132 MB at 512 eats the cap: B2 5/8, 6/8, 4/8, 2/8 at cells in-mem completes) |
+| NX-H3 cost band | **REFUTED — costs are steeper on in-order data** | at over-spilled fits-cells −42…−54% tps (A@512: U8 1.07M vs in-mem 2.31M; 580 slices / 682 MB written for a workload that FITS — the soft=CAP/10 policy spills without benefit; CPU 59% = I/O-bound vs in-mem 97%); at the win cell B2 runs 1.05–1.38M vs uncapped 2.55M (−46…−59%) doing genuine OOC |
+| NX-H4 fits-parity | REFUTED for B2 (pool-floor flakiness, law-consistent), held for U8 on completion (8/8) but not cost | table above |
+| NX-H5 MAX ≈ SUM | broadly held | same pattern both queries; one edge-cell discrepancy (B@512 B2: q7 0/8 rc141 vs q3 5/8) in knife-edge territory |
+
+## RQ contributions (final)
+- **RQ1 (7.2.8):** external validity DELIVERED: on a canonical bid-stream schema with realistic
+  auction popularity, bounded OOC completes a workload the in-memory engine cannot, p=7.8×10⁻⁵,
+  with device-verified out-of-core operation. Boundary honestly stated: demonstrated at one
+  coordinate (ρ_inm≈0.93+flush at 1024); fits-cells show the pool-floor cost instead.
+- **RQ2:** in-order realistic streams pay the FULL spill+restore round trip (the synthetic jitter
+  masked restore costs by keeping slices hot/unspillable): −42…−59% tps at spilling cells. A
+  state-aware threshold (don't spill below fit) is the obvious, documented improvement — NOT
+  applied here (no tuning on evaluation workloads).
+- **RQ3:** the model survives out of distribution: safety prediction exact (0 corruption), failure
+  placement exact (every bounded rc137 = right-wall floor; the lone in-mem rc141 = I/O flood at the
+  63 MB pool), and the ref-inflation effect is the race mechanism in its in-order form.
+- **RQ4:** fits-cell over-spilling visible as CPU 59% vs in-mem 97%; win-cell restores read from
+  DEVICE (234 MB — first heavy exercise of the SD read path at 1024).
+- **RQ5:** device WA at the win cell ≈ 610/309 ≈ 2.0 (restore-heavy churn); fits-cell 682/317 ≈ 2.2.

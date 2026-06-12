@@ -226,6 +226,20 @@ W). Why there are two is the subject of 7.6; here the windows of both are report
   self-throttle into the pool's backpressure [E: W 512 column, survivor tps 3.33 vs 1.98 M].
 - 7.2.7 Completion is therefore a race between ingest rate and drain rate in both architectures;
   this reframing drives the rest of the evaluation.
+- 7.2.8 The beyond-memory result transfers to realistic workloads: on a Nexmark-style bid stream
+  (canonical schema, hot-skewed auction popularity, in-order event time), bounded allocation
+  completes the workload the in-memory engine cannot fit (8/8 and 7/8 vs 0/8, p=7.8×10⁻⁵ and
+  7.0×10⁻⁴), performing verified out-of-core work (610 MB spilled, 234 MB restored from device)
+  [E: NX C@1024]. Supporting evidence (proposal stretch goal); the synthetic grid remains primary.
+- 7.2.9 The same run is the failure model's out-of-distribution test, and it passes: zero
+  corruption events in 210 in-order cells (the twin-defect mechanism predicts the hazard requires
+  late writes), and every bounded failure lands where the two-sided law puts it (pool floor at
+  fits-cells) [E: NX run, rc census].
+- 7.2.10 The honest transfer cost: in-order streams pay the full spill-and-restore round trip that
+  the synthetic jitter masked (hot slices never spilled there); with the pre-committed cap-derived
+  threshold, fits-cells over-spill (−42…−54% throughput for no benefit), and the win cell pays
+  −46…−59% vs the unlimited reference; a state-aware spill threshold is documented future work,
+  deliberately not tuned on the evaluation workloads [E: NX cost table, CPU/IO columns].
 
 ### 7.3 RQ2 — cost
 *(All headline cost comparisons are made at MATCHED I/O granularity (~8 K buffers in every variant,
