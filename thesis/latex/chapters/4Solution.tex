@@ -1,0 +1,133 @@
+\chapter{A Spillable Slice Store for NebulaStream\label{cha:solution}}
+% Drafted per POINT-SEQUENCE.md Ch.4 (points 5.1–5.11 design, 6.1–6.6 implementation).
+
+This chapter presents the backend.
+The first half covers the design: the requirements, the store, the spill mechanisms, and two design iterations.
+The second half covers the implementation: the integration points, the instrumentation, and the evaluation harness.
+
+\section{Requirements\label{sec:requirements}}
+
+% [5.1]
+Four requirements follow from the goal in Chapter~\ref{cha:problem}.
+First, the backend spills state before memory pressure becomes fatal.
+Second, it forces spilling when pressure becomes acute anyway.
+Third, it never changes query results.
+Fourth, it leaves the just-in-time compilation pipeline untouched.
+
+\section{The Spillable Slice Store\label{sec:architecture}}
+
+% [5.2]
+NebulaStream keeps window state in a slice store (Section~\ref{sec:bg-windows}).
+The design replaces the in-memory slice store with a spillable slice store behind the same interface.
+The operators above the store do not change.
+
+% [5.3]
+A slice moves through five states.
+A hot slice belongs to a window that still receives data.
+A cold slice belongs to a window that is complete but not yet emitted.
+A spilled slice lies in RocksDB.
+A restored slice is read back into memory for emission.
+An emitted slice has delivered its results and is freed.
+Figure~\ref{fig:ooc-integration} shows the store, its new components, and their place in the engine.
+
+% Benjamin's existing TikZ diagram (from the May draft), restored into this project.
+\input{figures/spillable_slice_store}
+
+% [5.4]
+A background thread, the spiller, wakes every 100 milliseconds.
+The soft watermark is a memory threshold for preemptive spilling.
+When the resident bytes of slice state exceed the soft watermark, the spiller moves cold slices to RocksDB.
+It moves cold slices first because no operator writes to them anymore.
+
+% [5.5]
+The hard watermark is a higher threshold for forced spilling.
+When resident slice bytes reach it, the store spills synchronously.
+This covers the case where the background spiller falls behind the arrival rate.
+
+% [5.6]
+Slices serialize page by page into RocksDB key-value pairs.
+The serializer preserves the exact memory layout of the hash map.
+A restore is therefore a plain byte copy back into pages.
+
+% [5.7]
+Before a window's results are emitted, the store restores its spilled slices.
+
+% [5.8]
+The spill controller observes one signal: the resident byte count of slice data pages.
+Other consumers of the buffer pool, such as input buffers and emission buffers, are invisible to it.
+This is a design property, stated here openly.
+Chapter~\ref{cha:evaluation} measures its consequences.
+
+\section{Design Iteration Two: Pool-Pressure Levers\label{sec:levers}}
+
+% [5.9]
+The first evaluation round motivates four additional mechanisms.
+Each one reacts to pressure on the global buffer pool instead of resident bytes.
+Each one is gated behind its own configuration flag.
+Lever 1a lets the spiller also drain when the free buffers in the pool fall below a reserve.
+Lever 1b reacts to an allocation that finds the pool empty: it triggers an immediate spill of one cold slice instead of waiting passively.
+Lever 1c paces restores: a restore before emission proceeds only when the pool has headroom.
+Lever 1d adds the bucket directories (Section~\ref{sec:bg-windows}) to the resident budget.
+
+\section{Design Iteration Three: Allocation Backpressure\label{sec:backpressure}}
+
+% [5.10]
+The second iteration adds allocation backpressure, also gated.
+An allocation that would abort (Section~\ref{sec:bg-nes}) instead stalls in bounded rounds.
+A progress guard watches the whole pool.
+If no buffer returns to the pool for two full rounds, the guard aborts early.
+In that situation the threads that would return buffers are themselves blocked, so waiting longer cannot help.
+
+% [5.11]
+Every mechanism in this chapter is off by default.
+With all gates closed, the engine is byte-identical to the unmodified baseline.
+Every comparison in Chapter~\ref{cha:evaluation} is therefore an A/B test on one binary.
+
+\section{Integration into NebulaStream\label{sec:integration}}
+
+% [6.1]
+The store is created when the query is lowered into its physical plan.
+Its configuration travels from the worker configuration through the engine builder into the store and the buffer manager.
+
+% [6.2]
+One implementation detail deserves its own statement.
+Whether a hash map page is pooled is decided by one comparison inside ChainedHashMap.
+A page is pooled if the configured page size fits into the engine's buffer size.
+The engine's default buffer size is 4096 bytes.
+The page size in this thesis is 8192 bytes.
+This fact is stated here; Chapter~\ref{cha:evaluation} measures its consequence.
+
+% [6.3]
+The buffer manager gains three extensions.
+An availability query reports the number of free buffers.
+Pressure listeners notify the store when an allocation finds the pool empty; lever 1b uses this hook.
+The backpressure loop uses a recycle counter as its progress signal.
+
+\section{Instrumentation\label{sec:instrumentation}}
+
+% [6.4]
+Six gauges instrument the memory system.
+A sampler reads the cgroup memory statistics every 0.2 seconds.
+A pool gauge records pool occupancy at buffer rent time.
+An unpooled gauge tracks live bytes outside the pool.
+A map gauge records the exact composition of every hash map at its destruction.
+A spill gauge records the controller's view at every spiller wake.
+A backpressure gauge records every stall event.
+
+\section{Evaluation Harness and Reproducibility\label{sec:reproducibility}}
+
+% [6.5]
+The harness runs each measurement cell in Docker.
+A cell is one combination of workload, memory cap, pool size, and configuration.
+Docker enforces a hard memory cap and pins the processor cores.
+Input data lies on a memory-backed file system.
+The spill target is an SD card, as on a real edge device.
+Cells run one at a time.
+Each cell writes one row with 34 measured columns.
+
+% [6.6]
+Correctness is verified with output checksums against the in-memory baseline.
+The gated binary itself is verified with a levers-off regression arm, which must behave identically to the unmodified engine.
+
+The backend, the levers, and the instrumentation are in place.
+The next chapter evaluates them.

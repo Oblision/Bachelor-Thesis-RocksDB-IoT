@@ -1,0 +1,99 @@
+\chapter{Introduction\label{cha:introduction}}
+% Drafted per POINT-SEQUENCE.md Ch.1 (points 1.1–1.12).
+% Note: Intro precedes Background, so every technical term here is used in its plain-word form
+% and gets its precise definition in Chapter 2.
+
+\section{Motivation\label{sec:motivation}}
+
+% [1.1]
+Sensors in cities, factories, and vehicles produce data without pause.
+Stream processing systems compute results from this data while it arrives.
+
+% [1.2]
+Many useful computations need memory of the recent past.
+A system that reports the average temperature per sensor and per minute must collect values until each minute is complete.
+These collected partial results are called state.
+
+% [1.3]
+NebulaStream is a stream processing system for the Internet of Things~\cite{zeuch2020,zeuch2022}.
+It is built to run on small computers near the sensors, at the edge of the network.
+NebulaStream keeps all state in main memory.
+
+% [1.4]
+Edge devices have small main memories.
+A typical device offers a few hundred megabytes to a few gigabytes.
+
+% [1.5]
+State grows with the number of sensors and the length of the observed time range.
+When state grows beyond the available memory, the operating system terminates the process.
+Processing halts and results are lost.
+
+% [1.6]
+Two common answers to this problem fail at the edge.
+Provisioning more memory is not possible on fixed hardware.
+Moving the computation to the cloud forces the raw data to travel, and data movement dominates the cost of edge deployments~\cite{horowitz2014,zeuch2020}.
+
+% [1.7]
+Cloud stream processing systems know a third answer.
+An out-of-core state backend moves state to local disk when memory runs short.
+Out-of-core means that a computation uses more data than fits into main memory.
+RocksDB, an embeddable storage engine, is the industry standard for this role~\cite{flink2021}.
+
+\section{Research Challenge\label{sec:challenge}}
+
+% [1.8]
+NebulaStream executes queries with a push-based model.
+Data is pushed through the system as it arrives, and all operators share one fixed pool of memory buffers.
+Whether an out-of-core backend works inside this model is unknown.
+The combination has not been evaluated systematically~\cite{marcu2022}.
+
+% [1.9]
+This thesis builds an out-of-core backend for window state in NebulaStream.
+It then evaluates the backend on edge-class memory budgets, from 512 megabytes to 2 gigabytes.
+
+\section{Results in Brief\label{sec:results-brief}}
+
+% [1.10]
+The backend processes workloads whose state exceeds memory, without crashes, inside an operating window that this thesis characterizes.
+The throughput cost ranges from 3\% to 22\%.
+During the evaluation, one engine configuration default turned out to silently disable the engine's intended memory architecture.
+Correcting it requires one flag.
+The correction, combined with new memory-pressure mechanisms, raises stability to the level of the in-memory engine at 25\% less resident memory.
+The one remaining failure mode is diagnosed precisely, and its fix is specified as future work.
+
+\section{Contributions\label{sec:contributions}}
+
+% [1.11]
+This thesis makes six contributions.
+\begin{enumerate}
+  \item \textbf{C1 — A spillable window state backend for NebulaStream.}
+    Window state moves to RocksDB under memory pressure and returns for result emission.
+    The query compiler and the just-in-time compilation pipeline remain untouched.
+  \item \textbf{C2 — An instrumented, reproducible evaluation harness.}
+    Every run executes under a hard memory cap with pinned processor cores.
+    Six probes record the memory system over time.
+    The evaluation covers roughly 3{,}100 measured runs, and every follow-up hypothesis was registered before its experiment ran.
+  \item \textbf{C3 — Empirical operating windows for out-of-core processing on edge budgets.}
+    The evaluation maps where the backend succeeds and where it fails, per memory budget.
+    It shows that completion is a race between data arrival and disk drainage, not a fixed state-size threshold.
+  \item \textbf{C4 — A load-bearing architecture finding.}
+    The engine's default buffer size silently kept all window state outside the engine's buffer pool in every configuration.
+    One flag corrects this.
+    The corrected architecture, plus the new pressure mechanisms, reaches in-memory stability at lower memory cost.
+  \item \textbf{C5 — A failure taxonomy with a diagnosed root cause.}
+    Failures follow a three-regime law.
+    The residual failure is an allocation deadlock, demonstrated by direct instrumentation.
+  \item \textbf{C6 — An open-source implementation.}
+    All mechanisms are configuration-gated.
+    With all gates closed, the engine is byte-identical to the unmodified baseline.
+\end{enumerate}
+
+\section{Thesis Structure\label{sec:structure}}
+
+% [1.12]
+Chapter~\ref{cha:background} introduces NebulaStream, windowed aggregation, RocksDB, and the terms of the evaluation.
+Chapter~\ref{cha:problem} states the research problem and the research questions.
+Chapter~\ref{cha:solution} presents the design and implementation of the backend.
+Chapter~\ref{cha:evaluation} evaluates effectiveness, cost, and stability, and investigates the failure modes.
+Chapter~\ref{cha:related} relates the thesis to existing work.
+Chapter~\ref{cha:conclusion} concludes and lists future work.

@@ -62,3 +62,17 @@ music-venture/
 *.jpeg
 *.jpg
 2026-01-26_130519_signature.pdf
+
+# LaTeX build artifacts (thesis/latex)
+thesis/latex/**/*.aux
+thesis/latex/*.log
+thesis/latex/*.out
+thesis/latex/*.toc
+thesis/latex/*.lof
+thesis/latex/*.lot
+thesis/latex/*.loa
+thesis/latex/*.bbl
+thesis/latex/*.blg
+thesis/latex/Template.pdf
+thesis/latex/_compile_check.*
+thesis/latex/ngerman.ldf.broken-404-stub

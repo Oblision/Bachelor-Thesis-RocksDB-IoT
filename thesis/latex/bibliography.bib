@@ -1,0 +1,445 @@
+% ══════════════════════════════════════════════════════════════════════════════
+% Bibliography — Out-of-Core Stream Processing in NebulaStream
+% ══════════════════════════════════════════════════════════════════════════════
+
+% ── NebulaStream ─────────────────────────────────────────────────────────────
+
+@inproceedings{zeuch2020,
+  author    = {Sebastian Zeuch and Ankit Chaudhary and Dimitrios Giouroukis
+               and Philipp M. Grulich and Sebastian Bre{\ss} and Johannes Traub
+               and Volker Markl},
+  title     = {The {NebulaStream} Platform: Data and Application Management
+               for the {Internet of Things}},
+  booktitle = {Proc.\ Conference on Innovative Data Systems Research (CIDR)},
+  year      = {2020}
+}
+
+@article{zeuch2022,
+  author  = {Sebastian Zeuch and Xenofon Chatziliadis and Ankit Chaudhary
+             and Dimitrios Giouroukis and Philipp M. Grulich
+             and Denny P. N. A. Nugroho and Alexander Ziehn and Volker Markl},
+  title   = {{NebulaStream}: Data Management for the {Internet of Things}},
+  journal = {Datenbank-Spektrum},
+  volume  = {22},
+  number  = {2},
+  pages   = {131--141},
+  year    = {2022}
+}
+
+@article{lepping2023iotropolis,
+  author  = {A. Lepping and H. M. Pham and L. Mons and B. Rueb
+             and Ankit Chaudhary and Philipp M. Grulich
+             and P. Chrysogelos and E. T. Zacharatou and Volker Markl},
+  title   = {Showcasing Data Management Challenges for Future {IoT}
+             Applications with {NebulaStream}},
+  journal = {Proceedings of the {VLDB} Endowment},
+  volume  = {16},
+  number  = {12},
+  pages   = {3934--3937},
+  year    = {2023},
+  doi     = {10.14778/3611540.3611588}
+}
+
+@inproceedings{markl2024nebulastream,
+  author    = {Volker Markl},
+  title     = {{NebulaStream}: Data Stream Processing in Massively Distributed,
+               Heterogeneous, Volatile Environments},
+  booktitle = {Proc.\ {ACM} International Conference on Distributed and
+               Event-Based Systems (DEBS)},
+  note      = {Keynote},
+  year      = {2024},
+  doi       = {10.1145/3629104.3672505}
+}
+
+% ── RocksDB ──────────────────────────────────────────────────────────────────
+
+@misc{borthakur2013,
+  author       = {Dhruba Borthakur},
+  title        = {Under the Hood: Building and Open-Sourcing {RocksDB}},
+  howpublished = {Meta Engineering Blog},
+  month        = nov,
+  year         = {2013},
+  url          = {https://engineering.fb.com/2013/11/21/core-infra/under-the-hood-building-and-open-sourcing-rocksdb/}
+}
+
+@misc{rocksdb-memory,
+  author       = {{Facebook/Meta}},
+  title        = {Memory Usage in {RocksDB}},
+  howpublished = {RocksDB Wiki, GitHub},
+  year         = {2026},
+  note         = {Accessed April 2026},
+  url          = {https://github.com/facebook/rocksdb/wiki/Memory-usage-in-RocksDB}
+}
+
+% ── RocksDB tuning and analysis ──────────────────────────────────────────────
+
+@article{jin2022,
+  author  = {Huijin Jin and Won Gi Choi and Jonghwan Choi
+             and Hanseung Sung and Sanghyun Park},
+  title   = {Improvement of {RocksDB} Performance via Large-Scale Parameter
+             Analysis and Optimization},
+  journal = {Journal of Information Processing Systems},
+  volume  = {18},
+  number  = {4},
+  pages   = {374--388},
+  year    = {2022},
+  doi     = {10.3745/JIPS.04.0244}
+}
+
+@article{pamarthi2024,
+  author  = {Sandeep Pamarthi},
+  title   = {Real-Time State Management Techniques Using {RocksDB}: A
+             High-Performance Approach to Scalable Stream Processing},
+  journal = {International Journal of Scientific Research Archive},
+  volume  = {12},
+  number  = {1},
+  pages   = {3180--3190},
+  year    = {2024}
+}
+
+@inproceedings{wei2025,
+  author    = {Rui Wei and Zixuan Zhu and Adam Kryczka and Jun Zhuang
+               and Michael Athanassoulis},
+  title     = {Benchmarking, Analyzing, and Optimizing Write Amplification
+               of Partial Compaction in {RocksDB}},
+  booktitle = {Proc.\ International Conference on Extending Database
+               Technology (EDBT)},
+  pages     = {425--437},
+  year      = {2025}
+}
+
+@article{adao2025,
+  author  = {R{\'u}ben Ad{\~a}o and Zhongjie Wu and Changjun Zhou
+             and Oana Balmau and Jo{\~a}o Paulo and Ricardo Macedo},
+  title   = {Keigo: Co-Designing Log-Structured Merge Key-Value Stores
+             with a Non-Volatile, Concurrency-Aware Storage Hierarchy},
+  journal = {Proceedings of the VLDB Endowment},
+  volume  = {18},
+  number  = {9},
+  pages   = {2872--2885},
+  year    = {2025},
+  doi     = {10.14778/3746405.3746414}
+}
+
+% ── Stream processing ────────────────────────────────────────────────────────
+
+@article{fragkoulis2024,
+  author  = {Manos Fragkoulis and Paris Carbone and Vasiliki Kalavri
+             and others},
+  title   = {A Survey on the Evolution of Stream Processing Systems},
+  journal = {The VLDB Journal},
+  volume  = {33},
+  pages   = {507--541},
+  year    = {2024},
+  doi     = {10.1007/s00778-023-00819-8}
+}
+
+@misc{flink2021,
+  author       = {{Apache Flink Documentation}},
+  title        = {Using {RocksDB} State Backend in {Apache Flink}: When and How},
+  month        = jan,
+  year         = {2021},
+  url          = {https://flink.apache.org/2021/01/18/using-rocksdb-state-backend-in-apache-flink-when-and-how/}
+}
+
+@article{frassinelli2025,
+  author  = {Simone Frassinelli and Gabriele Mencagli},
+  title   = {Larger-than-Memory Stateful Stream Processing with {WindFlow}},
+  journal = {International Journal of Parallel Programming},
+  volume  = {53},
+  number  = {2},
+  pages   = {Article~12},
+  year    = {2025},
+  doi     = {10.1007/s10766-025-00785-4}
+}
+
+@article{esteves2020,
+  author  = {S{\'e}rgio Esteves and Andr{\'e} Brito and Jorge Bernardino
+             and Pedro F. Pires},
+  title   = {{AION}: Managing Window Memory and Persistent Storage in
+             Stream Processing},
+  journal = {arXiv preprint},
+  year    = {2020},
+  note    = {arXiv:2003.03604},
+  url     = {https://arxiv.org/abs/2003.03604}
+}
+
+@article{marcu2022,
+  author  = {Ovidiu-Cristian Marcu and Pascal Bouvry},
+  title   = {Colocating Real-Time Storage and Processing: An Analysis of
+             Pull-Based versus Push-Based Streaming},
+  journal = {arXiv preprint},
+  year    = {2022},
+  note    = {arXiv:2211.05857},
+  doi     = {10.48550/arXiv.2211.05857}
+}
+
+@inproceedings{TraubGCBKRM20,
+  author    = {Jonas Traub and Philipp Marian Grulich
+               and Alejandro Rodr{\'i}guez Cu{\'e}llar and Sebastian Bress
+               and Asterios Katsifodimos and Tilmann Rabl and Volker Markl},
+  title     = {Scotty: General and Efficient Open-Source Window Aggregation
+               for Stream Processing Systems},
+  journal   = {ACM Transactions on Database Systems},
+  year      = {2020},
+  url       = {https://dl.acm.org/doi/10.1145/3433675}
+}
+
+% ── Edge computing and IoT ───────────────────────────────────────────────────
+
+@article{shi2016,
+  author  = {Weisong Shi and Jie Cao and Quan Zhang and Youhuizi Li
+             and Lanyu Xu},
+  title   = {Edge Computing: Vision and Challenges},
+  journal = {IEEE Internet of Things Journal},
+  volume  = {3},
+  number  = {5},
+  pages   = {637--646},
+  year    = {2016},
+  doi     = {10.1109/JIOT.2016.2579198}
+}
+
+@article{ojo2019,
+  author  = {Mike O. Ojo and Stefano Giordano and Gregorio Procissi
+             and Ioannis N. Seitanidis},
+  title   = {A Review of Low-End, Middle-End, and High-End {IoT} Devices},
+  journal = {IEEE Access},
+  volume  = {7},
+  pages   = {70528--70554},
+  year    = {2019},
+  doi     = {10.1109/ACCESS.2019.2917547}
+}
+
+@article{shukla2017riotbench,
+  author  = {A. Shukla and S. Chaturvedi and Y. Simmhan},
+  title   = {{RIoTBench}: An {IoT} Benchmark for Distributed Stream
+             Processing Systems},
+  journal = {Concurrency and Computation: Practice and Experience},
+  volume  = {29},
+  number  = {21},
+  pages   = {Article~e4257},
+  year    = {2017},
+  doi     = {10.1002/cpe.4257}
+}
+
+@inproceedings{horowitz2014,
+  author    = {Mark Horowitz},
+  title     = {Computing's Energy Problem (and What We Can Do About It)},
+  booktitle = {Proc.\ International Solid-State Circuits Conference (ISSCC)},
+  pages     = {10--14},
+  year      = {2014},
+  publisher = {IEEE},
+  doi       = {10.1109/ISSCC.2014.6757323}
+}
+
+% ── Foundations ──────────────────────────────────────────────────────────────
+
+@article{graefe1993,
+  author  = {Goetz Graefe},
+  title   = {Query Evaluation Techniques for Large Databases},
+  journal = {ACM Computing Surveys},
+  volume  = {25},
+  number  = {2},
+  pages   = {73--169},
+  year    = {1993}
+}
+
+% ── Storage-strategy critique (motivates RocksDB over mmap) ──────────────────
+
+@inproceedings{crotty2022mmap,
+  author    = {Andrew Crotty and Viktor Leis and Andrew Pavlo},
+  title     = {Are You Sure You Want to Use {MMAP} in Your Database Management System?},
+  booktitle = {Proc.\ Conference on Innovative Data Systems Research (CIDR)},
+  year      = {2022},
+  url       = {https://www.cidrdb.org/cidr2022/papers/p13-crotty.pdf}
+}
+
+% ══════════════════════════════════════════════════════════════════════════════
+% Phase 2 — partition-at-spill (grace/hybrid-hash) + push-based backpressure
+% Added 2026-05-24. Justify the partition-at-spill design and the credit/token
+% backpressure model. See .planning/dev-eng-cpp-phase2/DESIGN-BRIEF.md (§8a/§8b/§4)
+% and exploration/{EXTERNAL-AGG-AND-FANOUT,PUSH-BASED-BACKPRESSURE}.md for the
+% claim-by-claim mapping.
+% ══════════════════════════════════════════════════════════════════════════════
+
+% ── External / out-of-core hash aggregation (partition-at-spill foundations) ──
+
+@article{shapiro1986,
+  author  = {Leonard D. Shapiro},
+  title   = {Join Processing in Database Systems with Large Main Memories},
+  journal = {ACM Transactions on Database Systems (TODS)},
+  volume  = {11},
+  number  = {3},
+  pages   = {239--264},
+  year    = {1986},
+  doi     = {10.1145/6314.6315}
+}
+
+@misc{davis2020pghashagg,
+  author       = {Jeff Davis and {PostgreSQL Global Development Group}},
+  title        = {Disk-based Hash Aggregation (v13): {\tt nodeAgg.c}
+                  partition-count heuristic and recursive spill},
+  howpublished = {PostgreSQL source and design thread},
+  year         = {2020},
+  note         = {Constants {\tt HASHAGG\_PARTITION\_FACTOR 1.50},
+                  {\tt HASHAGG\_MIN\_PARTITIONS 4}, {\tt HASHAGG\_MAX\_PARTITIONS 1024};
+                  accessed May 2026},
+  url          = {https://github.com/postgres/postgres/blob/master/src/backend/executor/nodeAgg.c}
+}
+
+@inproceedings{kuiper2024duckdb,
+  author    = {Laurens Kuiper and Peter Boncz and Hannes M{\"u}hleisen},
+  title     = {Robust External Hash Aggregation in the Solid State Age},
+  booktitle = {Proc.\ {IEEE} International Conference on Data Engineering (ICDE)},
+  year      = {2024},
+  url       = {https://duckdb.org/pdf/ICDE2024-kuiper-boncz-muehleisen-out-of-core.pdf}
+}
+
+@misc{trino_spill,
+  author       = {{Trino Software Foundation}},
+  title        = {Spill to Disk},
+  howpublished = {Trino Documentation},
+  year         = {2026},
+  note         = {Aggregation spill writes accumulated state then merges with lower
+                  footprint; explicit no-guarantee-under-skew caveat; accessed May 2026},
+  url          = {https://trino.io/docs/current/admin/spill.html}
+}
+
+@misc{hive_hhghj,
+  author       = {{Apache Hive}},
+  title        = {Hybrid Hybrid Grace Hash Join, v1.0},
+  howpublished = {Apache Hive Wiki},
+  year         = {2026},
+  note         = {Accessed May 2026},
+  url          = {https://cwiki.apache.org/confluence/display/Hive/Hybrid+Hybrid+Grace+Hash+Join,+v1.0}
+}
+
+@misc{spark_sql_tuning,
+  author       = {{Apache Spark}},
+  title        = {Performance Tuning ({Spark SQL}): Adaptive Query Execution
+                  and Partition Sizing},
+  howpublished = {Apache Spark Documentation},
+  year         = {2026},
+  note         = {Accessed May 2026},
+  url          = {https://spark.apache.org/docs/latest/sql-performance-tuning.html}
+}
+
+% ── Hash-partition data skew ──────────────────────────────────────────────────
+
+@inproceedings{nakayama1988,
+  author    = {Masaru Nakayama and Masaru Kitsuregawa and Mikio Takagi},
+  title     = {Hash-Partitioned Join Method Using Dynamic Destaging Strategy},
+  booktitle = {Proc.\ International Conference on Very Large Data Bases (VLDB)},
+  pages     = {468--478},
+  year      = {1988}
+}
+
+@inproceedings{kitsuregawa1990,
+  author    = {Masaru Kitsuregawa and Yasushi Ogawa},
+  title     = {Bucket Spreading Parallel Hash: A New, Robust, Parallel Hash Join
+               Method for Data Skew in the Super Database Computer ({SDC})},
+  booktitle = {Proc.\ International Conference on Very Large Data Bases (VLDB)},
+  year      = {1990}
+}
+
+% ── Push-based backpressure / flow control ───────────────────────────────────
+
+@misc{flink_credit,
+  author       = {{Apache Flink}},
+  title        = {{FLINK-7282}: Credit-based Network Flow Control},
+  howpublished = {Apache Flink JIRA (design issue)},
+  year         = {2017},
+  note         = {``Senders must never send buffers without credit'';
+                  1 credit = 1 receiver-guaranteed buffer. Accessed May 2026},
+  url          = {https://issues.apache.org/jira/browse/FLINK-7282}
+}
+
+@misc{kruber2019flinknet,
+  author       = {Nico Kruber},
+  title        = {A Deep-Dive into {Flink}'s Network Stack},
+  howpublished = {Apache Flink project blog},
+  month        = jun,
+  year         = {2019},
+  url          = {https://flink.apache.org/2019/06/05/a-deep-dive-into-flinks-network-stack/}
+}
+
+@misc{storm_perf,
+  author       = {{Apache Storm}},
+  title        = {Performance Tuning ({\tt topology.max.spout.pending})},
+  howpublished = {Apache Storm Documentation},
+  year         = {2026},
+  note         = {Bounded pool of un-acked tuples gating the spout; accessed May 2026},
+  url          = {https://storm.apache.org/releases/current/Performance.html}
+}
+
+@misc{storm886,
+  author       = {{Apache Storm}},
+  title        = {{STORM-886}: Automatic Back Pressure (high/low watermark)},
+  howpublished = {Apache Storm JIRA},
+  year         = {2016},
+  url          = {https://issues.apache.org/jira/browse/STORM-886}
+}
+
+@inproceedings{kulkarni2015heron,
+  author    = {Sanjeev Kulkarni and Nikunj Bhagat and Maosong Fu and Vikas Kedigehalli
+               and Christopher Kellogg and Sailesh Mittal and Jignesh M. Patel
+               and Karthik Ramasamy and Siddarth Taneja},
+  title     = {Twitter {Heron}: Stream Processing at Scale},
+  booktitle = {Proc.\ {ACM} {SIGMOD} International Conference on Management of Data},
+  pages     = {239--250},
+  year      = {2015},
+  doi       = {10.1145/2723372.2742788}
+}
+
+@misc{reactivestreams,
+  author       = {{Reactive Streams}},
+  title        = {Reactive Streams Specification (Asynchronous Stream Processing
+                  with Non-Blocking Back Pressure)},
+  howpublished = {reactive-streams.org},
+  year         = {2015},
+  note         = {{\tt request(n)} demand budget; accessed May 2026},
+  url          = {https://www.reactive-streams.org/}
+}
+
+@book{silberschatz2018os,
+  author    = {Abraham Silberschatz and Peter B. Galvin and Greg Gagne},
+  title     = {Operating System Concepts},
+  edition   = {10th},
+  publisher = {Wiley},
+  year      = {2018},
+  note      = {Bounded-buffer producer/consumer with counting semaphores
+               (empty/full slot counts) --- the classic backpressure primitive}
+}
+
+% ── RocksDB amplification (constrained-device storage trade-offs) ─────────────
+
+@inproceedings{dong2017,
+  author    = {Siying Dong and Mark Callaghan and Leonidas Galanis
+               and Dhruba Borthakur and Tony Savor and Michael Strum},
+  title     = {Optimizing Space Amplification in {RocksDB}},
+  booktitle = {Proc.\ Conference on Innovative Data Systems Research (CIDR)},
+  year      = {2017},
+  url       = {https://www.cidrdb.org/cidr2017/papers/p82-dong-cidr17.pdf}
+}
+
+% ── Flink keyed-state on-disk layout (streaming spill precedent) ──────────────
+
+@misc{flink_flip41,
+  author       = {{Apache Flink}},
+  title        = {{FLIP-41}: Unify Binary Format for Keyed State
+                  ({\textless}KeyGroup, Key, Namespace{\textgreater})},
+  howpublished = {Apache Flink Improvement Proposal},
+  year         = {2019},
+  note         = {Window = namespace in the RocksDB key; accessed May 2026},
+  url          = {https://cwiki.apache.org/confluence/display/FLINK/FLIP-41:+Unify+Binary+format+for+Keyed+State}
+}
+
+@misc{kafka_streams_guide,
+  author       = {{Apache Kafka}},
+  title        = {{Kafka Streams} Developer Guide: {RocksDB} Local State Stores
+                  and Time-Based Windowed Segments},
+  howpublished = {Apache Kafka / Confluent Documentation},
+  year         = {2026},
+  note         = {Accessed May 2026},
+  url          = {https://docs.confluent.io/platform/current/streams/developer-guide/}
+}

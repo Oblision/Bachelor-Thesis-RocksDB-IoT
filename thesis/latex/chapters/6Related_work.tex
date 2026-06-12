@@ -1,0 +1,58 @@
+\chapter{Related Work\label{cha:related}}
+% Drafted per POINT-SEQUENCE.md Ch.6 (points 3.1–3.7).
+
+This chapter places the thesis next to existing systems and studies.
+It covers the reference integration of RocksDB in stream processing, work on larger-than-memory window state, the tuning literature, and the methodology this thesis follows.
+
+\section{RocksDB as a State Backend in Stream Processing\label{sec:rel-flink}}
+
+% [3.1]
+Apache Flink is a widely used stream processing system.
+Flink ships RocksDB as its production out-of-core state backend~\cite{flink2021}.
+This integration is the reference point for state that exceeds memory in stream processing.
+
+% [3.2]
+Flink's runtime differs from NebulaStream's in two ways that matter here.
+Flink organizes its state access around checkpoints, which are periodic snapshots for fault tolerance.
+Its data exchange is pull-based at the boundaries that Marcu and Bouvry analyze~\cite{marcu2022}.
+NebulaStream pushes data through pipelines and shares one global buffer pool across all operators (Section~\ref{sec:bg-nes}).
+Results from Flink therefore do not transfer directly to NebulaStream.
+
+% [3.5]
+A separate line of work studies RocksDB's parameters.
+Jin et al.\ show that large-scale parameter tuning improves performance but does not remove compaction overhead~\cite{jin2022}.
+Pamarthi reports that careful integration and tuning improve RocksDB's behavior in stream processing~\cite{pamarthi2024}.
+Ad\~ao et al.\ co-design the storage hierarchy below the key-value store and reduce, but do not eliminate, sensitivity to memory and I/O pressure~\cite{adao2025}.
+Wei et al.\ analyze how background compaction degrades foreground performance~\cite{wei2025}.
+Together these studies show that parameters mitigate but do not remove memory and I/O sensitivity.
+This thesis therefore fixes one research-informed configuration instead of searching over configurations (Section~\ref{sec:bg-rocksdb}).
+
+\section{Larger-than-Memory Window State\label{sec:rel-windows}}
+
+% [3.3]
+WindFlow demonstrates larger-than-memory windowed processing in a single-node engine~\cite{frassinelli2025}.
+Its existence shows that the problem is open beyond Flink.
+
+% [3.4]
+AION manages window state across memory and persistent storage~\cite{esteves2020}.
+It separates hot windows from cold windows.
+This matches the slice granularity that this thesis spills (Section~\ref{sec:bg-windows}).
+
+Neither WindFlow nor AION evaluates a push-based engine with one shared global buffer pool under hard memory caps.
+
+\section{Evaluation Methodology\label{sec:rel-method}}
+
+% [3.6]
+Fragkoulis et al.\ survey the evaluation practice of stream processing systems~\cite{fragkoulis2024}.
+Their survey motivates the single-node methodology of this thesis.
+The thesis additionally pre-registers its hypotheses and reports negative results in full.
+Chapter~\ref{cha:evaluation} applies this discipline throughout.
+
+\section{Positioning\label{sec:rel-positioning}}
+
+% [3.7]
+No published work evaluates an out-of-core window state backend inside a push-based engine with one shared global buffer pool under hard memory caps.
+This thesis provides this evaluation.
+Its contribution is evaluation-first: the backend exists to make the measurement possible.
+
+The next chapter summarizes what the evaluation establishes and what remains open.

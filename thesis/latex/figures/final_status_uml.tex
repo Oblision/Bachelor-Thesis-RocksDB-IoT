@@ -1,0 +1,134 @@
+% Final status of the out-of-core subsystem + future-improvement overlay.
+% Use as: \input{figures/final_status_uml}   (preamble needs tikz, see Template.tex)
+%
+% LAYOUT — strict raster so no element can overlap another:
+%   Column centres : x = 0, 7.4, 14.8   (pitch 7.4 cm, boxes 5.2 cm wide -> 2.2 cm gaps)
+%   Row centres    : y = 0, -3, -6, -9, -12, -15   (pitch 3 cm, boxes <= 2.6 cm tall)
+%   Future badges  : dashed red circles pinned at box corners, poking into the
+%                    column gaps only; the F-numbers resolve in the band below.
+%   Edge labels    : white badges (style "lbl"), placed on vertical runs or on
+%                    same-row horizontal runs only — no diagonal label can graze a box.
+
+\begin{figure}[p]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+  font=\sffamily\small,
+  every node/.style={align=center},
+  box/.style ={rectangle, draw, thick, minimum width=5.2cm, minimum height=1.5cm,
+               inner sep=4pt, rounded corners=1pt},
+  existing/.style ={box, fill=black!12},
+  newcomp/.style  ={box, fill=blue!18},
+  storage/.style  ={box, fill=orange!28, double, double distance=1pt},
+  hook/.style     ={box, fill=yellow!55},
+  flow/.style={-{Latex[length=2.4mm]}, thick},
+  impl/.style={-{Triangle[open, length=3.2mm, width=3.2mm]}, thick},
+  warn/.style={-{Latex[length=2.4mm]}, thick, dashed, red!60!black},
+  lbl/.style={fill=white, draw=black!30, line width=0.2pt, rounded corners=1pt,
+              inner sep=2pt, font=\sffamily\footnotesize\itshape, text=black!75},
+  fbadge/.style={circle, draw=red!70!black, dashed, thick, text=red!70!black,
+                 fill=white, font=\sffamily\bfseries\footnotesize, inner sep=1.6pt},
+]
+
+\def\cA{0} \def\cB{7.4} \def\cC{14.8}
+
+% ================= COLUMN A : store path =================
+\node[existing] (handler) at (\cA,0)
+  {WindowBasedOperatorHandler\\\footnotesize\itshape triggers windows, drives emit};
+\node[existing] (iface) at (\cA,-3)
+  {WindowSlicesStoreInterface\\\footnotesize\itshape «interface» --- unchanged\\\footnotesize\itshape (requirement R4 met)};
+\node[newcomp, minimum height=2.6cm] (store) at (\cA,-6.2)
+  {\textbf{SpillableTimeBasedSliceStore}\\[1pt]
+   \footnotesize soft / hard watermarks $\cdot$ spiller (100\,ms)\\
+   \footnotesize levers 1a reserve $\cdot$ 1b rescue\\
+   \footnotesize 1c paced restore $\cdot$ 1d dir.\ accounting};
+\node[newcomp] (bp) at (\cA,-9.6)
+  {Allocation backpressure\\\footnotesize\itshape + progress guard --- converted\\\footnotesize\itshape nothing; ships as diagnostics};
+
+% ================= COLUMN B : state path =================
+\node[newcomp] (cfg) at (\cB,0)
+  {SpillConfig «configuration»\\\footnotesize\itshape every mechanism gated; all gates\\\footnotesize\itshape closed $\Rightarrow$ byte-identical baseline};
+\node[newcomp] (slice) at (\cB,-6.2)
+  {\textbf{SpillableAggregationSlice}\\\footnotesize : HashMapSlice $\cdot$ resident flag\\\footnotesize spill() $\cdot$ unspill()\\\footnotesize\itshape hot $\cdot$ cold $\cdot$ spilled $\cdot$ restored $\cdot$ emitted};
+\node[newcomp] (serializer) at (\cB,-9.6)
+  {SliceSerializer\\\footnotesize\itshape page-exact layout;\\\footnotesize\itshape restore = plain byte copy};
+\node[newcomp] (backend) at (\cB,-12.6)
+  {SpillBackend «interface»\\\footnotesize put $\cdot$ get $\cdot$ erase};
+\node[storage] (rocks) at (\cB,-15.4)
+  {RocksDBSpillBackend\\\footnotesize\itshape lz4 $\cdot$ SD-card spill target};
+
+% ================= COLUMN C : memory side =================
+\node[existing] (bufmgr) at (\cC,0)
+  {BufferManager\\\footnotesize + \textcolor{blue!50!black}{availability query $\cdot$ pressure}\\\footnotesize \textcolor{blue!50!black}{listeners $\cdot$ recycle counter}};
+\node[hook] (chained) at (\cC,-3)
+  {ChainedHashMap pooling boundary\\\footnotesize\itshape pooled iff page size $\leq$ buffer size;\\\footnotesize\itshape 8192-flag = bounded architecture};
+\node[existing] (cache) at (\cC,-6.2)
+  {Per-worker slice cache\\\footnotesize\itshape raw map pointers ---\\\footnotesize\itshape bypasses every spill fence};
+\node[newcomp] (gauges) at (\cC,-9.6)
+  {Six memory gauges\\\footnotesize cgroup $\cdot$ pool $\cdot$ unpooled\\\footnotesize map $\cdot$ spill $\cdot$ backpressure};
+
+% ================= EDGES =================
+\draw[flow] (handler) -- node[lbl]{uses} (iface);
+\draw[impl] (store) -- node[lbl]{implements} (iface);
+\draw[flow] (store) -- node[lbl, pos=0.5]{manages} (slice);
+\draw[flow] (slice) -- node[lbl, pos=0.74]{serialized by} (serializer);
+\draw[flow] (serializer) -- node[lbl]{pages as key--value pairs} (backend);
+\draw[impl] (rocks) -- node[lbl]{implements} (backend);
+% config tunes the store: route through the A--B column gap (x = 3.7)
+\draw[flow, rounded corners=6pt] (cfg.west) -| (3.7,-5.6) -- ($(store.east)+(0,0.6)$);
+\node[lbl] at (3.7,-2.1) {tunes};
+% buffer manager notifies the store (lever 1b): vertical run in the B--C gap
+% (x = 11.1), horizontal run at y = -7.9 (clear of the slice row above and the
+% serializer row below), then up into the store's south edge.
+\draw[flow, rounded corners=6pt] (bufmgr.west) -| (11.1,-7.9) -| ($(store.south)+(0.9,0)$);
+\node[lbl] at (11.1,-4.2) {pressure\\listeners\\(lever 1b)};
+% slice cache races restores — same-row horizontal, dashed warning
+\draw[warn] (cache.west) -- node[lbl, text=red!60!black]{races\\restores} (slice.east);
+% buffer manager pages for the hash maps
+\draw[flow] (bufmgr) -- node[lbl]{rents pages} (chained);
+
+% ================= FUTURE-IMPROVEMENT BADGES =================
+\node[fbadge] at ($(bufmgr.north east)+(-0.05,0.05)$)  {F1};
+\node[fbadge] at ($(bufmgr.south east)+(-0.05,-0.05)$) {F2};
+\node[fbadge] at ($(chained.north east)+(-0.05,0.05)$) {F3};
+\node[fbadge] at ($(slice.north east)+(-0.05,0.05)$)   {F4};
+\node[fbadge] at ($(cache.north east)+(-0.05,0.05)$)   {F5};
+\node[fbadge] at ($(store.north east)+(-0.05,0.05)$)   {F6};
+
+% ================= FUTURE-WORK BAND =================
+\node[draw=red!70!black, dashed, thick, rounded corners, fill=red!4,
+      text width=19.6cm, inner sep=8pt, align=left,
+      font=\sffamily\footnotesize] (future) at (\cB,-18.6)
+  {\textbf{\textcolor{red!70!black}{Potential further improvements (Section~\ref{sec:future}, in order of precision)}}\\[3pt]
+   \textbf{F1} role-aware allocation: a drain-side reserve that build-path allocations cannot consume --- merges the two architectures' operating windows\\
+   \textbf{F2} closed-loop ingest admission keyed to pool headroom --- replaces accidental throttling by the cap with a deliberate mechanism\\
+   \textbf{F3} entry-header refactor: remove the unused virtual-dispatch pointer ($-$20\,\% state) and fix directory sizing on all map-creation paths\\
+   \textbf{F4} exception-safe restore path in the spillable slice\\
+   \textbf{F5} epoch-stamped slice-cache invalidation --- the upstream fix for the diagnosed corruption, one comparison per cache hit\\
+   \textbf{F6} open-window spilling (build-side partitioning) --- requires compilation-pipeline changes, out of scope here\\
+   \textbf{F7} sliding windows and a fuller Nexmark suite (evaluation scope, no component change)};
+
+% ================= LEGEND =================
+\node[draw, thick, rounded corners, inner sep=5pt, align=center,
+      font=\sffamily\footnotesize] at (\cB,-21.6)
+  {\tikz\node[draw, thick, fill=black!12, minimum width=9mm, minimum height=4mm, inner sep=0pt]{};\,existing NES code\quad
+   \tikz\node[draw, thick, fill=blue!18, minimum width=9mm, minimum height=4mm, inner sep=0pt]{};\,built in this thesis\quad
+   \tikz\node[draw, thick, fill=yellow!55, minimum width=9mm, minimum height=4mm, inner sep=0pt]{};\,decisive integration point\quad
+   \tikz\node[draw, thick, double, double distance=1pt, fill=orange!28, minimum width=9mm, minimum height=4mm, inner sep=0pt]{};\,persistent storage\quad
+   \tikz\node[circle, draw=red!70!black, dashed, thick, text=red!70!black, font=\sffamily\bfseries\scriptsize, inner sep=1pt]{F};\,future improvement};
+
+\end{tikzpicture}%
+}
+\caption[Final architecture status and future improvements]{%
+Final status of the out-of-core subsystem after both design iterations, and
+where the potential further improvements attach. Grey components are unchanged
+NebulaStream code; blue components were built in this thesis; the yellow box is
+the one-comparison pooling boundary whose engine default silently disabled the
+bounded architecture (Section~\ref{sec:rq3}). Dashed red badges F1--F6 pin the
+future-work items of Section~\ref{sec:future} to the component they would
+modify; F7 concerns the evaluation scope only. The dashed red edge marks the
+diagnosed corruption mechanism: the per-worker slice cache hands compiled code
+raw map pointers that bypass the spill fences, which F5 would invalidate per
+epoch.}
+\label{fig:final-status}
+\end{figure}

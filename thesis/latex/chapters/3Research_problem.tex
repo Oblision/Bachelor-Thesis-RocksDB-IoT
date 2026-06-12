@@ -1,0 +1,59 @@
+\chapter{Research Problem\label{cha:problem}}
+% Drafted per POINT-SEQUENCE.md Ch.3 (points 4.1–4.8, re-homed from WP Ch.4).
+
+\section{Goal\label{sec:goal}}
+
+% [4.1]
+The goal of this thesis is to store tumbling-window operator state larger than memory in NebulaStream.
+The state backend is RocksDB in one research-informed configuration (Section~\ref{sec:bg-rocksdb}).
+The backend must preserve query results.
+It must work inside the push-based execution model and its shared global buffer pool (Section~\ref{sec:bg-nes}).
+
+\section{Research Questions\label{sec:rqs}}
+
+The evaluation answers three core questions and two additional questions.
+
+% [4.2]
+\textbf{RQ0 (design).}
+How can an out-of-core backend integrate into the push-based execution model?
+The design and implementation in Chapter~\ref{cha:solution} answer this question by construction.
+
+% [4.3]
+\textbf{RQ1 (effectiveness).}
+Does the backend prevent out-of-memory failures for workloads whose state exceeds the memory budget?
+And for which workloads and budgets does it do so?
+
+% [4.4]
+\textbf{RQ2 (cost).}
+What does the backend cost in throughput and tail latency?
+What do spilling and restoring state cost on their own?
+
+% [4.5]
+\textbf{RQ3 (memory behavior).}
+How does memory behave as state grows past the cap?
+Why do the remaining failures happen?
+
+% [4.6]
+\textbf{RQ4 (additional).}
+How do processor utilization and disk traffic evolve with growing state?
+
+% [4.7]
+\textbf{RQ5 (additional).}
+How efficiently is storage used?
+This covers write amplification and the composition of the memory footprint.
+
+\section{Scope\label{sec:scope}}
+
+% [4.8]
+The thesis is scoped deliberately.
+It covers tumbling windows only.
+It runs on a single node.
+It changes neither the query compiler nor the just-in-time compilation pipeline.
+It excludes fault tolerance, durability guarantees, sliding windows, state migration, and automatic parameter tuning.
+Cross-system comparisons are out of scope.
+
+The success criterion follows the signed proposal.
+The backend succeeds if it completes workloads whose state exceeds physical memory, without out-of-memory failures, with results verified against a baseline that has sufficient memory.
+Efficiency is measured against the standard in-memory backend under identical processor constraints without memory limits.
+
+The next chapter presents the backend that this goal requires.

@@ -1,0 +1,65 @@
+\chapter{Conclusion\label{cha:conclusion}}
+% Drafted per POINT-SEQUENCE.md Ch.7 (WP 9.1–9.3 + 8.3–8.4).
+
+\section{Summary\label{sec:summary}}
+
+This thesis asks whether NebulaStream can process window state larger than memory on edge-class devices.
+It builds a spillable slice store with RocksDB as the storage engine, evaluates it under hard memory caps across roughly 3{,}100 measured runs, and investigates every failure until its cause is known.
+
+% [9.1 — one conclusion per contribution]
+The six contributions hold as follows.
+C1: the backend integrates behind the unchanged store interface and operated across the full evaluation without changes to the compilation pipeline.
+C2: the harness reproduces every result from one binary, with pre-registered hypotheses and six memory gauges; the evaluation data and analysis documents are versioned with the code.
+C3: the backend prevents out-of-memory failures inside characterized operating windows per memory budget, and completion is a race between ingest and drain rather than a state-size threshold.
+C4: a single engine default kept all window state outside the buffer pool in every configuration; the one-flag correction with pool-pressure levers reaches in-memory stability at 25\% less resident memory.
+C5: the failures follow a three-regime feasibility law, and the residual failure is a role-blind allocation deadlock, demonstrated by direct instrumentation.
+C6: all mechanisms ship configuration-gated in an open branch; with gates closed the engine is byte-identical to the baseline.
+
+\section{Limitations and Generalizability\label{sec:generalizability}}
+
+% [8.3]
+The effectiveness claim holds inside the characterized windows, not universally.
+The specific thresholds, the pooling boundary, and the slice cache are NebulaStream-specific.
+The three-regime law and the deadlock pattern are stated in terms of one fixed shared buffer pool.
+Any engine with this property plausibly shows the same regimes; verifying this is future work.
+
+\section{Practical Guidance\label{sec:guidance}}
+
+% [8.4]
+For an edge deployment of NebulaStream, the evaluation supports one recipe.
+Enable page pooling by raising the operator buffer size to the page size.
+Choose a lean pool near the sizing rule of Chapter~\ref{cha:evaluation}.
+Set the soft threshold to about one third of the pool.
+Enable the reserve lever at 15\% and paced restore.
+Leave allocation backpressure off.
+
+\section{Lessons Learned\label{sec:lessons}}
+
+Four working rules emerged from the investigation and are recorded here for successors.
+Pin every configuration knob explicitly; one differing binary default produced a fake optimum.
+Pre-register every hypothesis; the refuted explanations were as informative as the confirmed ones.
+Report negative results in full; three of the six design mechanisms converted nothing, and stating this plainly is part of the contribution.
+Verify the architecture assumption behind every experiment; the levers defended an empty pool for an entire campaign.
+
+\section{Future Work\label{sec:future}}
+
+% [9.2 — in order of precision]
+Figure~\ref{fig:final-status} shows the final status of the subsystem and pins
+each improvement below to the component it would modify.
+Future work is listed in order of how precisely it is specified.
+
+\input{figures/final_status_uml}
+First, role-aware allocation: a drain-side reserve that build-path allocations cannot consume.
+This is the one mechanism the deadlock diagnosis isolates, and it would merge the two architectures' operating windows.
+Second, closed-loop ingest admission keyed to pool headroom, which would replace the accidental throttling by the memory cap with a deliberate mechanism.
+Third, the 20\% state reduction by removing the unused virtual-dispatch pointer from map entries.
+Fourth, an exception-safe restore path.
+Fifth, epoch-stamped slice-cache invalidation, the upstream fix for the diagnosed corruption.
+Sixth, open-window spilling, which requires changes to the compilation pipeline and is out of scope here.
+Seventh, sliding windows and a fuller Nexmark suite.
+
+% [9.3]
+Three recommendations go upstream to NebulaStream independently of out-of-core processing.
+Raise the 4096-byte operator buffer default toward the page size; the default lost at every tested cell, and the in-memory engine alone gains up to 13\%.
+Make the pooled-versus-unpooled allocation boundary explicit and observable instead of an implicit size comparison.
+Ship the pool-pressure levers configuration-gated.

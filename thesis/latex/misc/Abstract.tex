@@ -1,0 +1,12 @@
+% ~200 words. Mirrors the final chapter set; numbers from DATA-AUDIT.md.
+Stream processing systems on edge devices keep operator state in main memory.
+When the state of windowed aggregations grows beyond the available memory, the operating system terminates the process.
+This thesis builds and evaluates an out-of-core state backend for NebulaStream, a stream processing system for the Internet of Things.
+Window state spills to RocksDB, an embedded key-value store, under soft and hard memory watermarks, and returns for result emission.
+
+The evaluation runs about 3{,}100 measured cells under hard memory caps of 512 to 2048\,MB with pre-registered hypotheses.
+The backend completes workloads whose state exceeds memory where the in-memory engine always fails (14/24 versus 0/18 at 512\,MB, Fisher $p = 4.1 \times 10^{-5}$), with results verified by checksum while spilling.
+The throughput cost is 11--15\% at matched I/O granularity.
+The evaluation also uncovers an engine default that silently kept all window state outside the buffer pool.
+Correcting it with one flag, plus new pool-pressure mechanisms, raises stability to in-memory parity at 25\% less resident memory.
+The remaining failures follow a three-regime feasibility law and end in a precisely diagnosed allocation deadlock, whose fix is specified as future work.
