@@ -35,12 +35,12 @@ Figure~\ref{fig:ooc-integration} shows the store, its new components, and their 
 
 % [5.4]
 A background thread, the spiller, wakes every 100 milliseconds.
-The soft watermark is a memory threshold for preemptive spilling.
-When the resident bytes of slice state exceed the soft watermark, the spiller moves cold slices to RocksDB.
+The soft threshold is the memory level that triggers preemptive spilling.
+When the resident bytes of slice state exceed the soft threshold, the spiller moves cold slices to RocksDB.
 It moves cold slices first because no operator writes to them anymore.
 
 % [5.5]
-The hard watermark is a higher threshold for forced spilling.
+The hard threshold is a higher level for forced spilling.
 When resident slice bytes reach it, the store spills synchronously.
 This covers the case where the background spiller falls behind the arrival rate.
 

@@ -5,8 +5,9 @@
 % ── NebulaStream ─────────────────────────────────────────────────────────────
 
 @inproceedings{zeuch2020,
-  author    = {Sebastian Zeuch and Ankit Chaudhary and Dimitrios Giouroukis
-               and Philipp M. Grulich and Sebastian Bre{\ss} and Johannes Traub
+  author    = {Steffen Zeuch and Ankit Chaudhary and Bonaventura Del Monte
+               and Haralampos Gavriilidis and Dimitrios Giouroukis
+               and Philipp M. Grulich and Sebastian Bre{\ss} and Jonas Traub
                and Volker Markl},
   title     = {The {NebulaStream} Platform: Data and Application Management
                for the {Internet of Things}},
@@ -15,9 +16,9 @@
 }
 
 @article{zeuch2022,
-  author  = {Sebastian Zeuch and Xenofon Chatziliadis and Ankit Chaudhary
+  author  = {Steffen Zeuch and Xenofon Chatziliadis and Ankit Chaudhary
              and Dimitrios Giouroukis and Philipp M. Grulich
-             and Denny P. N. A. Nugroho and Alexander Ziehn and Volker Markl},
+             and Dwi Prasetyo Adi Nugroho and Ariane Ziehn and Volker Markl},
   title   = {{NebulaStream}: Data Management for the {Internet of Things}},
   journal = {Datenbank-Spektrum},
   volume  = {22},
@@ -27,15 +28,15 @@
 }
 
 @article{lepping2023iotropolis,
-  author  = {A. Lepping and H. M. Pham and L. Mons and B. Rueb
-             and Ankit Chaudhary and Philipp M. Grulich
-             and P. Chrysogelos and E. T. Zacharatou and Volker Markl},
+  author  = {Aljoscha P. Lepping and Hoang Mi Pham and Laura Mons and Balint Rueb
+             and Philipp M. Grulich and Ankit Chaudhary and Steffen Zeuch
+             and Volker Markl},
   title   = {Showcasing Data Management Challenges for Future {IoT}
              Applications with {NebulaStream}},
   journal = {Proceedings of the {VLDB} Endowment},
   volume  = {16},
   number  = {12},
-  pages   = {3934--3937},
+  pages   = {3930--3933},
   year    = {2023},
   doi     = {10.14778/3611540.3611588}
 }
@@ -74,13 +75,13 @@
 % ── RocksDB tuning and analysis ──────────────────────────────────────────────
 
 @article{jin2022,
-  author  = {Huijin Jin and Won Gi Choi and Jonghwan Choi
+  author  = {Huijun Jin and Won Gi Choi and Jonghwan Choi
              and Hanseung Sung and Sanghyun Park},
   title   = {Improvement of {RocksDB} Performance via Large-Scale Parameter
              Analysis and Optimization},
   journal = {Journal of Information Processing Systems},
   volume  = {18},
-  number  = {4},
+  number  = {3},
   pages   = {374--388},
   year    = {2022},
   doi     = {10.3745/JIPS.04.0244}
@@ -98,8 +99,8 @@
 }
 
 @inproceedings{wei2025,
-  author    = {Rui Wei and Zixuan Zhu and Adam Kryczka and Jun Zhuang
-               and Michael Athanassoulis},
+  author    = {Ran Wei and Zichen Zhu and Andrew Kryczka and Jay Zhuang
+               and Manos Athanassoulis},
   title     = {Benchmarking, Analyzing, and Optimizing Write Amplification
                of Partial Compaction in {RocksDB}},
   booktitle = {Proc.\ International Conference on Extending Database
@@ -124,8 +125,8 @@
 % ── Stream processing ────────────────────────────────────────────────────────
 
 @article{fragkoulis2024,
-  author  = {Manos Fragkoulis and Paris Carbone and Vasiliki Kalavri
-             and others},
+  author  = {Marios Fragkoulis and Paris Carbone and Vasiliki Kalavri
+             and Asterios Katsifodimos},
   title   = {A Survey on the Evolution of Stream Processing Systems},
   journal = {The VLDB Journal},
   volume  = {33},
@@ -154,10 +155,9 @@
 }
 
 @article{esteves2020,
-  author  = {S{\'e}rgio Esteves and Andr{\'e} Brito and Jorge Bernardino
-             and Pedro F. Pires},
-  title   = {{AION}: Managing Window Memory and Persistent Storage in
-             Stream Processing},
+  author  = {S{\'e}rgio Esteves and Gianmarco {De Francisci Morales} and
+             Rodrigo Rodrigues and Marco Serafini and Lu{\'i}s Veiga},
+  title   = {{Aion}: Better Late than Never in Event-Time Streams},
   journal = {arXiv preprint},
   year    = {2020},
   note    = {arXiv:2003.03604},
@@ -176,12 +176,12 @@
 
 @inproceedings{TraubGCBKRM20,
   author    = {Jonas Traub and Philipp Marian Grulich
-               and Alejandro Rodr{\'i}guez Cu{\'e}llar and Sebastian Bress
+               and Alejandro Rodr{\'i}guez Cu{\'e}llar and Sebastian Bre{\ss}
                and Asterios Katsifodimos and Tilmann Rabl and Volker Markl},
   title     = {Scotty: General and Efficient Open-Source Window Aggregation
                for Stream Processing Systems},
   journal   = {ACM Transactions on Database Systems},
-  year      = {2020},
+  year      = {2021},
   url       = {https://dl.acm.org/doi/10.1145/3433675}
 }
 
@@ -201,13 +201,13 @@
 
 @article{ojo2019,
   author  = {Mike O. Ojo and Stefano Giordano and Gregorio Procissi
-             and Ioannis N. Seitanidis},
+             and Ilias N. Seitanidis},
   title   = {A Review of Low-End, Middle-End, and High-End {IoT} Devices},
   journal = {IEEE Access},
-  volume  = {7},
+  volume  = {6},
   pages   = {70528--70554},
-  year    = {2019},
-  doi     = {10.1109/ACCESS.2019.2917547}
+  year    = {2018},
+  doi     = {10.1109/ACCESS.2018.2879615}
 }
 
 @article{shukla2017riotbench,
@@ -327,7 +327,7 @@
 % ── Hash-partition data skew ──────────────────────────────────────────────────
 
 @inproceedings{nakayama1988,
-  author    = {Masaru Nakayama and Masaru Kitsuregawa and Mikio Takagi},
+  author    = {Masaya Nakayama and Masaru Kitsuregawa and Mikio Takagi},
   title     = {Hash-Partitioned Join Method Using Dynamic Destaging Strategy},
   booktitle = {Proc.\ International Conference on Very Large Data Bases (VLDB)},
   pages     = {468--478},
@@ -415,7 +415,7 @@
 
 @inproceedings{dong2017,
   author    = {Siying Dong and Mark Callaghan and Leonidas Galanis
-               and Dhruba Borthakur and Tony Savor and Michael Strum},
+               and Dhruba Borthakur and Tony Savor and Michael Stumm},
   title     = {Optimizing Space Amplification in {RocksDB}},
   booktitle = {Proc.\ Conference on Innovative Data Systems Research (CIDR)},
   year      = {2017},

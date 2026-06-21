@@ -34,9 +34,11 @@ WindFlow demonstrates larger-than-memory windowed processing in a single-node en
 Its existence shows that the problem is open beyond Flink.
 
 % [3.4]
-AION manages window state across memory and persistent storage~\cite{esteves2020}.
-It separates hot windows from cold windows.
-This matches the slice granularity that this thesis spills (Section~\ref{sec:bg-windows}).
+AION keeps window state across memory and persistent storage so that late
+events can still update windows that have already closed~\cite{esteves2020}.
+It bounds storage growth with proactive caching and predictive cleanup.
+Like this thesis, it pushes window state out of memory onto a storage device
+(Section~\ref{sec:bg-windows}), though for late-event handling rather than a hard memory cap.
 
 Neither WindFlow nor AION evaluates a push-based engine with one shared global buffer pool under hard memory caps.
 

@@ -9,12 +9,11 @@
 \usepackage[ngerman, english]{babel}
 \usepackage[utf8]{inputenc}
 \usepackage{graphicx} 
-\usepackage{acronym}
 \usepackage{url}           	 
 \usepackage{hyperref} 	
 \usepackage{listings, color}	% for source code
 \usepackage{scrlayer-scrpage}	% header and footer line
-\usepackage{acronym}
+\usepackage[nohyperlinks]{acronym}
 \usepackage[ruled,vlined,algochapter]{algorithm2e}
 \usepackage{tocbibind}
 \usepackage{blindtext}
@@ -117,7 +116,7 @@
   \addtocounter{footnote}{-1}%
   \endgroup
 }
-\blfootnote{Chapters 3-5 are the core of the thesis, whereas Chapters 1, 2, 6, and 7 provide context. The major contributions should be in Chapters 4 and 5. This structure serves as a guideline and should be customized accordingly. In particular, the generic chapter titles should be replaced with more specific ones, where appropriate (e.g., Chapter 4).} 
+\blfootnote{Chapters~3--5 form the core of this thesis: Chapter~3 states the research problem and questions, Chapter~4 presents the spillable slice store and its implementation, and Chapter~5 reports the experimental evaluation. Chapters~1, 2, 6, and~7 provide the motivation, background, related work, and conclusion. The principal contributions are in Chapters~4 and~5.} 
 
 %list of figures
 \listoffigures
@@ -134,8 +133,20 @@
 % List of Abbreviations
 \onecolumn
 \addchap{List of Abbreviations}
-\begin{acronym}[Bash]   
- \acro{DIMA}{Database Systems and Information Management}
+\begin{acronym}[cgroup]
+ \acro{AI}{artificial intelligence}
+ \acro{ASAN}{AddressSanitizer}
+ \acro{cgroup}{control group}
+ \acro{CPU}{central processing unit}
+ \acro{DIMA}{Database and Information Systems at TU Berlin}
+ \acro{IoT}{Internet of Things}
+ \acro{MB}{megabyte}
+ \acro{OOC}{out-of-core}
+ \acro{OOM}{out of memory}
+ \acro{RAM}{random access memory}
+ \acro{RQ}{research question}
+ \acro{SD}{Secure Digital (memory card)}
+ \acro{TSV}{tab-separated values}
 \end{acronym}
 \onecolumn
 

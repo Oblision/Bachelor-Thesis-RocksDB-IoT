@@ -1,7 +1,7 @@
 \chapter{Experimental Evaluation\label{cha:evaluation}}
 % Drafted per POINT-SEQUENCE.md Ch.5 (WP 7.1–7.7 + 8.1–8.2).
-% EVIDENCE CONTRACT: every claim traces to thesis/DATA-AUDIT.md. Figure placeholders mark
-% figures still to be produced (task #10).
+% EVIDENCE CONTRACT: every claim traces to thesis/DATA-AUDIT.md. All figures are final and
+% regenerate from thesis/latex/figures/scripts/make_all.sh.
 
 This chapter answers the research questions from Chapter~\ref{cha:problem}.
 Section~\ref{sec:setup} describes the setup.
@@ -170,6 +170,27 @@ bounded rows are the corrected 8192-byte flag that engages pooling.}
 \label{tab:windows}
 \end{table}
 
+% [7.2.6c] Multi-cap completion headline (generalizes the 512\,MB flagship).
+Figure~\ref{fig:effectiveness} draws the headline of this table at every cap.
+The capped in-memory baseline collapses once state pressure passes $\rho = 1$.
+At 512 and 1024\,MB the best out-of-core operating point, taken over pool sizes and both architectures, extends completion past the memory boundary.
+At 2048\,MB the single beyond-memory workload, r1000 at $\rho \approx 1$, defeats every configuration; this cell is the honest edge of the result and is marked as such.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=\textwidth]{img/fig_effectiveness.pdf}
+\caption[Beyond-memory completion at every cap]{Out-of-core completion at
+every cap. Per cap, the capped in-memory baseline (which fails once
+$\rho > 1$) against the best out-of-core operating point (maximum completion
+over pool sizes and both architectures), one pair per workload, ordered by
+state pressure $\rho$. Bar labels are completed/attempted runs; the dashed
+line marks the $\rho = 1$ memory boundary. The out-of-core arm extends
+completion past the boundary at 512 and 1024\,MB; at 2048\,MB the lone
+beyond-memory workload (r1000, $\rho \approx 1$) fails under every
+configuration.}
+\label{fig:effectiveness}
+\end{figure}
+
 % [7.2.7]
 Completion is therefore a race.
 The ingest rate competes with the rate at which the spiller drains state to disk.
@@ -196,6 +217,19 @@ A Nexmark-style auction bid stream provides supporting evidence.
 The stream uses the canonical bid schema, hot-skewed auction popularity, and in-order event time.
 The bounded backend completes this workload where the capped in-memory engine cannot: 8 of 8 and 7 of 8 versus 0 of 8 ($p = 7.8 \times 10^{-5}$ and $7.0 \times 10^{-4}$).
 The runs perform verified out-of-core work: 610\,MB spilled, 234\,MB restored from the device.
+Figure~\ref{fig:nexmark-sweep} places this win in context across scenarios and caps: the capped in-memory engine fits the small and medium scenarios and fails only at the beyond-memory point at 1024\,MB, which is exactly where the bounded backend completes.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=\textwidth]{img/fig_nexmark_sweep.pdf}
+\caption[Nexmark completion across scenarios and caps]{Nexmark completion
+across scenarios and caps for queries q3 and q7. Bars are completion fraction
+(completed over attempted, labelled) for the capped in-memory engine, the
+bounded out-of-core backend, and the heap out-of-core backend. The in-memory
+engine fits scenarios A and B and fails only at the beyond-memory point C at
+1024\,MB, where the bounded backend completes (8/8 and 7/8 versus 0/8).}
+\label{fig:nexmark-sweep}
+\end{figure}
 
 % [7.2.9]
 The same run tests the failure model outside its training data.
@@ -209,6 +243,19 @@ In-order streams pay the full spill-and-restore round trip; the out-of-order jit
 With the pre-committed cap-derived threshold, fitting workloads over-spill and lose 42--54\% throughput for no benefit.
 The winning cell pays 46--59\% against the unlimited reference.
 A state-aware spill threshold would remove the over-spilling; it is documented future work and was deliberately not tuned on the evaluation workloads.
+Figure~\ref{fig:nexmark-cost} quantifies the cost: every out-of-core point runs below the uncapped reference, deepest on the fitting scenarios that over-spill under the fixed threshold.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=\textwidth]{img/fig_nexmark_cost.pdf}
+\caption[Nexmark throughput cost]{Nexmark throughput cost: median throughput of
+each out-of-core arm (bounded B2, heap U8) relative to the uncapped reference
+for the same scenario, per query. In-order streams pay the full spill-and-restore
+round trip, and the fixed cap-derived spill threshold over-spills the fitting
+scenarios for no benefit; the winning beyond-memory cell (C at 1024\,MB) pays
+46--59\% against the unlimited reference.}
+\label{fig:nexmark-cost}
+\end{figure}
 
 \section{Cost (RQ2)\label{sec:rq2}}
 
@@ -240,7 +287,7 @@ This is an actionable finding for the engine itself, independent of out-of-core 
 
 % [7.3.6]
 The bounded architecture's footprint advantage is confirmed at matched granularity.
-It uses 33\% less resident memory than the in-memory engine (924 versus 1387\,MB).
+It uses 33\% less anonymous memory than the in-memory engine (924 versus 1387\,MB).
 It uses 27\% less than heap-allocated out-of-core at the same cell.
 
 % [7.3.7]
@@ -361,7 +408,7 @@ The corridor has a knife edge: at one cell, pools of 16k and 32k buffers complet
 
 % [7.6b]
 Where the backend completes, it is also lighter than the in-memory engine.
-It uses 14--22\% less resident memory on identical workloads.
+It uses 14--22\% less anonymous memory on identical workloads.
 The mechanism is recycling: pooled pages return to the pool on spill.
 The advantage grows as the pool shrinks.
 
@@ -400,7 +447,7 @@ nothing; the reserve lever and paced restore carry the cell to 7/8
 
 % [7.6f]
 At this operating point the backend reaches throughput parity with the in-memory engine: 3.38 versus 3.44 million tuples per second.
-It uses 25\% less resident memory: 517 versus 685\,MB.
+It uses 25\% less anonymous memory: 517 versus 685\,MB.
 Its 99th-percentile latency is 2.2 times higher.
 
 % [7.6g]

@@ -11,7 +11,7 @@ The six contributions hold as follows.
 C1: the backend integrates behind the unchanged store interface and operated across the full evaluation without changes to the compilation pipeline.
 C2: the harness reproduces every result from one binary, with pre-registered hypotheses and six memory gauges; the evaluation data and analysis documents are versioned with the code.
 C3: the backend prevents out-of-memory failures inside characterized operating windows per memory budget, and completion is a race between ingest and drain rather than a state-size threshold.
-C4: a single engine default kept all window state outside the buffer pool in every configuration; the one-flag correction with pool-pressure levers reaches in-memory stability at 25\% less resident memory.
+C4: a single engine default kept all window state outside the buffer pool in every configuration; the one-flag correction with pool-pressure levers reaches the in-memory engine's throughput at 25\% less anonymous memory.
 C5: the failures follow a three-regime feasibility law, and the residual failure is a role-blind allocation deadlock, demonstrated by direct instrumentation.
 C6: all mechanisms ship configuration-gated in an open branch; with gates closed the engine is byte-identical to the baseline.
 

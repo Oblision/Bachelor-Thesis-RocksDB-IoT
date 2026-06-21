@@ -76,3 +76,7 @@ thesis/latex/*.blg
 thesis/latex/Template.pdf
 thesis/latex/_compile_check.*
 thesis/latex/ngerman.ldf.broken-404-stub
+thesis/latex/*.fdb_latexmk
+thesis/latex/*.fls
+thesis/latex/*.synctex.gz
+.gstack/

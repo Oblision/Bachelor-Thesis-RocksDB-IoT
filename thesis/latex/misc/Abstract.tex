@@ -1,12 +1,12 @@
 % ~200 words. Mirrors the final chapter set; numbers from DATA-AUDIT.md.
-Stream processing systems on edge devices keep operator state in main memory.
-When the state of windowed aggregations grows beyond the available memory, the operating system terminates the process.
-This thesis builds and evaluates an out-of-core state backend for NebulaStream, a stream processing system for the Internet of Things.
-Window state spills to RocksDB, an embedded key-value store, under soft and hard memory watermarks, and returns for result emission.
+NebulaStream, a stream processing system for the Internet of Things, stores operator state in main memory.
+When the state of windowed aggregations grows beyond the available memory, the operating system terminates the process, halting the stream processing.
+This thesis builds and evaluates an out-of-core state backend for NebulaStream, which spills window state to disk when memory is scarce.
+RocksDB serves as the embedded key-value store. Spills are triggered under soft and hard memory thresholds, and state is restored for result emission.
 
 The evaluation runs about 3{,}100 measured cells under hard memory caps of 512 to 2048\,MB with pre-registered hypotheses.
-The backend completes workloads whose state exceeds memory where the in-memory engine always fails (14/24 versus 0/18 at 512\,MB, Fisher $p = 4.1 \times 10^{-5}$), with results verified by checksum while spilling.
-The throughput cost is 11--15\% at matched I/O granularity.
+The backend completes workloads whose state exceeds memory where the in-memory engine always fails (14/24 versus 0/18 at 512\,MB, Fisher $p = 4.1 \times 10^{-5}$),  with results verified by checksum against an unconstrained, sufficient baseline.
+Against the in-memory engine, on workloads both complete, the throughput cost is 11--15\%.
 The evaluation also uncovers an engine default that silently kept all window state outside the buffer pool.
-Correcting it with one flag, plus new pool-pressure mechanisms, raises stability to in-memory parity at 25\% less resident memory.
+Correcting it with one flag, plus new pool-pressure mechanisms, recovers most of the failing workloads and matches the in-memory engine's throughput at 25\% less anonymous memory.
 The remaining failures follow a three-regime feasibility law and end in a precisely diagnosed allocation deadlock, whose fix is specified as future work.
