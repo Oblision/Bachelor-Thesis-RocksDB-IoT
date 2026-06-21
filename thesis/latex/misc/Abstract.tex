@@ -1,5 +1,5 @@
 % ~200 words. Mirrors the final chapter set; numbers from DATA-AUDIT.md.
-NebulaStream, a stream processing system for the Internet of Things, stores operator state in main memory.
+NebulaStream, a data management system for the Internet of Things, stores operator state in main memory.
 When the state of windowed aggregations grows beyond the available memory, the operating system terminates the process, halting the stream processing.
 This thesis builds and evaluates an out-of-core state backend for NebulaStream, which spills window state to disk when memory is scarce.
 RocksDB serves as the embedded key-value store. Spills are triggered under soft and hard memory thresholds, and state is restored for result emission.
