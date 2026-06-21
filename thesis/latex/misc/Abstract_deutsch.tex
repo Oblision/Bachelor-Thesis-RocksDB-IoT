@@ -8,5 +8,5 @@ Die Evaluation umfasst rund 3{.}100 gemessene Durchl\"aufe unter harten Speicher
 Das Backend verarbeitet Arbeitslasten, deren Zustand den Speicher \"ubersteigt, dort, wo die In-Memory-Engine stets scheitert (14/24 gegen\"uber 0/18 bei 512\,MB, Fisher $p = 4{,}1 \times 10^{-5}$); die Korrektheit ist w\"ahrend des Auslagerns per Pr\"ufsumme verifiziert.
 Gegen\"uber der In-Memory-Engine betragen die Durchsatzkosten auf gemeinsam bew\"altigten Arbeitslasten 11--15\,\%.
 Die Evaluation deckt zudem eine Engine-Voreinstellung auf, die s\"amtlichen Fensterzustand am Pufferpool vorbeileitete.
-Ihre Korrektur durch ein einziges Flag stellt zusammen mit neuen Pool-Druck-Mechanismen die meisten fehlgeschlagenen Arbeitslasten wieder her und erreicht den Durchsatz der In-Memory-Engine bei 25\,\% weniger anonymem Speicher.
+Ihre Korrektur durch ein einziges Flag stellt zusammen mit neuen Pool-Druck-Hebeln die meisten fehlgeschlagenen Arbeitslasten wieder her und erreicht den Durchsatz der In-Memory-Engine bei 25\,\% weniger anonymem Speicher.
 Die verbleibenden Fehler folgen einem Drei-Regime-Gesetz und enden in einer pr\"azise diagnostizierten Allokations-Verklemmung, deren Behebung als zuk\"unftige Arbeit spezifiziert ist.
