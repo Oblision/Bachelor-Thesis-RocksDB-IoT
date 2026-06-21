@@ -18,12 +18,11 @@ A stream processing system computes results from such streams while the data arr
 It does not first store all data and query it later.
 
 NebulaStream is a data management system for the Internet of Things~\cite{zeuch2020,zeuch2022}.
-Researchers at Technische Universit\"at Berlin develop it.
+Researchers at \ac{DIMA} develop it together with \ac{BIFOLD}.
 Its execution engine processes data streams, the capability this thesis builds on.
-The Internet of Things consists of many small networked devices, such as sensors spread across a city.
-NebulaStream is built to run not only in data centers but also on the small computers close to these sensors.
+The Internet of Things consists of many small networked devices, such as sensors spread across a city. 
 This part of the network is called the edge.
-
+NebulaStream combines the advantages of edge processing near the source, such as low latency and reduced bandwidth, with the advantages of cloud processing at data centers, such as powerful computation and storage~\cite{zeuch2020,zeuch2022}.
 % [2.1]
 A user describes a computation as a query.
 NebulaStream compiles each query into pipelines~\cite{zeuch2020,zeuch2022}.
@@ -72,15 +71,17 @@ The operator computes one aggregate per key and per window.
 A key identifies one group in the data, for example one sensor.
 
 % [2.8]
-The partial results of an unfinished window are called state.
+As tuples arrive, a window accumulates aggregation values.
+These values are called state.
 NebulaStream stores window state in slices.
 A slice holds the aggregation state of one window interval.
 
 % [2.9]
-Inside a slice, the state is a hash map.
+Inside a slice, the state is stored in a hash map.
 A hash map is a data structure that finds the entry for a key in constant time.
 NebulaStream uses a hash map implementation called ChainedHashMap.
-Its entries live on pages of a fixed size.
+Its entries live on pages.
+A page is a fixed-size block of memory that holds hash-map entries.
 A separate table, the bucket directory, points to the entries.
 Each entry consists of a 24-byte header and the aggregate values themselves, the payload.
 

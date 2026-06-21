@@ -26,26 +26,26 @@ Moving the computation to the cloud forces the raw data to travel, and data move
 % [1.4]
 Another approach is to spill completed state to storage when memory runs short and unspill when it is required.
 An \ac{OOC} state backend describes this approach.
-RocksDB, an embeddable storage engine, is an industry standard for this role~\cite{flink2021}.
+RocksDB, an embeddable storage engine, is selected as an industry standard for this role~\cite{flink2021}.
 
 \section{Research Challenge\label{sec:challenge}}
 
 % [1.5]
 NebulaStream executes queries with a push-based model.
-Implementing an \ac{OOC} backend for push-based processing is a challenge because since data movement to and from storage is significantly slower than in-memory operations.
-Under memory pressure, the backend must keep up with the data arrival rate, maintaining stability, so \ac{OOM} errors can be prevent when state grows beyond the available memory.
+Data is pushed through the operators at in-memory processing speed.
+Storage is orders of magnitude slower than memory. Maintaining stability during spilling and unspilling whilst alleviating memory pressure is the  main research challenge.
 
 % [1.6]
-This thesis presents an \ac{OOC} implementation for enabling window state larger than the available memory in NebulaStream.
-It then evaluates the backend on edge-class memory budgets, from 512 megabytes to 2 gigabytes.
+This thesis presents an \ac{OOC} implementation for enabling tumbling window state larger than the available memory in NebulaStream.
+It evaluates the backend-implementation on edge-class memory budgets, from 512 megabytes to 2 gigabytes.
 
 \section{Results in Brief\label{sec:results-brief}}
 
 % [1.7]
-The backend processes workloads whose state exceeds memory, without crashes, inside an operating window that this thesis characterizes (Table~\ref{tab:windows}).
-Against the in-memory engine, on workloads where both complete, the throughput cost is 11\% to 15\% (Table~\ref{tab:cost}).
+The backend processes workloads whose state exceed memory, without crashing, inside an operating window that this thesis characterizes (Table~\ref{tab:windows}).
+Against the in-memory engine, on workloads where both complete, the throughput cost is measured at 11\% to 15\% (Table~\ref{tab:cost}).
 During the evaluation, one engine configuration default turned out to silently disable the engine's intended memory architecture.
-Correcting it requires one flag (Section~\ref{sec:disambiguation}).
+Correcting it requires one flag (Section~\ref{sec:disambiguation}). 
 The correction, combined with new pool-pressure levers, recovers most of the failing workloads and matches the in-memory engine's throughput at 25\% less anonymous memory, 517 versus 685\,MB (Figure~\ref{fig:ladder}).
 The one remaining failure mode is diagnosed precisely, and its fix is specified as future work (Figure~\ref{fig:gridlock}).
 
@@ -60,14 +60,14 @@ This thesis makes six contributions.
   \item \textbf{C2 — An instrumented, reproducible evaluation harness.}
     Every run executes under a hard memory cap with pinned processor cores.
     Six probes record the memory system over time.
-    The evaluation covers roughly 3{,}100 measured runs, and every follow-up hypothesis was registered before its experiment ran.
+    The evaluation covers roughly 3{,}100 measured runs.
   \item \textbf{C3 — Empirical operating windows for out-of-core processing on edge budgets.}
     The evaluation maps where the backend succeeds and where it fails, per memory budget.
-    It shows that completion is a race between data arrival and disk drainage, not a fixed state-size threshold.
+    It shows that completion is a race between data arrival and storage ingestion, not dictated by a fixed state-size threshold.
   \item \textbf{C4 — A load-bearing architecture finding.}
     The engine's default buffer size silently kept all window state outside the engine's buffer pool in every configuration.
     One flag corrects this.
-    The corrected architecture, plus the new pool-pressure levers, reaches the in-memory engine's throughput at lower memory cost (Figure~\ref{fig:ladder}).
+    The corrected configuration, plus the new pool-pressure levers, reaches near in-memory engine's throughput at lower memory cost (Figure~\ref{fig:ladder}).
   \item \textbf{C5 — A failure taxonomy with a diagnosed root cause.}
     Failures follow a three-regime feasibility law.
     The residual failure is an allocation deadlock, demonstrated by direct instrumentation.
