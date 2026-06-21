@@ -53,7 +53,7 @@ It excludes fault tolerance, durability guarantees, sliding windows, state migra
 Cross-system comparisons are out of scope.
 
 The success criterion follows the signed proposal.
-The backend succeeds if it completes workloads whose state exceeds physical memory, without out-of-memory failures, with results verified against a baseline that has sufficient memory.
-Efficiency is measured against the standard in-memory backend under identical processor constraints without memory limits.
+The backend succeeds if it completes workloads whose state exceeds physical memory, without out-of-memory failures, with results verified against the in-memory engine with sufficient memory.
+Efficiency is measured against the same in-memory engine under identical processor constraints without memory limits.
 
 The next chapter presents the backend that this goal requires.

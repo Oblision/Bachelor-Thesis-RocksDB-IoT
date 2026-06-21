@@ -259,7 +259,7 @@ scenarios for no benefit; the winning beyond-memory cell (C at 1024\,MB) pays
 
 \section{Cost (RQ2)\label{sec:rq2}}
 
-All headline cost comparisons in this section use matched I/O granularity: about 8{,}000-byte buffers in every variant, including the in-memory reference.
+All headline cost comparisons in this section use matched input/output (I/O) granularity: about 8{,}000-byte buffers in every variant, including the in-memory reference.
 The reason follows in the granularity finding below.
 
 % [7.3.1]
@@ -301,7 +301,7 @@ at matched I/O granularity ($\sim$8\,K buffers in every variant, same pool per
 coordinate; means over completing repetitions). The heap $-28\%$ at 512/r075 is
 the stated outlier on 3--4\,s cells and is reported as measured. Panel (c)
 shows the bounded architecture's footprint advantage: $-33\%$ versus the
-in-memory engine at 2048/r200 (924 vs 1388\,MB).}
+in-memory engine at 2048/r200 (924 vs 1387\,MB).}
 \label{fig:cost}
 \end{figure}
 
@@ -321,9 +321,9 @@ Matched granularity ($\sim$8\,K all variants) & $-11$ to $-15\%$ & 1.1--1.6$\tim
 \hline
 Default architecture (own 4096 baselines) & $-3$ to $-22\%$ & $\mu$s $\to$ ms at $10^7$ keys & 6 coordinates \\
 \hline
-Bounded vs in-memory, resident footprint & $-33\%$ (924 vs 1387\,MB) & --- & 2048/r200 \\
+Bounded vs in-memory, anonymous-memory footprint & $-33\%$ (924 vs 1387\,MB) & --- & 2048/r200 \\
 \hline
-Nexmark transfer (in-order, supporting) & $-46$ to $-59\%$ & --- & NX C@1024 \\
+Nexmark transfer (in-order, supporting) & $-46$ to $-59\%$ & --- & Nexmark C@1024 \\
 \hline
 \end{tabular}
 \caption{Cost bands per comparison class (numbers per the data audit).}
@@ -457,7 +457,7 @@ One cell rises from 3 of 10 to 23 of 24 ($p = 1.6 \times 10^{-4}$).
 
 % [7.6h]
 Pooling rewrites the sizing rules.
-The pool is allocated up front, so the pool is the resident floor.
+The pool is allocated up front, so the pool is the anonymous-memory floor.
 Cells with large pools now die by OOM kill.
 Lean pools win both footprint and survival.
 The old tradeoff between footprint and survival dissolves.
@@ -516,7 +516,7 @@ twice the pool, where unconstrained ingest pins the pool.}
 % [7.6m]
 The recommended operating configuration is pooling with reserve and paced restore, backpressure off.
 Backpressure costs 10\% throughput near the edge and converts nothing.
-Its gridlock guard ships as diagnostic instrumentation.
+Its progress guard ships as diagnostic instrumentation.
 
 % [7.6n]
 The full-grid confirmation run closes three loops.
@@ -598,7 +598,7 @@ Table~\ref{tab:verdicts} compresses the chapter into one row per research questi
 \hline
 \textbf{RQ} & \textbf{Verdict} & \textbf{Strongest single number} \\
 \hline
-RQ0 & Met by construction and operation & $\sim$3{,}100 cells executed through the unchanged store interface \\
+RQ0 & Met by construction and operation & $\sim$3{,}100 runs executed through the unchanged store interface \\
 \hline
 RQ1 & Met inside a characterized window & 14/24 vs 0/18 at 512\,MB, $p = 4.1 \times 10^{-5}$, checksums match while spilling \\
 \hline

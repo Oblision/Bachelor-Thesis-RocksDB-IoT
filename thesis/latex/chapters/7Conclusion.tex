@@ -9,10 +9,10 @@ It builds a spillable slice store with RocksDB as the storage engine, evaluates 
 % [9.1 — one conclusion per contribution]
 The six contributions hold as follows.
 C1: the backend integrates behind the unchanged store interface and operated across the full evaluation without changes to the compilation pipeline.
-C2: the harness reproduces every result from one binary, with pre-registered hypotheses and six memory gauges; the evaluation data and analysis documents are versioned with the code.
-C3: the backend prevents out-of-memory failures inside characterized operating windows per memory budget, and completion is a race between ingest and drain rather than a state-size threshold.
-C4: a single engine default kept all window state outside the buffer pool in every configuration; the one-flag correction with pool-pressure levers reaches the in-memory engine's throughput at 25\% less anonymous memory.
-C5: the failures follow a three-regime feasibility law, and the residual failure is a role-blind allocation deadlock, demonstrated by direct instrumentation.
+C2: the harness reproduces every result from one binary, with pre-registered hypotheses and six memory probes; the evaluation data and analysis documents are versioned with the code.
+C3: the backend prevents out-of-memory failures inside characterized operating windows per memory budget (Table~\ref{tab:windows}), and completion is a race between ingest and drain rather than a state-size threshold.
+C4: a single engine default kept all window state outside the buffer pool in every configuration; the one-flag correction with pool-pressure levers reaches the in-memory engine's throughput at 25\% less anonymous memory (517 versus 685\,MB, Figure~\ref{fig:ladder}).
+C5: the failures follow a three-regime feasibility law, and the residual failure is a role-blind allocation deadlock, demonstrated by direct instrumentation (Figure~\ref{fig:gridlock}).
 C6: all mechanisms ship configuration-gated in an open branch; with gates closed the engine is byte-identical to the baseline.
 
 \section{Limitations and Generalizability\label{sec:generalizability}}
@@ -20,7 +20,7 @@ C6: all mechanisms ship configuration-gated in an open branch; with gates closed
 % [8.3]
 The effectiveness claim holds inside the characterized windows, not universally.
 The specific thresholds, the pooling boundary, and the slice cache are NebulaStream-specific.
-The three-regime law and the deadlock pattern are stated in terms of one fixed shared buffer pool.
+The three-regime feasibility law and the deadlock pattern are stated in terms of one fixed shared buffer pool.
 Any engine with this property plausibly shows the same regimes; verifying this is future work.
 
 \section{Practical Guidance\label{sec:guidance}}
@@ -28,8 +28,8 @@ Any engine with this property plausibly shows the same regimes; verifying this i
 % [8.4]
 For an edge deployment of NebulaStream, the evaluation supports one recipe.
 Enable page pooling by raising the operator buffer size to the page size.
-Choose a lean pool near the sizing rule of Chapter~\ref{cha:evaluation}.
-Set the soft threshold to about one third of the pool.
+Choose a lean pool near the sizing rule of Section~\ref{sec:rq5}.
+Derive the soft threshold from the memory cap, not the pool (Section~\ref{sec:rq3}).
 Enable the reserve lever at 15\% and paced restore.
 Leave allocation backpressure off.
 

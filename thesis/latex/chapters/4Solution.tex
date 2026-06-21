@@ -2,7 +2,7 @@
 % Drafted per POINT-SEQUENCE.md Ch.4 (points 5.1–5.11 design, 6.1–6.6 implementation).
 
 This chapter presents the backend.
-The first half covers the design: the requirements, the store, the spill mechanisms, and two design iterations.
+The first half covers the design: the requirements, the store, the spill mechanisms, and two further design iterations.
 The second half covers the implementation: the integration points, the instrumentation, and the evaluation harness.
 
 \section{Requirements\label{sec:requirements}}
@@ -23,7 +23,7 @@ The operators above the store do not change.
 
 % [5.3]
 A slice moves through five states.
-A hot slice belongs to a window that still receives data.
+A hot slice (the implementation's \texttt{WINDOW\_FILLING} state) belongs to a window that still receives data.
 A cold slice belongs to a window that is complete but not yet emitted.
 A spilled slice lies in RocksDB.
 A restored slice is read back into memory for emission.
@@ -36,12 +36,12 @@ Figure~\ref{fig:ooc-integration} shows the store, its new components, and their 
 % [5.4]
 A background thread, the spiller, wakes every 100 milliseconds.
 The soft threshold is the memory level that triggers preemptive spilling.
-When the resident bytes of slice state exceed the soft threshold, the spiller moves cold slices to RocksDB.
+When the live slice bytes exceed the soft threshold, the spiller moves cold slices to RocksDB.
 It moves cold slices first because no operator writes to them anymore.
 
 % [5.5]
 The hard threshold is a higher level for forced spilling.
-When resident slice bytes reach it, the store spills synchronously.
+When the live slice bytes reach it, the store spills synchronously.
 This covers the case where the background spiller falls behind the arrival rate.
 
 % [5.6]
@@ -53,7 +53,7 @@ A restore is therefore a plain byte copy back into pages.
 Before a window's results are emitted, the store restores its spilled slices.
 
 % [5.8]
-The spill controller observes one signal: the resident byte count of slice data pages.
+The spill controller observes one signal: the live byte count of slice data pages.
 Other consumers of the buffer pool, such as input buffers and emission buffers, are invisible to it.
 This is a design property, stated here openly.
 Chapter~\ref{cha:evaluation} measures its consequences.
@@ -62,17 +62,17 @@ Chapter~\ref{cha:evaluation} measures its consequences.
 
 % [5.9]
 The first evaluation round motivates four additional mechanisms.
-Each one reacts to pressure on the global buffer pool instead of resident bytes.
+Each one reacts to pressure on the global buffer pool instead of live slice bytes.
 Each one is gated behind its own configuration flag.
 Lever 1a lets the spiller also drain when the free buffers in the pool fall below a reserve.
 Lever 1b reacts to an allocation that finds the pool empty: it triggers an immediate spill of one cold slice instead of waiting passively.
 Lever 1c paces restores: a restore before emission proceeds only when the pool has headroom.
-Lever 1d adds the bucket directories (Section~\ref{sec:bg-windows}) to the resident budget.
+Lever 1d adds the bucket directories (Section~\ref{sec:bg-windows}) to the live slice budget.
 
 \section{Design Iteration Three: Allocation Backpressure\label{sec:backpressure}}
 
 % [5.10]
-The second iteration adds allocation backpressure, also gated.
+A second evaluation round motivates allocation backpressure, also gated.
 An allocation that would abort (Section~\ref{sec:bg-nes}) instead stalls in bounded rounds.
 A progress guard watches the whole pool.
 If no buffer returns to the pool for two full rounds, the guard aborts early.
@@ -106,10 +106,10 @@ The backpressure loop uses a recycle counter as its progress signal.
 \section{Instrumentation\label{sec:instrumentation}}
 
 % [6.4]
-Six gauges instrument the memory system.
+Six probes instrument the memory system.
 A sampler reads the cgroup memory statistics every 0.2 seconds and splits them into anonymous memory, page cache, and shared memory (Section~\ref{sec:bg-metrics}).
 The process-level anonymous set from the kernel's per-process status is read alongside as a cross-check on the cgroup accounting.
-The split is what makes the memory numbers of Chapter~\ref{cha:evaluation} trustworthy: a spilling backend inflates the page cache by design, and an early measurement round that reported undifferentiated totals produced footprint numbers that moved with the spill volume rather than with the working set.
+The split is what makes the memory numbers of Chapter~\ref{cha:evaluation} trustworthy: a spilling backend inflates the page cache by design, and an early evaluation round that reported undifferentiated totals produced footprint numbers that moved with the spill volume rather than with the working set.
 A pool gauge records pool occupancy at buffer rent time.
 An unpooled gauge tracks live bytes outside the pool.
 A map gauge records the exact composition of every hash map at its destruction.
