@@ -33,7 +33,7 @@ RocksDB, an embeddable storage engine, is selected as an industry standard for t
 % [1.5]
 NebulaStream executes queries with a push-based model.
 Data is pushed through the operators at in-memory processing speed.
-Storage is orders of magnitude slower than memory. Maintaining stability during spilling and unspilling whilst alleviating memory pressure is the  main research challenge.
+Storage is orders of magnitude slower than memory. Maintaining stability during spilling and unspilling whilst alleviating memory pressure is the main research challenge.
 
 % [1.6]
 This thesis presents an \ac{OOC} implementation for enabling tumbling window state larger than the available memory in NebulaStream.
@@ -42,7 +42,7 @@ It evaluates the backend-implementation on edge-class memory budgets, from 512 m
 \section{Results in Brief\label{sec:results-brief}}
 
 % [1.7]
-The backend processes workloads whose state exceed memory, without crashing, inside an operating window that this thesis characterizes (Table~\ref{tab:windows}).
+The backend processes workloads whose state exceeds memory, without crashing, inside an operating window that this thesis characterizes (Table~\ref{tab:windows}).
 Against the in-memory engine, on workloads where both complete, the throughput cost is measured at 11\% to 15\% (Table~\ref{tab:cost}).
 During the evaluation, one engine configuration default turned out to silently disable the engine's intended memory architecture.
 Correcting it requires one flag (Section~\ref{sec:disambiguation}). 
