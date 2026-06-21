@@ -60,6 +60,9 @@ def main() -> None:
     ax.set_title("(b) disk traffic")
     ax.legend(fontsize=8, loc="upper left")
 
+    fig.suptitle("Processor and disk behaviour across state pressure",
+                 fontsize=11, fontweight="bold")
+    style.caption(fig, extra="each point = one cell (median of its completing reps)")
     style.save(fig, "fig_cpu_io")
 
 

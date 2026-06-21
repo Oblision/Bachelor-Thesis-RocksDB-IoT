@@ -38,18 +38,33 @@ def _cell_marker(n_ok: int, reps: int, rc: str) -> tuple[str, str]:
 
 
 def _panel(ax, df, rho_mb, cap: int, campaign: str, arm: str) -> None:
+    # Feasibility-grid cells only: drop checksum-verification (chk) and reference
+    # (ref) runs — they re-test an existing coordinate and exit with the rc141
+    # teardown status, which would draw a spurious "dies" marker over a real one.
     sub = df[(df["campaign"] == campaign) & (df["arm"] == arm)
              & (df["cap_mb"] == cap) & df["workload"].notna()
-             & df["pool_buffers"].notna()]
+             & df["pool_buffers"].notna()
+             & ~df["cell"].str.contains("chk|ref", case=False, na=False)]
     workloads = sorted(sub["workload"].unique(), key=lambda w: rho_mb[int(w)])
     y_of = {w: i for i, w in enumerate(workloads)}
+    pools = sorted(sub["pool_buffers"].unique())
+    plotted: set[tuple[float, float]] = set()
     for cell, runs in sub.groupby("cell"):
-        pool_mb = runs["pool_buffers"].iloc[0] * 8192 / 2**20
+        pool_buf = runs["pool_buffers"].iloc[0]
         w = runs["workload"].iloc[0]
         n_ok, reps = int(runs["ok"].sum()), len(runs)
         color, marker = _cell_marker(n_ok, reps, _modal_rc(runs))
-        ax.scatter(pool_mb, y_of[w], s=110, c=color, marker=marker,
+        ax.scatter(pool_buf * 8192 / 2**20, y_of[w], s=110, c=color, marker=marker,
                    edgecolors="black", linewidths=0.5, zorder=3)
+        plotted.add((w, pool_buf))
+    # (workload, pool) combinations never run: explicit hollow marker so a blank
+    # cell reads as "not in the probed grid", not as a dropped/lost data point.
+    for w in workloads:
+        for pool_buf in pools:
+            if (w, pool_buf) not in plotted:
+                ax.scatter(pool_buf * 8192 / 2**20, y_of[w], s=30, facecolors="none",
+                           edgecolors=style.GREY, linewidths=0.8, marker="o",
+                           alpha=0.7, zorder=1)
     ax.set_yticks(range(len(workloads)),
                   [f"r{int(w)} ({rho_mb[int(w)] / cap:.2f})" for w in workloads],
                   fontsize=8)
@@ -75,12 +90,9 @@ def main() -> None:
     for row in axes:
         row[0].set_ylabel("workload ($\\rho$ at cap)", fontsize=9)
 
-    # Knife edge: 512 MB heap r75 — complete at 16k, degrade at 32k, die at 64k.
-    knife = axes[0, 0]
-    knife.annotate("knife edge:\n10/10 $\\to$ 6/10 $\\to$ 0/10",
-                   xy=(64000 * 8192 / 2**20, 0.22), xytext=(135, 1.5),
-                   fontsize=8, style="italic",
-                   arrowprops=dict(arrowstyle="->", lw=0.9), ha="left")
+    # Knife edge (512 MB heap r75: 10/10 at 16k -> 6/10 at 32k -> 0/10 at 64k) is
+    # described in the caption rather than annotated in-panel: the heap/512 grid is
+    # fully populated, so any in-axes callout would occlude real data markers.
 
     handles = [
         Line2D([], [], marker="o", ls="", mfc=style.GREEN, mec="black", label="completes ($\\geq$ half reps)"),
@@ -88,9 +100,13 @@ def main() -> None:
         Line2D([], [], marker="v", ls="", mfc=style.ORANGE, mec="black", label="dies: allocation abort (pool too small)"),
         Line2D([], [], marker="^", ls="", mfc=style.RED, mec="black", label="dies: OOM kill (pool + overhead $>$ cap)"),
         Line2D([], [], marker="X", ls="", mfc=style.PURPLE, mec="black", label="dies: crash cluster"),
+        Line2D([], [], marker="o", ls="", mfc="none", mec=style.GREY, label="not run (outside probed grid)"),
     ]
     fig.legend(handles=handles, loc="outside lower center", ncol=3, fontsize=8.5,
                frameon=False)
+    fig.suptitle("Feasibility corridor of both architectures (cap × pool size × workload)",
+                 fontsize=11, fontweight="bold")
+    style.caption(fig, extra="each marker = one cell; filled = ≥ half of its reps complete")
     style.save(fig, "fig_geometry")
 
 

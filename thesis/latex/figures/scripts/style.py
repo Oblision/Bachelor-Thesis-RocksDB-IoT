@@ -48,6 +48,29 @@ def use_style() -> None:
     plt.rcParams.update(RC)
 
 
+# --- shared provenance / methods caption -----------------------------------
+# Every data figure carries the same two-line footnote so the workload, the
+# fixed configuration, the sample size, and the data source are unambiguous and
+# identical across the thesis (scientific-figure best practice).
+_METHODS = ("Synthetic Zipfian sensor stream (s≈1.0, 1.5 M-key universe, "
+            "top-10≈ 20% of traffic)  ·  tumbling window 50k tuples, "
+            "emit-lag 4 M (N_w=80 retained windows)  ·  2 pinned cores, hard cgroup cap, "
+            "lz4 spill → SD card")
+_SOURCE = ("n = 8–10 repetitions per cell unless labelled otherwise  ·  "
+           "source: lag-validation campaign (3,133 runs, 457 cells), debug build, single host")
+
+
+def caption(fig, extra: str = "") -> None:
+    """Stamp the standard two-line methods/provenance footnote on a figure.
+
+    Uses supxlabel so constrained_layout reserves space (no overlap). Pass
+    `extra` for a figure-specific note (e.g. the statistical test used).
+    """
+    source = _SOURCE if not extra else f"{extra}  ·  {_SOURCE}"
+    fig.supxlabel(f"{_METHODS}\n{source}", fontsize=6.4, color="#6f6f6f",
+                  linespacing=1.5)
+
+
 def save(fig, name: str) -> None:
     """Write a PDF into latex/img/ and report the path."""
     from data import IMG_OUT

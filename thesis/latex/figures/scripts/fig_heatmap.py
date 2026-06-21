@@ -90,6 +90,9 @@ def main() -> None:
                                norm=plt.Normalize(0, 1))
     cbar = fig.colorbar(sm, ax=axes, shrink=0.75, pad=0.02)
     cbar.set_label("completion fraction", fontsize=9)
+    fig.suptitle("Operating windows — completion fraction across cap × pool × workload",
+                 fontsize=11, fontweight="bold")
+    style.caption(fig, extra="cell labels = completed/attempted · dot = not run")
     style.save(fig, "fig_heatmap")
 
 

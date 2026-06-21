@@ -28,7 +28,7 @@ def main() -> None:
     rho_mb = data.rho_table(df)
     free = _free_running(df)
 
-    fig, ax = plt.subplots(figsize=(6.4, 4.2))
+    fig, ax = plt.subplots(figsize=(7.6, 4.6))
     seen: set[tuple[str, bool]] = set()
     grid = df[df["campaign"].isin(["L", "W"]) & df["arm"].isin(["heap", "bounded"])
               & df["workload"].notna() & df["pool_buffers"].notna()
@@ -71,6 +71,9 @@ def main() -> None:
         Line2D([], [], marker="s", ls="", mfc=style.RED, mec="black", label="bounded, fails"),
     ]
     ax.legend(handles=handles, loc="upper left", fontsize=8.5)
+    fig.suptitle("Completion is a race between ingest rate and spill-drain rate",
+                 fontsize=11, fontweight="bold")
+    style.caption(fig, extra="each point = one cell; all-fail cells plotted at the free-running reference rate")
     style.save(fig, "fig_race")
 
 

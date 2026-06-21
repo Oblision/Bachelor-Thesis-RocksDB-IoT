@@ -82,6 +82,9 @@ def main() -> None:
     ax.set_title("(b) the pool stays pinned")
     ax.legend(fontsize=7.5, loc="upper right", ncols=1)
 
+    fig.suptitle("Anatomy of the role-blind allocation deadlock (1024 MB / 32k pool / r200)",
+                 fontsize=11, fontweight="bold")
+    style.caption(fig, extra="cgroup 0.2 s sampler · all 8 reps of the cell fail (rc 141)")
     style.save(fig, "fig_gridlock")
 
 

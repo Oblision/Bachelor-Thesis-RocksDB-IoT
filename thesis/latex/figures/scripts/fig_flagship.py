@@ -33,7 +33,7 @@ def main() -> None:
     p = data.fisher_one_sided(ok_a, n_a, ok_b, n_b)
     print(f"flagship: ooc {ok_a}/{n_a} vs inm {ok_b}/{n_b}, Fisher p = {p:.2e}")
 
-    fig, ax = plt.subplots(figsize=(5.6, 3.4))
+    fig, ax = plt.subplots(figsize=(6.8, 4.0))
     x = np.arange(len(workloads))
     width = 0.36
     frac_ooc = [o / n for o, n in counts["ooc"]]
@@ -51,13 +51,17 @@ def main() -> None:
     labels = [f"r{w}\n" r"$\rho \approx $" f"{rho_mb[w] / cap:.2f}" for w in workloads]
     ax.set_xticks(x, labels)
     ax.set_ylim(0, 1.18)
-    ax.set_ylabel("completion fraction")
-    ax.set_xlabel("workload (state pressure at the 512 MB cap)")
-    ax.legend(loc="upper right")
+    ax.set_ylabel("completion fraction (completed / attempted)")
+    ax.set_xlabel("workload (state pressure ρ at the 512 MB cap)")
+    ax.set_title("Out-of-core completes beyond the budget where capped in-memory cannot\n"
+                 "512 MB cap · output verified by checksum against the uncapped reference",
+                 fontsize=10)
+    ax.legend(loc="upper right", title="backend (reps per ρ point)")
     ax.text(0.02, 0.97,
             f"total: {ok_a}/{n_a} vs {ok_b}/{n_b}\nFisher $p = 4.1\\times10^{{-5}}$",
             transform=ax.transAxes, va="top", ha="left", fontsize=9,
             bbox=dict(boxstyle="round,pad=0.35", fc="white", ec=style.GREY, lw=0.8))
+    style.caption(fig, extra="bar labels = completed/attempted · Fisher's exact test, one-sided")
     style.save(fig, "fig_flagship")
 
 

@@ -84,6 +84,9 @@ def main() -> None:
     ax.set_title("(c) resident footprint")
     ax.legend(fontsize=8, loc="upper left")
 
+    fig.suptitle("The cost of out-of-core at matched I/O granularity (~8 K buffers in every arm)",
+                 fontsize=11, fontweight="bold")
+    style.caption(fig, extra="three pool-matched coordinates · bars = means over completing reps")
     style.save(fig, "fig_cost")
 
 

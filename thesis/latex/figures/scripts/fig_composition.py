@@ -58,6 +58,9 @@ def main() -> None:
     ax.set_title("(b) on-disk footprint of completing spilling cells")
     ax.legend(fontsize=8, loc="upper left")
 
+    fig.suptitle("Composition and on-disk footprint of the spilled state",
+                 fontsize=11, fontweight="bold")
+    style.caption(fig, extra="(a) HMGAUGE per-map census at 26 M entries; (b) one point per completing spilling cell")
     style.save(fig, "fig_composition")
 
 

@@ -79,6 +79,9 @@ def main() -> None:
     ax.text(-0.045, 0.50, "memory cap constrains ingest $\\rightarrow$",
             ha="center", va="center", fontsize=9, rotation=90)
 
+    fig.suptitle("The three-regime feasibility law of the pooled architecture",
+                 fontsize=11, fontweight="bold")
+    style.caption(fig, extra="schematic; the two example cells are verified against the result TSVs")
     style.save(fig, "fig_regimes")
 
 
