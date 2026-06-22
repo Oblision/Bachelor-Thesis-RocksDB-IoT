@@ -21,12 +21,19 @@ to be executed on another machine over a few days (`./run_rb32_contrast.sh run`)
    - drain mechanism: `io_w_b` / `spill_dir_mb` (SD bytes) and drain rate (H3, expect ~35% fewer bytes at 32/32);
    - secondary: `tps`, `p99`.
 
-3. **Write the Ch.4 RocksDB-characterization subsection** (placement already
-   agreed: Ch.4 subsection + Annex tables, ONE in-text summary table). Cover:
-   - the microbench characterization (256MB pilot → 512MB sweep; verified findings);
-   - the memory-fit rationale for 16/8 at the floor (`SpillConfig.hpp:56`, E0);
-   - **the RB32 contrast: config is cap-dependent** — memory-fit at 512, compaction-friendly (32/32) wins at 1024/2048 via lower SD drain load.
-   - Full per-parameter tables → Annex.
+3. **Slot the RB32 results into the EXISTING Ch.4 subsection.** The subsection is
+   already WRITTEN (2026-06-22) from the microbench alone:
+   `4Solution.tex` §4.3 `\section{Configuring the RocksDB Backend}` (sec:rocksdb-config),
+   in-text summary `tab:rocksdb-char`, and Annex "Appendix E: RocksDB Characterization
+   Tables". It covers the 256MB pilot → 512MB sweep findings, the memory-fit rationale
+   for 16/8 at the floor, and the cap-dependent story — but the larger-cap gain is
+   currently framed as **future work** (marked LaTeX comment slot: search
+   `% RB32 contrast (32/32 vs 16/8) result slots in here once run`).
+   Remaining once runs finish:
+   - replace the "left to future work" sentence with the measured 32/32-vs-16/8 result
+     (Fisher per cap: H1 at 1024/2048, H2 crossover at 512);
+   - add a paired completion figure per cap + the drain-bytes (H3) evidence;
+   - extend Annex Appendix E (or add a sub-table) with the NES-level paired numbers.
 
 4. **Cross-references.** §2.3 is now open (no config stated); point the Ch.4
    subsection at the open prior-studies framing, and reconcile with Ch.5:38
