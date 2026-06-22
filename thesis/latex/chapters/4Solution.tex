@@ -63,6 +63,58 @@ Other consumers of the buffer pool, such as input buffers and emission buffers, 
 This is a design property, stated here openly.
 Chapter~\ref{cha:evaluation} measures its consequences.
 
+\section{Configuring the RocksDB Backend\label{sec:rocksdb-config}}
+
+% RocksDB characterization — sets the spill backend config from a separate db_bench sweep.
+% Data: Microbenchmark-BA/results/constrained_512mb (10,000 runs); all numbers verified vs raw CSV.
+The store spills slices into RocksDB (Section~\ref{sec:architecture}).
+RocksDB exposes tuning knobs that trade memory for speed~\cite{jin2022}.
+Three of them matter under an edge memory budget: the compression algorithm, the write buffer size, and the block cache size (Section~\ref{sec:bg-rocksdb}).
+A larger write buffer or block cache spends memory that the window state can then no longer use.
+The backend configuration is therefore chosen from a characterization, not left at the defaults.
+
+The characterization runs RocksDB on its own through the \texttt{db\_bench} tool, outside NebulaStream.
+It sweeps the three knobs under a hard memory cap that Docker enforces.
+Its dataset is ten million records, about 1.1\,GB, so it exceeds the cap and forces spilling.
+Two workloads stand in for the backend's duty cycle: \texttt{fillrandom} writes continuously and models ingestion, and \texttt{readwhilewriting} reads and writes at once and models an operator that restores and spills state concurrently.
+A pilot at a 256\,MB cap completes only 58 of 100 runs, too few to tell the knobs apart, so the main sweep uses a 512\,MB cap.
+The main sweep is 200 configurations at 50 repetitions, 10{,}000 runs in total, of which 9{,}665 complete.
+
+Table~\ref{tab:rocksdb-char} reports the result.
+Compression is the dominant knob: lz4 raises concurrent throughput 4.4-fold over no compression, and together with a write buffer of at least 16\,MB it holds write stalls below one percent.
+The block cache barely matters: enlarging it from 8 to 256\,MB leaves throughput flat although its hit rate climbs from 6 to 77 percent, because the write path dominates the run time.
+A larger write buffer lowers write amplification, from 2.68 at 4\,MB to 0.91 at 32\,MB, and raises concurrent throughput, but the memory it commits competes with the window state.
+Every OOM kill in the sweep occurs only as the write buffer and the block cache together approach the cap.
+
+\begin{table}[ht]
+\centering
+\small
+\begin{tabular}{|l|p{8.2cm}|l|}
+\hline
+\textbf{Knob} & \textbf{Measured effect under the 512\,MB cap} & \textbf{Choice} \\
+\hline
+Compression & lz4 vs.\ none: $38{,}072$ vs.\ $8{,}723$ ops/s on the concurrent workload ($4.4\times$); with lz4 and a $\geq 16$\,MB buffer, stalls stay below $1\%$ & lz4 \\
+\hline
+Block cache & throughput stays flat near $25{,}000$ ops/s from 8 to 256\,MB while the hit rate rises from $6\%$ to $77\%$ & 8\,MB \\
+\hline
+Write buffer & from 4 to 32\,MB, write amplification falls $2.68 \to 0.91$ and concurrent throughput rises $13{,}435 \to 27{,}187$ ops/s & 16\,MB \\
+\hline
+\end{tabular}
+\caption{RocksDB characterization with \texttt{db\_bench} under a 512\,MB cap (10{,}000 runs, 9{,}665 completing; means over completing runs, concurrent workload \texttt{readwhilewriting}) and the resulting backend configuration. Full per-parameter tables are in Appendix~E.}
+\label{tab:rocksdb-char}
+\end{table}
+
+These findings fix the backend at lz4 compression, a 16\,MB write buffer, and an 8\,MB block cache, with the partition count held at four.
+This is the memory-fit point for the tightest cap: compression costs nothing, the small cache costs almost no throughput, and a 16\,MB write buffer already removes the stalls while leaving the most memory for state.
+The evaluation holds this configuration constant across all caps (Section~\ref{sec:setup}).
+
+The memory-fit point is specific to the tightest cap.
+At 512\,MB a larger write buffer and cache are unaffordable, so 16 and 8\,MB are the right choice.
+Once the cap rises to 1024 or 2048\,MB, a 32\,MB write buffer and a 32\,MB block cache fit, and the characterization shows the larger write buffer roughly halves write amplification.
+The evaluation establishes that the storage device's write bandwidth bounds the rate at which the backend drains state to disk (Section~\ref{sec:rq4}), so writing fewer bytes should let more runs finish where the larger configuration fits.
+This thesis identifies the effect but holds the backend fixed to keep every comparison a single-variable test; a dedicated contrast that re-runs the grid with the larger configuration at the higher caps is left to future work.
+% RB32 contrast (32/32 vs 16/8) result slots in here once run — see thesis/experiments/rb32-config-contrast.
+
 \section{Design Iteration Two: Pool-Pressure Levers\label{sec:levers}}
 
 % [5.9]

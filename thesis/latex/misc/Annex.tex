@@ -93,7 +93,107 @@ ADMQ & default / 8 & refuted task queue bound \\
 \hline
 \end{longtable}
 
-\addchap{Appendix E: AI-Generated Content}
+\addchap{Appendix E: RocksDB Characterization Tables}
+% Full per-parameter breakdown behind Section sec:rocksdb-config. Source: Microbenchmark-BA
+% results/constrained_512mb/parsed/summary.csv (10,000 runs); all values verified vs raw CSV.
+
+These tables give the full per-parameter breakdown of the RocksDB characterization summarized in Section~\ref{sec:rocksdb-config}.
+The data is the 512\,MB \texttt{db\_bench} sweep: 200 configurations (5 write buffer sizes $\times$ 5 block cache sizes $\times$ 4 compression algorithms $\times$ 2 workloads) at 50 repetitions each, 10{,}000 runs, of which 9{,}665 complete.
+Throughput and write-amplification figures are means over completing runs; write-stall percentages treat the absent \texttt{db\_bench} stall field as zero, since the tool emits that field only when stalls occur.
+
+\subsection*{E.1\quad Throughput by compression}
+\begin{center}
+\begin{tabular}{|l|r|r|r|}
+\hline
+\textbf{Compression} & \textbf{readwhilewriting (ops/s)} & \textbf{speedup} & \textbf{fillrandom (ops/s)} \\
+\hline
+none   & 8{,}723  & $1.0\times$ & 453{,}678 \\
+\hline
+zstd   & 22{,}104 & $2.5\times$ & 378{,}109 \\
+\hline
+snappy & 33{,}871 & $3.9\times$ & 453{,}027 \\
+\hline
+lz4    & 38{,}072 & $4.4\times$ & 460{,}611 \\
+\hline
+\end{tabular}
+\end{center}
+
+\subsection*{E.2\quad Block cache size (concurrent workload)}
+\begin{center}
+\begin{tabular}{|l|r|r|}
+\hline
+\textbf{Block cache} & \textbf{throughput (ops/s)} & \textbf{hit rate} \\
+\hline
+8\,MB   & 25{,}600 & 5.8\% \\
+\hline
+32\,MB  & 25{,}598 & 22.8\% \\
+\hline
+64\,MB  & 28{,}625 & 41.6\% \\
+\hline
+128\,MB & 27{,}397 & 59.1\% \\
+\hline
+256\,MB & 21{,}707 & 77.1\% \\
+\hline
+\end{tabular}
+\end{center}
+
+\subsection*{E.3\quad Write buffer size}
+\begin{center}
+\begin{tabular}{|l|r|r|r|}
+\hline
+\textbf{Write buffer} & \textbf{fillrandom (ops/s)} & \textbf{write amp.} & \textbf{readwhilewriting (ops/s)} \\
+\hline
+4\,MB   & 395{,}071 & 2.68 & 13{,}435 \\
+\hline
+16\,MB  & 481{,}382 & 1.41 & 23{,}147 \\
+\hline
+32\,MB  & 500{,}833 & 0.91 & 27{,}187 \\
+\hline
+64\,MB  & 460{,}150 & 0.59 & 31{,}012 \\
+\hline
+128\,MB & 344{,}346 & 0.35 & 39{,}004 \\
+\hline
+\end{tabular}
+\end{center}
+
+\subsection*{E.4\quad Write stalls, percent of run (concurrent workload, by compression $\times$ write buffer)}
+\begin{center}
+\begin{tabular}{|l|r|r|r|r|r|}
+\hline
+\textbf{Compression} & \textbf{4\,MB} & \textbf{16\,MB} & \textbf{32\,MB} & \textbf{64\,MB} & \textbf{128\,MB} \\
+\hline
+none   & 24.7 & 12.6 & 25.4 & 5.9 & 0.0 \\
+\hline
+zstd   & 52.9 & 2.5  & 0.9  & 0.0 & 0.0 \\
+\hline
+snappy & 21.0 & 0.3  & 0.2  & 0.0 & 0.0 \\
+\hline
+lz4    & 21.9 & 0.2  & 0.1  & 0.0 & 0.0 \\
+\hline
+\end{tabular}
+\end{center}
+
+\subsection*{E.5\quad OOM kills by write buffer $\times$ block cache}
+\begin{center}
+\begin{tabular}{|l|r|r|r|r|r|}
+\hline
+\textbf{Write buffer} & \textbf{8\,MB} & \textbf{32\,MB} & \textbf{64\,MB} & \textbf{128\,MB} & \textbf{256\,MB} \\
+\hline
+4\,MB   & 0 & 0 & 0 & 0  & 0   \\
+\hline
+16\,MB  & 0 & 0 & 0 & 0  & 0   \\
+\hline
+32\,MB  & 0 & 0 & 0 & 0  & 0   \\
+\hline
+64\,MB  & 0 & 0 & 0 & 0  & 79  \\
+\hline
+128\,MB & 7 & 8 & 7 & 35 & 199 \\
+\hline
+\end{tabular}
+\end{center}
+Each write-buffer/block-cache combination aggregates 400 runs (4 compressions $\times$ 2 workloads $\times$ 50 repetitions); all 335 OOM kills fell in \texttt{readwhilewriting}.
+
+\addchap{Appendix F: AI-Generated Content}
 % Per DIMA policy: documentation of AI tool usage with links to the public archive.
 % The declaration-of-aids table (front matter) carries the per-phase links; this appendix
 % holds the citation block and the pointer to the conversation archive.
