@@ -33,6 +33,11 @@ Figure~\ref{fig:ooc-integration} shows the store, its new components, and their 
 % Benjamin's existing TikZ diagram (from the May draft), restored into this project.
 \input{figures/spillable_slice_store}
 
+% [5.3b — emit lag: the thesis's addition that creates the cold-slice population]
+Standard NebulaStream emits a completed window without delay.
+This backend instead holds it for a configured emit lag $L$, while no operator still writes to it, giving the spiller time to move it to storage.
+With window length $W$, the store then holds $N_w = L/W$ completed windows as cold slices at any time.
+
 % [5.4]
 A background thread, the spiller, wakes every 100 milliseconds.
 The soft threshold is the memory level that triggers preemptive spilling.

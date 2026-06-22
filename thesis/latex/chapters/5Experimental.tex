@@ -580,6 +580,15 @@ With jitter equal to the retention lag, the entire band is pinned and spilling b
 The two defects mask each other.
 The headline data is unaffected: the corruption manifests only in cells that fail regardless.
 
+% [7.6v-bis — separate the corruption crash from a benign pressure abort]
+The crash cluster must be separated from a second, benign process death.
+Under a memory cap the allocator can fail and abort the process.
+This abort shares the memory signature of an OOM kill: the run dies early with memory pinned at the cap, before it completes.
+It is therefore counted with the pressure failures, not as corruption.
+The corruption is a segmentation fault, root-caused above, and is counted separately.
+The distinction is load-bearing at the boundary: a few pressure aborts fall in marginal cells that complete in other repetitions, whereas every segmentation fault falls in a cell that never completes.
+Counting only the segmentation fault as corruption is what confines the crash cluster to already-failing cells.
+
 % [7.6w]
 The architectural conclusion is general.
 Unmediated pointers into evictable state require an invalidation protocol.
