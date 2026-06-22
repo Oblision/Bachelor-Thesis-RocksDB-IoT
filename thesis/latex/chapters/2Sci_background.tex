@@ -6,16 +6,16 @@ This chapter introduces the systems and terms that the rest of the thesis uses.
 It first describes NebulaStream and its execution model.
 It then explains how NebulaStream computes aggregates over time windows.
 It continues with RocksDB, the storage engine this thesis uses.
-It closes with the principle behind moving data to disk and with the measures used in the evaluation.
+It closes with the principle behind moving data to storage and with the metrics used in the evaluation.
 
 \section{Stream Processing and NebulaStream\label{sec:bg-nes}}
 
-A data stream is a sequence of data items that arrives over time.
-Each item is called a tuple.
+A data stream is a continuous real-time transmission of data.
+Each individual data item is called a tuple.
 A tuple is one record, for example one sensor reading together with the time it was taken.
 A stream has no defined end.
-A stream processing system computes results from such streams while the data arrives.
-It does not first store all data and query it later.
+A stream processing system computes results from such streams while data arrives.
+It does not first store all of the data and query it later for evaluation.
 
 NebulaStream is a data management system for the Internet of Things~\cite{zeuch2020,zeuch2022}.
 Researchers at \ac{DIMA} develop it together with \ac{BIFOLD}.
@@ -107,7 +107,7 @@ With window length $W$ and emit lag $L$, the store retains $N_w = L/W$ completed
 
 Window state grows with the number of keys and windows.
 On a small device, it can grow beyond the available memory.
-The system then needs a place for this state on disk.
+The system then needs a place for this state on storage.
 The next section introduces the storage engine that provides this place.
 
 \section{RocksDB and the Log-Structured Merge Tree\label{sec:bg-rocksdb}}
@@ -117,26 +117,26 @@ It can write, read, and delete a value under its key.
 
 % [2.13]
 RocksDB is a persistent key-value store~\cite{borthakur2013}.
-Persistent means that the data survives on disk.
+Persistent means that the data survives on storage.
 RocksDB originates at Facebook and runs embedded inside another program.
 Its design follows the log-structured merge tree.
 
 % [2.14]
 Writes first go to a structure in memory, the memtable.
-When the memtable is full, RocksDB writes its contents to a sorted file on disk.
+When the memtable is full, RocksDB writes its contents to a sorted file on storage.
 A background process called compaction merges these files over time.
 
 % [2.15]
 Compaction rewrites data that the application already wrote once.
-The ratio of bytes written to disk over bytes written by the application is the write amplification~\cite{jin2022,wei2025}.
+The ratio of bytes written to storage over bytes written by the application is the write amplification~\cite{jin2022,wei2025}.
 
 Prior studies show that RocksDB's parameters affect its memory use and its write behavior, but tuning cannot remove these costs~\cite{jin2022,pamarthi2024,adao2025,wei2025}.
 This thesis therefore fixes one configuration informed by these studies.
 It uses lz4 compression, a 16\,MB write buffer, an 8\,MB block cache, and four partitions.
 Chapter~\ref{cha:evaluation} keeps this configuration constant in all experiments.
 
-Storing state on disk is slower than keeping it in memory.
-The next section explains when moving data to disk is still the right choice.
+Storing state on storage is slower than keeping it in memory.
+The next section explains when moving data to storage is still the right choice.
 
 \section{The External-Memory Principle\label{sec:bg-extmem}}
 
@@ -145,12 +145,12 @@ Algorithms whose data exceeds main memory are called external-memory algorithms~
 Their guiding principle is simple.
 Data that is used often is hot.
 Data that is used rarely is cold.
-Keep hot data in memory and move cold data to disk.
-The cost of the disk is then paid only for data that is rarely needed.
+Keep hot data in memory and move cold data to storage.
+The cost of the storage is then paid only for data that is rarely needed.
 
 On a large server, memory for the hot data is usually available.
 On an edge device, memory is scarce.
-The machinery that moves data to and from disk also needs memory.
+The machinery that moves data to and from storage also needs memory.
 On a small fixed buffer pool, the hot data therefore includes the input and output path itself.
 Chapter~\ref{cha:evaluation} returns to this point.
 
@@ -171,7 +171,7 @@ The kernel accounts a cgroup's memory in two kinds.
 Anonymous memory holds the working data of the processes; the kernel cannot reclaim it, and it is the quantity that triggers the OOM killer.
 File-backed memory is the page cache for file reads and writes; the kernel reclaims it under pressure, so it never kills a run.
 This distinction is load-bearing for measuring a spilling backend.
-A backend that spills to disk inflates the page cache as a by-product of working correctly: every spilled and restored byte passes through it.
+A backend that spills to storage inflates the page cache as a by-product of working correctly: every spilled and restored byte passes through it.
 A naive total, such as the resident set size or the cgroup's current consumption, therefore charges the backend for its own spill traffic and overstates its footprint in proportion to how much it spills.
 Every memory footprint reported in this thesis is anonymous memory, read from the cgroup's memory statistics; the page cache is recorded separately and never counted as pressure.
 
@@ -190,8 +190,20 @@ Or it exceeds the time limit.
 % [2.20]
 Completion counts are compared with Fisher's exact test.
 Fisher's exact test computes the probability that two completion proportions differ by chance.
-Mean values, such as throughput, are compared with Welch's t-test.
-Welch's t-test compares two means without assuming equal variance.
+Mean values, such as throughput, are compared with Welch's t-test~\cite{welch1947}.
+Welch's t-test compares two means without assuming that their variances are equal.
+For two samples with means $\bar{x}_1$ and $\bar{x}_2$, variances $s_1^2$ and $s_2^2$, and sizes $n_1$ and $n_2$, the test statistic is
+\[
+  t = \frac{\bar{x}_1 - \bar{x}_2}{\sqrt{\dfrac{s_1^2}{n_1} + \dfrac{s_2^2}{n_2}}} .
+\]
+The numerator is the observed difference between the two means.
+The denominator is its standard error, in which each sample keeps its own variance instead of a single pooled estimate.
+This separate-variance form is what lets the test compare samples of unequal variance and unequal size, where Student's t-test would not.
+The statistic follows a t-distribution whose degrees of freedom $\nu$ are approximated by the Welch--Satterthwaite equation
+\[
+  \nu \approx \frac{\left( \dfrac{s_1^2}{n_1} + \dfrac{s_2^2}{n_2} \right)^2}{\dfrac{(s_1^2/n_1)^2}{n_1 - 1} + \dfrac{(s_2^2/n_2)^2}{n_2 - 1}} .
+\]
+A small resulting p-value means a difference in means unlikely to arise if the two true means were equal.
 
 These terms complete the background.
 The next chapter states the problem of this thesis and the questions the evaluation answers.
