@@ -11,16 +11,16 @@ It closes with the principle behind moving data to storage and with the metrics 
 \section{Stream Processing and NebulaStream\label{sec:bg-nes}}
 
 A data stream is a continuous real-time transmission of data.
-Each individual data item is called a tuple.
+Each individual item of data is called a tuple.
 A tuple is one record, for example one sensor reading together with the time it was taken.
 A stream has no defined end.
-A stream processing system computes results from such streams while data arrives.
-It does not first store all of the data and query it later for evaluation.
+A \ac{DSPS} computes results in real-time from such streams while data arrives.
+It does not first store all the data and query it later for evaluation.
 
 NebulaStream is a data management system for the Internet of Things~\cite{zeuch2020,zeuch2022}.
 Researchers at \ac{DIMA} develop it together with \ac{BIFOLD}.
 Its execution engine processes data streams, the capability this thesis builds on.
-The Internet of Things consists of many small networked devices, such as sensors spread across a city. 
+The \ac{IoT} consists of many small networked devices, such as sensors spread across a city. 
 This part of the network is called the edge.
 NebulaStream combines the advantages of edge processing near the source, such as low latency and reduced bandwidth, with the advantages of cloud processing at data centers, such as powerful computation and storage~\cite{zeuch2020,zeuch2022}.
 % [2.1]
@@ -46,7 +46,7 @@ A buffer is a block of memory with a fixed size.
 % [2.5]
 All buffers come from one global buffer pool.
 The pool holds a fixed number of buffers.
-The engine allocates the pool once at start.
+The engine allocates the pool once at process start.
 This pool is the central shared resource in this thesis.
 
 % [2.6]
@@ -73,8 +73,9 @@ A key identifies one group in the data, for example one sensor.
 % [2.8]
 As tuples arrive, a window accumulates aggregation values.
 These values are called state.
-NebulaStream stores window state in slices.
-A slice holds the aggregation state of one window interval.
+NebulaStream stores window state in slices~\cite{TraubGCBKRM20}.
+Because tumbling windows do not overlap, each window maps to exactly one slice.
+A slice thus holds the state of a single window interval.
 
 % [2.9]
 Inside a slice, the state is stored in a hash map.
