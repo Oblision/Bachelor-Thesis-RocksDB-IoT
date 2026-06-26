@@ -1,0 +1,63 @@
+# RB32 (32/32) vs baseline (16/8) — PAIRED ANALYSIS
+b32 cells: 1954 | paired with a 16/8 twin: 1938 | b32 without twin: 16
+
+## Completion — HEADLINE W_ (final_matrix, POOLED maps-in-pool)  (n_pairs=346)
+     cap  pairs      ok32      ok16       Δ  both  32+  16+ neither    McNemar    Fisher
+     512     80   34( 42%)   22( 28%)    +15%    21   13    1      45    0.002**   0.068ns
+    1024    106   43( 41%)   39( 37%)     +4%    29   14   10      53    0.541ns   0.672ns
+    2048    160   37( 23%)   37( 23%)     +0%    36    1    1     122    1.000ns   1.000ns
+
+## Completion — N_ (lever_matrix_n1, POOLED pooling arms)  (n_pairs=264)
+     cap  pairs      ok32      ok16       Δ  both  32+  16+ neither    McNemar    Fisher
+     512     72   71( 99%)   47( 65%)    +33%    46   25    1       0    0.000***   0.000***
+    1024     96    7(  7%)   12( 12%)     -5%     4    3    8      81    0.227ns   0.334ns
+    2048     96    0(  0%)    0(  0%)     +0%     0    0    0      96    1.000ns   1.000ns
+
+## Completion — L_ (large_matrix, HEAP by design)  (n_pairs=630)
+     cap  pairs      ok32      ok16       Δ  both  32+  16+ neither    McNemar    Fisher
+     512    200   50( 25%)   56( 28%)     -3%    43    7   13     137    0.263ns   0.571ns
+    1024    200   73( 36%)   72( 36%)     +1%    61   12   11     116    1.000ns   1.000ns
+    2048    200   80( 40%)   92( 46%)     -6%    78    2   14     106    0.004**   0.267ns
+    none     30   30(100%)   30(100%)     +0%    30    0    0       0    1.000ns   1.000ns
+
+## Completion — U_ (u8_arm, HEAP control 8128)  (n_pairs=112)
+     cap  pairs      ok32      ok16       Δ  both  32+  16+ neither    McNemar    Fisher
+     512     40    7( 18%)   22( 55%)    -38%     7    0   15      18    0.000***   0.001***
+    1024     32   14( 44%)   25( 78%)    -34%    13    1   12       6    0.003**   0.010**
+    2048     40   24( 60%)   24( 60%)     +0%    24    0    0      16    1.000ns   1.000ns
+
+## Completion — ALL campaigns pooled+heap (context only)  (n_pairs=1938)
+     cap  pairs      ok32      ok16       Δ  both  32+  16+ neither    McNemar    Fisher
+     512    628  300( 48%)  254( 40%)     +7%   198  102   56     272    0.000***   0.011 *
+    1024    634  224( 35%)  238( 38%)     -2%   172   52   66     344    0.231ns   0.448ns
+    2048    628  148( 24%)  153( 24%)     -1%   138   10   15     465    0.424ns   0.791ns
+    none     48   48(100%)   48(100%)     +0%    48    0    0       0    1.000ns   1.000ns
+
+## Completion by campaign (all caps pooled)
+      camp  pairs   ok32%   ok16%      Δ    McNemar
+        B3     60     27%     23%    +3%    0.791ns
+         F     68     35%      0%   +35%    0.000***
+         L    630     37%     40%    -3%    0.036 *
+         N    264     30%     22%    +7%    0.003**
+        NX    210     68%     69%    -1%    0.897ns
+         S    188     36%     29%    +7%    0.047 *
+         U    112     40%     63%   -23%    0.000***
+         W    346     33%     28%    +5%    0.017 *
+    psweep     60      0%      3%    -3%    0.500ns
+
+## H3 io_w_b — W_ pooled  (both-ok pairs)
+     cap  pairs      med32      med16   ratio   32<16   sign p
+     512     21 207421440.0 129490944.0   1.60x   1/21   0.000***
+    1024     29 84000768.0 94269440.0   0.89x   3/29   0.000***
+    2048     36 229220352.0 229343232.0   1.00x  14/29   1.000ns
+     ALL     86 221698048.0 144527360.0   1.53x  18/79   0.000***
+
+## H3 spill_dir_mb — W_ pooled  (both-ok pairs)
+     cap  pairs      med32      med16   ratio   32<16   sign p
+     512     21       86.0       87.0   0.99x   4/17   0.049 *
+    1024     29      104.0      103.0   1.01x  10/26   0.327ns
+    2048     36      209.5      145.0   1.44x   8/20   0.503ns
+     ALL     86      131.5      116.5   1.13x  22/63   0.023 *
+
+## Secondary tps (W_ both-ok, n=86): med32=2304362 med16=2532207 ratio=0.910x
+## Secondary lat_p99_us (W_ both-ok, n=86): med32=320 med16=315 ratio=1.014x

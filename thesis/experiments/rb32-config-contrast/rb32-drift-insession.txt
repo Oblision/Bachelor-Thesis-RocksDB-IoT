@@ -1,0 +1,16 @@
+# DRIFT-CONTROL ANALYSIS
+
+## DRIFT  (fresh 16/8 vs old-06-12 16/8) — B-only = cells the OLD baseline lost to session state   (A=W  B=D16)
+    cap pairs      okA      okB A-only B-only  McNemar
+    512    80  22( 28%)  26( 32%)      2      6  0.289ns
+   1024     6   0(  0%)   0(  0%)      0      0  1.000ns
+
+## IN-SESSION A/B  (16/8 vs 32/32, same session) — B-only = genuine 32/32 wins   (A=D16  B=D32)
+    cap pairs      okA      okB A-only B-only  McNemar
+    512    80  26( 32%)  32( 40%)      5     11  0.210ns
+   1024     6   0(  0%)   0(  0%)      0      0  1.000ns
+
+## Drift magnitude on cells BOTH completed (fresh-16/8 vs old-16/8)
+   peak_anon: n=20 median Δ=  -0.3%  range[-8%,+8%]
+         tps: n=20 median Δ= -48.6%  range[-81%,-0%]
+     peak_mb: n=20 median Δ=  +0.0%  range[-6%,+4%]
