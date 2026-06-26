@@ -56,8 +56,12 @@ Memory-overhead story (user wants graphics):
   + Arena + RocksDB anon + base + file cache) — buildable NOW from TSV summary cols
   (`pool_used_peak_mb`, `unpooled_peak_mb`, `rocksdb_rss_mb`, `peak_anon_mb`, `peak_file_mb`), per cap,
   did-work vs didn't-work.
-- Overhead-CLIMB-over-time line charts — RB32 run had SAMPLE OFF (no traces); the drift-control re-run
-  (§6) captures them with SAMPLE=on for representative cells at 512/1024 (worked vs OOM).
+- Overhead-CLIMB-over-time line charts — traces ARE captured in `lag-validation/traces/` (SAMPLE defaults
+  on): 1938 `*_b32_*.trace` from the main run (all caps/campaigns: W 346, L 630, N 264, NX 210, U 112, …)
+  + 172 `D{16,32}_*.trace` from the in-session 512 control. So over-time figures are possible at 1024/2048
+  too, not just 512. (Earlier "SAMPLE was off" note was a wrong-directory mistake — traces land in
+  `traces/`, not `work/rendered/`.) `fig_rb32.py` currently plots only a 512 D-cell; extend it to add
+  1024/2048 worked-vs-OOM panels from the b32 traces.
 
 For the "system that works" claim — the correctness journey:
 - The bugs found & fixed (SliceCache raw-pointer spill-fence bypass / twin-defect, the rc134/rc11
