@@ -35,7 +35,7 @@ def main() -> None:
          style.BLUE, "D"),
     ]
 
-    fig, axes = plt.subplots(2, 1, figsize=(7.2, 6.8))
+    fig, axes = plt.subplots(2, 1, figsize=(7.4, 5.8))
     ax = axes[0]
     for label, mask, color, marker in groups:
         cells = ok[mask].groupby("cell").agg(

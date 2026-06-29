@@ -72,7 +72,7 @@ Output checksums match the uncapped in-memory reference under both architectures
 cell. Out-of-core (8 repetitions per workload) versus the capped in-memory
 engine (6 repetitions) at the three beyond-memory state pressures of the
 512\,MB cap. Totals: 14/24 versus 0/18, Fisher's exact test
-$p = 4.1 \times 10^{-5}$ (two-sided).}
+$p = 4.1 \times 10^{-5}$ (two-sided).\methodsnote}
 \label{fig:flagship}
 \end{figure}
 
@@ -94,15 +94,17 @@ Every resident slice carries directory bytes outside the pool, so memory grows f
 % Design rule for all figures: generous spacing, no overlapping labels or items.
 \begin{figure}[ht]
 \centering
-\widefig[1.0]{img/fig_geometry.pdf}
+\widefig[1.1]{img/fig_geometry.pdf}
 \caption[The two-sided geometry law]{The two-sided geometry law: outcome per
 pool size, cap, workload, and architecture, regenerated from the final grid
-(L\_ and W\_ campaigns; heap = engine-default 4096-byte buffers, pooled =
-corrected 8192-byte flag). The failure mode separates the two bounds: allocation
+(L\_ and W\_ campaigns). Each row is one memory cap; the heap (engine-default
+4096-byte buffers, left) and pooled (corrected 8192-byte flag, right)
+architectures sit side by side for direct comparison. The failure mode
+separates the two bounds: allocation
 aborts (downward triangles) mark pools too small for the peak demand;
 out-of-memory kills (upward triangles) mark pools whose induced overhead breaks
 the cap. The knife-edge cell at 512\,MB (r75: 10/10 at 16k, 6/10 at 32k, 0/10
-at 64k buffers) is annotated.}
+at 64k buffers) is annotated.\methodsnote}
 \label{fig:geometry}
 \end{figure}
 
@@ -129,7 +131,7 @@ architectures: completions per cell over cap $\times$ pool $\times$ workload
 (L\_ matrix) with its capped in-memory baseline, the engine-default
 configuration whose 4096-byte buffers keep all window state outside the pool
 (Section~\ref{sec:rq3}); bottom row: bounded pooled architecture (W\_ grid)
-under the corrected 8192-byte flag. Dots mark untested cells.}
+under the corrected 8192-byte flag. Dots mark untested cells.\methodsnote}
 \label{fig:heatmap}
 \end{figure}
 
@@ -188,7 +190,7 @@ state pressure $\rho$. Bar labels are completed/attempted runs; the dashed
 line marks the $\rho = 1$ memory boundary. The out-of-core arm extends
 completion past the boundary at 512 and 1024\,MB; at 2048\,MB the lone
 beyond-memory workload (r1000, $\rho \approx 1$) fails under every
-configuration.}
+configuration.\methodsnote}
 \label{fig:effectiveness}
 \end{figure}
 
@@ -202,14 +204,38 @@ This reframing drives the rest of the chapter.
 \widefig{img/fig_race.pdf}
 \caption[Completion as a race]{Completion as a race: one point per cell of the
 two grids (heap = engine-default configuration, bounded = corrected pooling
-flag). Completing cells plot their realized median throughput; all-fail
-cells plot the workload's free-running reference rate (a dead run's own
-throughput is not meaningful). Above $\rho = 1$ no cell survives to the right
-of the 2.5--2.7\,M tuples/s band; below $\rho = 1$ sprinting is harmless
-because little or no state must drain.}
+flag). Filled markers are completing cells at their realized median throughput;
+hollow markers are all-fail cells, drawn at the workload's free-running
+reference rate because a dead run has no meaningful realized rate of its own.
+Two death causes overlap on the plot. Cells with $\rho > 1$ to the right of the
+2.5--2.7\,M tuples/s band are race losses, where ingest outruns the drain. The
+hollow cluster near 1.3--1.6\,M is the heaviest workloads (r500--r1000) dying by
+capacity, out-of-memory kill on heap and pool exhaustion on bounded, shown at
+their free-running rate. Below $\rho = 1$ sprinting is harmless because little
+or no state must drain.\methodsnote}
 \label{fig:race}
 \end{figure}
 
+% [7.2.7b] The low-ingest failure cluster is capacity, not the race.
+The figure draws every all-fail cell at its free-running reference rate, the
+speed the workload reaches unconstrained, because a run that dies produces no
+meaningful throughput of its own.
+This places a cluster of failures near 1.3 to 1.6 million tuples per second,
+well to the left of the survivor-band edge, which can read as a contradiction.
+It is not.
+Those failures are not race losses; they are the heaviest workloads, r500
+through r1000 at the 1024 and 2048\,MB caps, whose per-window state simply
+exceeds what the pool and cap can hold.
+The heap arms die by out-of-memory kill and the bounded arms by pool
+exhaustion, the same two bounds the geometry law draws in
+Figure~\ref{fig:geometry}.
+The race law governs the opposite edge: once $\rho > 1$, no cell that would
+free-run faster than the 2.5 to 2.7 million band survives, because ingest
+outruns the drain.
+A workload can therefore fail for either reason, capacity or speed, and the two
+sit at opposite sides of the plot.
+
+\FloatBarrier
 \subsection{Transfer to a Realistic Workload\label{sec:nexmark}}
 
 % [7.2.8]
@@ -235,15 +261,41 @@ Figure~\ref{fig:nexmark-sweep} places this win in context across scenarios and c
 
 \begin{figure}[ht]
 \centering
-\widefig{img/fig_nexmark_sweep.pdf}
+\widefig[1.0]{img/fig_nexmark_sweep.pdf}
 \caption[Nexmark completion across scenarios and caps]{Nexmark completion
 across scenarios and caps for queries q3 and q7. Bars are completion fraction
 (completed over attempted, labelled) for the capped in-memory engine, the
 bounded out-of-core backend, and the heap out-of-core backend. The in-memory
 engine fits scenarios A and B and fails only at the beyond-memory point C at
-1024\,MB, where the bounded backend completes (8/8 and 7/8 versus 0/8).}
+1024\,MB, where the bounded backend completes (8/8 and 7/8 versus 0/8). At the
+fits cells the out-of-core arms can instead over-spill and fail under the fixed
+threshold; scenario B at 512\,MB for q7 is the starkest case, both arms
+0/8.\nexmarknote}
 \label{fig:nexmark-sweep}
 \end{figure}
+
+% [7.2.8b] The fits-cell collapse, and why q7 tips fully over while q3 survives.
+The same figure shows the out-of-core arms collapsing at a cell where the
+in-memory engine is comfortable, most starkly at scenario B under the 512\,MB
+cap for q7: the capped in-memory engine completes 8 of 8, yet both out-of-core
+arms complete 0 of 8.
+This cell is a fits cell, not a beyond-memory one.
+Its state fits in 512\,MB, so the in-memory engine never struggles, but the
+fixed cap-derived spill threshold, soft at one tenth of the cap, forces the
+out-of-core arms to spill anyway.
+At the tight 512\,MB cap that over-spilling drives each arm into a different
+wall: the pooled arm's small pool, about 132\,MB at this cap, exhausts and
+aborts (buffer-pool exhaustion, status 141), while the heap arm's unpooled
+buffers break the cap and are out-of-memory killed (status 137).
+On q3 the same cell sits on a knife edge rather than over it, a few repetitions
+surviving (bounded 5 of 8, heap 1 of 8); on q7 none do.
+The gap is not the aggregate function: a maximum and a sum each keep one
+accumulator per key and carry identical state, so the prediction that q7 tracks
+q3 holds at every other coordinate, and this lone discrepancy is boundary
+sensitivity at a cell both queries are already failing or barely passing.
+It does not touch the headline, which is the one true beyond-memory coordinate,
+C at 1024\,MB, where the in-memory engine genuinely cannot fit (0 of 8) and the
+bounded backend completes (q7 7 of 8, q3 8 of 8).
 
 % [7.2.9]
 The same run tests the failure model outside its training data.
@@ -261,13 +313,13 @@ Figure~\ref{fig:nexmark-cost} quantifies the cost: every out-of-core point runs 
 
 \begin{figure}[ht]
 \centering
-\widefig{img/fig_nexmark_cost.pdf}
+\widefig[1.0]{img/fig_nexmark_cost.pdf}
 \caption[Nexmark throughput cost]{Nexmark throughput cost: median throughput of
 each out-of-core arm (bounded B2, heap U8) relative to the uncapped reference
 for the same scenario, per query. In-order streams pay the full spill-and-restore
 round trip, and the fixed cap-derived spill threshold over-spills the fitting
 scenarios for no benefit; the winning beyond-memory cell (C at 1024\,MB) pays
-46--59\% against the unlimited reference.}
+46--59\% against the unlimited reference.\nexmarknote}
 \label{fig:nexmark-cost}
 \end{figure}
 
@@ -315,7 +367,7 @@ at matched I/O granularity ($\sim$8\,K buffers in every variant, same pool per
 coordinate; means over completing repetitions). The heap $-28\%$ at 512/r075 is
 the stated outlier on 3--4\,s cells and is reported as measured. Panel (c)
 shows the bounded architecture's footprint advantage: $-33\%$ versus the
-in-memory engine at 2048/r200 (924 vs 1387\,MB).}
+in-memory engine at 2048/r200 (924 vs 1387\,MB).\methodsnote}
 \label{fig:cost}
 \end{figure}
 
@@ -358,13 +410,13 @@ The SD card's write bandwidth bounds the drain rate in the race from Section~\re
 
 \begin{figure}[ht]
 \centering
-\widefig{img/fig_cpu_io.pdf}
+\widefig[1.0]{img/fig_cpu_io.pdf}
 \caption[Processor and disk behavior across state pressure]{Processor and disk
 behavior across state pressure (completing cells of the grids; cgroup CPU and
 I/O accounting, medians per cell). The in-memory engine runs at 91--97\%
 utilization with zero disk traffic; spilling winners stay at 89--92\% with
 write-dominated traffic; the throttled and heavy bounded regimes drop to
-63\% and 54\%; the idle share is disk wait and pool backpressure.}
+63\% and 54\%; the idle share is disk wait and pool backpressure.\methodsnote}
 \label{fig:cpu-io}
 \end{figure}
 
@@ -403,7 +455,7 @@ The pool plus its unpooled overhead plus the base footprint must stay below 90\%
 footprint. (a) Hash-map state decomposition at the 26-million-entry working
 set from the per-map gauge census: headers 51\%, payload 34\%, bucket
 directory 14\%, slack below 1\%. (b) On-disk spill directory size (lz4) of
-completing spilling cells against state pressure.}
+completing spilling cells against state pressure.\methodsnote}
 \label{fig:composition}
 \end{figure}
 
@@ -455,7 +507,7 @@ Taken together, the pooled lever arms complete 12 of 16 where levers without poo
 (1024\,MB / 32k pool / r150). Each arm changes exactly one factor:
 buffer granularity alone recovers 3/8; pooling without levers recovers
 nothing; the reserve lever and paced restore carry the cell to 7/8
-(levers within pooling, 0/8 $\to$ 7/8: Fisher $p = 7.0 \times 10^{-4}$).}
+(levers within pooling, 0/8 $\to$ 7/8: Fisher $p = 7.0 \times 10^{-4}$).\methodsnote}
 \label{fig:ladder}
 \end{figure}
 
@@ -505,7 +557,7 @@ repetitions: the pre-allocated 250\,MB pool fills and stays pinned by
 emitted-but-unprocessed window state; draining it needs the very worker
 threads that are blocked allocating. The stall instrumentation recorded no
 returned buffer anywhere in the pool for two full seconds in 118 of 138
-stalls.}
+stalls.\methodsnote}
 \label{fig:gridlock}
 \end{figure}
 
@@ -523,7 +575,7 @@ One workload shows the law directly: it completes 23 of 24 at cap 512\,MB and di
 The same-workload contrast pair (stars) shows the law directly: r200
 completes 23 of 24 under the tight 512\,MB cap, whose backpressure throttles
 ingest to the drain rate, and dies 0 of 8 under the loose 1024\,MB cap with
-twice the pool, where unconstrained ingest pins the pool.}
+twice the pool, where unconstrained ingest pins the pool.\methodsnote}
 \label{fig:regimes}
 \end{figure}
 

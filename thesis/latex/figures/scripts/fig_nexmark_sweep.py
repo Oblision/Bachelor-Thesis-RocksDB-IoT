@@ -24,7 +24,7 @@ QUERIES = [("q3", "Nexmark q3"), ("q7", "Nexmark q7")]
 def main() -> None:
     style.use_style()
     df = data.load_runs()
-    fig, axes = plt.subplots(2, 1, figsize=(7.2, 7.0), sharey=True)
+    fig, axes = plt.subplots(2, 1, figsize=(7.4, 6.0), sharey=True)
     for qi, (q, qlabel) in enumerate(QUERIES):
         ax = axes[qi]
         x = np.arange(len(POINTS))
@@ -55,7 +55,7 @@ def main() -> None:
             ax.set_ylabel("completion fraction (completed / attempted)")
     axes[0].legend(loc="lower left", fontsize=8)
 
-    fig.suptitle("Nexmark across scenarios and caps — out-of-core matters only beyond memory",
+    fig.suptitle("Nexmark across scenarios and caps: out-of-core matters only beyond memory",
                  fontsize=11, fontweight="bold")
     style.caption(fig, extra="bar labels = completed/attempted · in-memory fits A and B, fails only at C · 1024 MB")
     style.save(fig, "fig_nexmark_sweep")

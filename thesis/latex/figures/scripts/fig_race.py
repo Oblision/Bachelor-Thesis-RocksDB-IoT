@@ -50,9 +50,16 @@ def main() -> None:
         if not n_ok:  # dodge only proxy-rate points
             rate *= 1 + 0.012 * (runs["pool_rank"].iloc[0] - 2)
         marker = "o" if arm == "heap" else "s"
-        color = style.GREEN if completes else style.RED
-        ax.scatter(rate / 1e6, rho, marker=marker, c=color, s=46, alpha=0.75,
-                   edgecolors="black", linewidths=0.4, zorder=3)
+        # Completing cells are filled at their REALIZED rate; failing cells are
+        # hollow and sit at the free-running REFERENCE rate (a dead run has no
+        # realized rate). The hollow fill is the visual cue that a red point's
+        # x-position is a proxy, not a measured ingest rate.
+        if completes:
+            ax.scatter(rate / 1e6, rho, marker=marker, c=style.GREEN, s=46,
+                       alpha=0.85, edgecolors="black", linewidths=0.4, zorder=3)
+        else:
+            ax.scatter(rate / 1e6, rho, marker=marker, facecolors="none",
+                       edgecolors=style.RED, s=48, linewidths=1.1, zorder=3)
         seen.add((arm, completes))
 
     ax.axvspan(2.5, 2.7, color=style.GREY, alpha=0.25, zorder=1)
@@ -65,12 +72,12 @@ def main() -> None:
     ax.set_xlabel("ingest rate (million tuples/s; free-running reference for all-fail cells)")
     ax.set_ylabel("state pressure $\\rho$")
     handles = [
-        Line2D([], [], marker="o", ls="", mfc=style.GREEN, mec="black", label="heap, completes"),
-        Line2D([], [], marker="o", ls="", mfc=style.RED, mec="black", label="heap, fails"),
-        Line2D([], [], marker="s", ls="", mfc=style.GREEN, mec="black", label="bounded, completes"),
-        Line2D([], [], marker="s", ls="", mfc=style.RED, mec="black", label="bounded, fails"),
+        Line2D([], [], marker="o", ls="", mfc=style.GREEN, mec="black", label="heap, completes (realized rate)"),
+        Line2D([], [], marker="s", ls="", mfc=style.GREEN, mec="black", label="bounded, completes (realized rate)"),
+        Line2D([], [], marker="o", ls="", mfc="none", mec=style.RED, mew=1.1, label="heap, fails (free-running rate)"),
+        Line2D([], [], marker="s", ls="", mfc="none", mec=style.RED, mew=1.1, label="bounded, fails (free-running rate)"),
     ]
-    ax.legend(handles=handles, loc="upper left", fontsize=8.5)
+    ax.legend(handles=handles, loc="upper left", fontsize=8.2)
     fig.suptitle("Completion is a race between ingest rate and spill-drain rate",
                  fontsize=11, fontweight="bold")
     style.caption(fig, extra="each point = one cell; all-fail cells plotted at the free-running reference rate")

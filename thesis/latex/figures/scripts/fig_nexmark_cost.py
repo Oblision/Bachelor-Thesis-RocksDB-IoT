@@ -29,7 +29,7 @@ def _tps(df, cell: str) -> float:
 def main() -> None:
     style.use_style()
     df = data.load_runs()
-    fig, axes = plt.subplots(2, 1, figsize=(7.2, 7.0), sharey=True)
+    fig, axes = plt.subplots(2, 1, figsize=(7.4, 6.0), sharey=True)
     for qi, (q, qlabel) in enumerate(QUERIES):
         ax = axes[qi]
         x = np.arange(len(POINTS))
@@ -60,7 +60,7 @@ def main() -> None:
             ax.set_ylabel("throughput vs uncapped reference (%)")
     axes[0].legend(loc="lower left", fontsize=8)
 
-    fig.suptitle("Nexmark throughput cost — in-order streams pay the full spill/restore round trip",
+    fig.suptitle("Nexmark throughput cost: in-order streams pay the full spill/restore round trip",
                  fontsize=11, fontweight="bold")
     style.caption(fig, extra="median tps over completing reps vs the uncapped reference · the fixed cap/10 threshold over-spills the fits cells")
     style.save(fig, "fig_nexmark_cost")

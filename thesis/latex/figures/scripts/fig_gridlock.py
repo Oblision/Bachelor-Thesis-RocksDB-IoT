@@ -43,7 +43,7 @@ def main() -> None:
     print(f"{CELL}: {int(runs['ok'].sum())}/{len(runs)} ok, modal rc",
           runs[~runs["ok"]]["rc"].mode().iloc[0])
 
-    fig, axes = plt.subplots(2, 1, figsize=(7.2, 6.8), height_ratios=[1.5, 1])
+    fig, axes = plt.subplots(2, 1, figsize=(7.2, 6.2), height_ratios=[1.5, 1])
 
     ax = axes[0]
     trace = _load_trace(REP)

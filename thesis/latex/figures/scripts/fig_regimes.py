@@ -32,7 +32,7 @@ def main() -> None:
 
     # ---- Regime 1 (left, full height) ----
     _box(ax, 0.02, 0.0, 0.92, 1.0, "#d7ecd9")
-    ax.text(0.48, 0.93, "Regime 1 — fits", ha="center", va="top",
+    ax.text(0.48, 0.93, "Regime 1: fits", ha="center", va="top",
             fontsize=10.5, fontweight="bold")
     ax.text(0.48, 0.78, "peak pool demand $\\leq$ pool", ha="center", va="top",
             fontsize=9)
@@ -43,7 +43,7 @@ def main() -> None:
 
     # ---- Regime 2 (top right) ----
     _box(ax, 1.02, 0.52, 1.0, 0.48, "#fdf3d0")
-    ax.text(1.52, 0.955, "Regime 2 — throttled", ha="center", va="top",
+    ax.text(1.52, 0.955, "Regime 2: throttled", ha="center", va="top",
             fontsize=10.5, fontweight="bold")
     ax.text(1.52, 0.86,
             "tight cap $\\Rightarrow$ blocked allocations pace ingest\n"
@@ -56,7 +56,7 @@ def main() -> None:
 
     # ---- Regime 3 (bottom right) ----
     _box(ax, 1.02, 0.0, 1.0, 0.44, "#f6d7cd")
-    ax.text(1.52, 0.395, "Regime 3 — gridlock", ha="center", va="top",
+    ax.text(1.52, 0.395, "Regime 3: gridlock", ha="center", va="top",
             fontsize=10.5, fontweight="bold")
     ax.text(1.52, 0.30,
             "unconstrained ingest pins the pool; emitted state\n"

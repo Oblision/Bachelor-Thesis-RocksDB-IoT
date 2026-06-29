@@ -73,9 +73,9 @@ def _panel(ax, df, rho_mb, cap: int, campaign: str, arm: str) -> None:
     ax.set_xticks(ticks, [str(t) for t in ticks], fontsize=8)
     ax.set_xlabel("pool size (MB)", fontsize=9)
     ax.set_ylim(-0.6, len(workloads) - 0.4)
-    arch = ("heap — engine default (4096 B)" if arm == "heap"
-            else "pooled — corrected flag (8192 B)")
-    ax.set_title(f"{arch}, cap {cap} MB", fontsize=9)
+    arch = ("heap, engine default (4096 B)" if arm == "heap"
+            else "pooled, corrected flag (8192 B)")
+    ax.set_title(f"cap {cap} MB  ·  {arch}", fontsize=9)
 
 
 def main() -> None:
@@ -83,10 +83,14 @@ def main() -> None:
     df = data.load_runs()
     rho_mb = data.rho_table(df)
 
-    fig, axes = plt.subplots(2, 3, figsize=(9.6, 5.8))
-    for col, cap in enumerate(CAPS):
-        _panel(axes[0, col], df, rho_mb, cap, "L", "heap")
-        _panel(axes[1, col], df, rho_mb, cap, "W", "bounded")
+    # 3 rows (caps) x 2 cols (arms): heap and pooled sit side by side per cap,
+    # so each cap is a direct heap-vs-bounded comparison (e.g. 512 heap | 512
+    # pooled). Wider panels than the old 2x3, and the portrait shape suits the
+    # narrow text column.
+    fig, axes = plt.subplots(3, 2, figsize=(8.6, 7.0))
+    for row, cap in enumerate(CAPS):
+        _panel(axes[row, 0], df, rho_mb, cap, "L", "heap")
+        _panel(axes[row, 1], df, rho_mb, cap, "W", "bounded")
     for row in axes:
         row[0].set_ylabel("workload ($\\rho$ at cap)", fontsize=9)
 
