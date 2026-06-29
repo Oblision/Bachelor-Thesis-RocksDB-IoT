@@ -9,8 +9,8 @@ The second half covers the implementation: the integration points, the instrumen
 
 % [5.1]
 Four requirements follow from the goal in Chapter~\ref{cha:problem}.
-First, the backend spills state before memory pressure becomes fatal.
-Second, it forces spilling when pressure becomes acute anyway.
+First, the backend spills state before memory pressure becomes fatal: a soft threshold triggers preemptive background spilling so that cold state leaves memory while the system is still healthy.
+Second, when preemptive spilling cannot keep up and pressure crosses a hard threshold despite it, the backend pulls an emergency lever: it forces a synchronous spill on the allocating thread that evicts state as quickly as the storage device permits, so an \ac{OOM} failure is averted rather than merely deferred.
 Third, it never changes query results.
 Fourth, it leaves the just-in-time compilation pipeline untouched.
 
@@ -54,7 +54,7 @@ Slices serialize page by page into RocksDB key-value pairs.
 The serializer preserves the exact memory layout of the hash map.
 A restore is therefore a plain byte copy back into pages.
 
-% [5.7]
+% [5.7]-
 Before a window's results are emitted, the store restores its spilled slices.
 
 % [5.8]
@@ -68,12 +68,11 @@ Chapter~\ref{cha:evaluation} measures its consequences.
 % RocksDB characterization — sets the spill backend config from a separate db_bench sweep.
 % Data: Microbenchmark-BA/results/constrained_512mb (10,000 runs); all numbers verified vs raw CSV.
 The store spills slices into RocksDB (Section~\ref{sec:architecture}).
-RocksDB exposes tuning knobs that trade memory for speed~\cite{jin2022}.
-Three of them matter under an edge memory budget: the compression algorithm, the write buffer size, and the block cache size (Section~\ref{sec:bg-rocksdb}).
-A larger write buffer or block cache spends memory that the window state can then no longer use.
-The backend configuration is therefore chosen from a characterization, not left at the defaults.
+RocksDB exposes several tuning knobs with which configurations can be optimized; prior work surveys their effects~\cite{jin2022,rocksdb-memory}.
+The characterization below (Table~\ref{tab:rocksdb-char}) sweeps those knobs under a 512\,MB edge memory constraint and finds three dominate both throughput and footprint: the compression algorithm, the write buffer size, and the block cache size.
+The backend configuration is therefore chosen from a characterization, not left at default settings.
 
-The characterization runs RocksDB on its own through the \texttt{db\_bench} tool, outside NebulaStream.
+The characterization runs RocksDB on its own through the \texttt{db\_bench} tool, outside NebulaStream with a docker container to enforce the memory constraint.
 It sweeps the three knobs under a hard memory cap that Docker enforces.
 Its dataset is ten million records, about 1.1\,GB, so it exceeds the cap and forces spilling.
 Two workloads stand in for the backend's duty cycle: \texttt{fillrandom} writes continuously and models ingestion, and \texttt{readwhilewriting} reads and writes at once and models an operator that restores and spills state concurrently.
@@ -104,16 +103,19 @@ Write buffer & from 4 to 32\,MB, write amplification falls $2.68 \to 0.91$ and c
 \label{tab:rocksdb-char}
 \end{table}
 
-These findings fix the backend at lz4 compression, a 16\,MB write buffer, and an 8\,MB block cache, with the partition count held at four.
+These findings fix the backend at lz4 compression, a 16\,MB write buffer, and an 8\,MB block cache.
 This is the memory-fit point for the tightest cap: compression costs nothing, the small cache costs almost no throughput, and a 16\,MB write buffer already removes the stalls while leaving the most memory for state.
 The evaluation holds this configuration constant across all caps (Section~\ref{sec:setup}).
 
 The memory-fit point is specific to the tightest cap.
-At 512\,MB a larger write buffer and cache are unaffordable, so 16 and 8\,MB are the right choice.
-Once the cap rises to 1024 or 2048\,MB, a 32\,MB write buffer and a 32\,MB block cache fit, and the characterization shows the larger write buffer roughly halves write amplification.
-The evaluation establishes that the storage device's write bandwidth bounds the rate at which the backend drains state to disk (Section~\ref{sec:rq4}), so writing fewer bytes should let more runs finish where the larger configuration fits.
-This thesis identifies the effect but holds the backend fixed to keep every comparison a single-variable test; a dedicated contrast that re-runs the grid with the larger configuration at the higher caps is left to future work.
-% RB32 contrast (32/32 vs 16/8) result slots in here once run — see thesis/experiments/rb32-config-contrast.
+At 512\,MB a larger write buffer and cache compete with the window state for scarce memory, so 16 and 8\,MB are the safe choice.
+Once the cap rises to 1024 or 2048\,MB, a 32\,MB write buffer and a 32\,MB block cache fit, and the characterization above shows the larger write buffer roughly halves write amplification.
+The evaluation establishes that the storage device's write bandwidth bounds the drain rate (Section~\ref{sec:rq4}), so writing fewer bytes should, in principle, let more runs finish where the larger configuration fits.
+A dedicated single-variable contrast tests this prediction inside NebulaStream, holding every other knob fixed (Section~\ref{sec:rb32}).
+The prediction does not hold in general.
+The larger configuration helps only when window-map pages live in the buffer pool (Section~\ref{sec:rq3}), and even there only as a directional trend under the tight cap; with headroom it is neutral, and for the heap architecture its fixed memory cost makes it a net loss.
+The evaluation therefore holds the backend at 16 and 8\,MB across all caps, now as a measured choice rather than a deferred question.
+% RB32 contrast (32/32 vs 16/8): measured result lives in Section~\ref{sec:rb32}; full tables in Appendix E.
 
 \section{Design Iteration Two: Pool-Pressure Levers\label{sec:levers}}
 
@@ -129,11 +131,17 @@ Lever 1d adds the bucket directories (Section~\ref{sec:bg-windows}) to the live 
 \section{Design Iteration Three: Allocation Backpressure\label{sec:backpressure}}
 
 % [5.10]
-A second evaluation round motivates allocation backpressure, also gated.
-An allocation that would abort (Section~\ref{sec:bg-nes}) instead stalls in bounded rounds.
-A progress guard watches the whole pool.
-If no buffer returns to the pool for two full rounds, the guard aborts early.
-In that situation the threads that would return buffers are themselves blocked, so waiting longer cannot help.
+The spiller can fall behind the arrival rate.
+When it does and all buffers are in flight, NebulaStream aborts the next allocation (Section~\ref{sec:bg-nes}).
+
+Stream engines handle this demand--supply gap with backpressure.
+Reactive Streams propagate demand signals upstream; Flink uses credit-based flow control; Storm and Heron throttle at the source~\cite{reactivestreams,flink_credit,storm886,kulkarni2015heron}.
+This design applies backpressure at the allocation layer: an allocation that would abort stalls instead, holding its thread in bounded rounds while the spiller frees space.
+
+The stall must be bounded.
+A progress guard tracks how many buffers return to the pool each round.
+If none come back across two consecutive rounds, the threads that would return buffers are blocked on the same pool, so waiting cannot break the cycle.
+The guard aborts.
 
 % [5.11]
 Every mechanism in this chapter is off by default.
@@ -163,25 +171,52 @@ The backpressure loop uses a recycle counter as its progress signal.
 \section{Instrumentation\label{sec:instrumentation}}
 
 % [6.4]
-Six probes instrument the memory system.
-A sampler reads the cgroup memory statistics every 0.2 seconds and splits them into anonymous memory, page cache, and shared memory (Section~\ref{sec:bg-metrics}).
-The process-level anonymous set from the kernel's per-process status is read alongside as a cross-check on the cgroup accounting.
-The split is what makes the memory numbers of Chapter~\ref{cha:evaluation} trustworthy: a spilling backend inflates the page cache by design, and an early evaluation round that reported undifferentiated totals produced footprint numbers that moved with the spill volume rather than with the working set.
-A pool gauge records pool occupancy at buffer rent time.
-An unpooled gauge tracks live bytes outside the pool.
-A map gauge records the exact composition of every hash map at its destruction.
-A spill gauge records the controller's view at every spiller wake.
-A backpressure gauge records every stall event.
+Measuring a spilling system cleanly requires separating what the kernel does for bookkeeping from what the workload actually uses.
+A spilling backend writes slices to disk and reads them back on restore; the kernel's response is to grow the page cache.
+An early evaluation round read undifferentiated \texttt{memory.current} totals and produced footprint numbers that moved with the spill volume rather than with the window working set.
+The fix is to read \texttt{memory.stat} instead, which breaks cgroup consumption into anonymous memory, page cache, and shared memory (Section~\ref{sec:bg-metrics}).
+A sampler does this every 0.2 seconds; the per-process anonymous set from the kernel's per-process status file runs alongside it as a cross-check on the cgroup accounting.
+
+Five further gauges observe what the application sees.
+A pool gauge records occupancy at every buffer allocation, exposing when the pool runs dry and by how much.
+An unpooled gauge tracks the live bytes held outside the pool, bounding the share of memory invisible to the spill controller.
+A map gauge captures the exact page-count composition of every hash map at its destruction, so the evaluation can attribute footprint to individual window slots.
+A spill gauge records the controller's state at every 100-millisecond spiller wake.
+A backpressure gauge logs each stall with its duration.
+
+Together, the six probes let Chapter~\ref{cha:evaluation} separate working-set footprint from spill artefacts, trace the controller's decisions under pressure, and cross-examine each claim against independent signals.
 
 \section{Evaluation Harness and Reproducibility\label{sec:reproducibility}}
 
 % [6.5]
-The harness runs each measurement cell in Docker.
-A cell is one combination of workload, memory cap, pool size, and configuration.
-Docker enforces a hard memory cap and pins the processor cores.
-Input data lies on a memory-backed file system.
-The spill target is an SD card, as on a real edge device.
-Cells run one at a time.
+The experiments ran on a desktop machine (Intel Core i7-10700K, \textbf{[?]}\,GB RAM) rather than a real edge node.
+Docker imposes the edge constraints: a cgroup memory hard cap with swap disabled, a CPU limit of four cores, and a consumer-grade SD card bind-mounted as the spill target.
+Together these three levers make the container's resource view match a memory-constrained edge device without requiring one.
+Table~\ref{tab:edge-profile} summarises the resulting device profile.
+
+\begin{table}[ht]
+\centering
+\small
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Resource} & \textbf{Container view} & \textbf{Mechanism} \\
+\hline
+Memory & 512 / 1024 / 2048\,MB, no swap & \texttt{--memory=Xm --memory-swap=Xm} \\
+\hline
+CPU & 4 cores & \texttt{--cpus=4} \\
+\hline
+Spill storage & SD card (\textbf{[model]}, ext4) & host \texttt{/mnt/sd-spill} bind-mounted at \texttt{/spill} \\
+\hline
+Input data & RAM-backed tmpfs & \texttt{/dev/shm} bind-mounted at \texttt{/input} (read-only) \\
+\hline
+\end{tabular}
+\caption{Container device profile: the four imposed constraints that approximate an edge node's resource view.}
+\label{tab:edge-profile}
+\end{table}
+
+Input data sits on a RAM-backed filesystem, keeping input reads off the SD card.
+The spiller owns all SD card traffic: writes during eviction, reads during restore before emission.
+Cells run sequentially: the SD card is a single physical device and concurrent spill I/O across cells would contaminate the per-cell latency measurements.
 Each cell writes one row with 34 measured columns.
 
 % [6.6]
