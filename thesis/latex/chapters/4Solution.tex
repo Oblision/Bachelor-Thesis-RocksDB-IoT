@@ -154,7 +154,8 @@ Every comparison in Chapter~\ref{cha:evaluation} is therefore an A/B test on one
 Two gaps survive the first three iterations.
 The controller checks the live budget only when a slice is created.
 A high-cardinality aggregation grows one slice between window boundaries without creating a new one, so that growth is unseen until the next safety-net spiller wake.
-And a spilled slice frees its logical state but not its resident memory: its pooled pages return to the pool's free list and stay resident until they are reused.
+And a spilled slice frees its logical state but not its resident memory.
+The pool is one fixed slab reserved at startup, so a recycled buffer only returns to the free list; the anonymous pages it touched were faulted in once and are never returned to the operating system.
 
 % [5.13]
 The growth signal closes the first gap.
@@ -167,7 +168,7 @@ A typical value is a few thousand writes; zero disables the signal and restores 
 % [5.14]
 Page release closes the second gap.
 On recycle the buffer manager advises the kernel to drop a recycled buffer's physical pages, and does so only while the free list already holds a configured fraction of the pool.
-The watermark confines the release to the idle, post-drain state and spares the fast-cycling input buffers.
+This free-list gate --- a pool-occupancy condition, unrelated to the event-time watermark of Section~\ref{sec:bg-windows} --- confines the release to the idle, post-drain state and spares the fast-cycling input buffers.
 The advice is issued before the buffer re-enters the free list, so no concurrent allocation can fault the page underneath it.
 The default sixty-four-byte buffer alignment is too coarse for a per-buffer page operation, so the flag also switches the pool to a page-aligned layout that keeps the control blocks in a separate region.
 Both mechanisms are off by default, and page release extends the buffer manager rather than the store.
