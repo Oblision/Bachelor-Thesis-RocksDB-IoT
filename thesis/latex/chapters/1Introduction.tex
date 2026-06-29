@@ -52,7 +52,7 @@ The one remaining failure mode is diagnosed precisely, and its fix is specified 
 \section{Contributions\label{sec:contributions}}
 
 % [1.8]
-This thesis makes six contributions.
+This thesis makes seven contributions.
 \begin{enumerate}
   \item \textbf{C1 — A spillable window state backend for NebulaStream.}
     Window state moves to RocksDB under memory pressure and returns for result emission.
@@ -74,6 +74,10 @@ This thesis makes six contributions.
   \item \textbf{C6 — An open-source implementation.}
     All mechanisms are configuration-gated.
     With all gates closed, the engine is byte-identical to the unmodified baseline.
+  \item \textbf{C7 — A fourth design iteration: growth signal and page release.}
+    A growth signal makes intra-slice bloat visible on the production path once the slice cache is bypassed.
+    A page-release extension cuts steady anonymous memory by a further 55\% on draining workloads.
+    Neither converts the residual deadlock; it stays bound by the un-spillable hot slice and the resident floor.
 \end{enumerate}
 
 \section{Thesis Structure\label{sec:structure}}

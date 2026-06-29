@@ -148,6 +148,30 @@ Every mechanism in this chapter is off by default.
 With all gates closed, the engine is byte-identical to the unmodified baseline.
 Every comparison in Chapter~\ref{cha:evaluation} is therefore an A/B test on one binary.
 
+\section{Design Iteration Four: The Growth Signal and Page Release\label{sec:growth-release}}
+
+% [5.12]
+Two gaps survive the first three iterations.
+The controller checks the live budget only when a slice is created.
+A high-cardinality aggregation grows one slice between window boundaries without creating a new one, so that growth is unseen until the next safety-net spiller wake.
+And a spilled slice frees its logical state but not its resident memory: its pooled pages return to the pool's free list and stay resident until they are reused.
+
+% [5.13]
+The growth signal closes the first gap.
+It re-evaluates the same soft and hard thresholds on the existing-slice write path, sampled every $N$ writes so the budget read never runs per record.
+Placement is the difficulty.
+The per-worker slice cache, an engine default (Section~\ref{sec:geometry-valley}), serves steady-state writes without re-entering the store, so a check inside the store's lookup is reached only on a cache miss --- the path the growth never takes.
+The signal is therefore sampled from the data-structure lookup the build operator calls on every record, hit or miss.
+A typical value is a few thousand writes; zero disables the signal and restores the byte-identical baseline.
+
+% [5.14]
+Page release closes the second gap.
+On recycle the buffer manager advises the kernel to drop a recycled buffer's physical pages, and does so only while the free list already holds a configured fraction of the pool.
+The watermark confines the release to the idle, post-drain state and spares the fast-cycling input buffers.
+The advice is issued before the buffer re-enters the free list, so no concurrent allocation can fault the page underneath it.
+The default sixty-four-byte buffer alignment is too coarse for a per-buffer page operation, so the flag also switches the pool to a page-aligned layout that keeps the control blocks in a separate region.
+Both mechanisms are off by default, and page release extends the buffer manager rather than the store.
+
 \section{Integration into NebulaStream\label{sec:integration}}
 
 % [6.1]

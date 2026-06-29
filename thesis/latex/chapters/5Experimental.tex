@@ -596,6 +596,34 @@ Unmediated pointers into evictable state require an invalidation protocol.
 Flink's backend mediates every state access; NebulaStream's slice cache does not.
 The precise upstream fix is an epoch-stamped cache entry that is invalidated on spill, at the cost of one comparison per cache hit.
 
+\subsection{Design Iteration Four: The Growth Signal and Page Release\label{sec:growth-release-results}}
+
+% [7.6x]
+The slice cache that causes the crash cluster also blinds the controller.
+The growth signal of Section~\ref{sec:growth-release} fires zero times when placed inside the store and throughout when sampled on the per-record lookup path.
+On a high-churn workload the in-store placement records no threshold crossing where the cache-bypassing placement records eight hundred.
+The cache defect is therefore two defects with one root cause: a memory-safety hazard and a controller-visibility hazard.
+
+% [7.6y]
+With the signal restored, one question follows: can a single growing slice break a run that the creation-time check would pass?
+A high-cardinality workload settles it.
+One window's slice reaches 127 to 157 megabytes and crosses the hard threshold between boundaries, while the matched low-cardinality workload holds every slice to four megabytes.
+The growth signal observes the crossing; the creation-time check, firing only at boundaries, never sees it.
+
+% [7.6z]
+Acting on the signal clips the slice and defends the pool, yet converts no failing run.
+The armed signal holds the largest slice below the threshold and keeps the pool from filling; the run still dies.
+The death moves rather than vanishes --- to an out-of-memory kill where resident memory binds, or to a self-inflicted allocation stall where the synchronous eviction blocks the thread that ingests.
+A softer variant that only wakes the background spiller is worse: it sheds the backpressure the synchronous eviction supplied, and the pool fills at full ingest speed.
+The signal is necessary to see intra-slice growth and insufficient to survive it; the binding limits remain the un-spillable hot slice and the resident floor.
+
+% [7.6aa]
+Page release attacks the resident floor.
+On a draining workload it cuts steady anonymous memory by 55 percent and peak by 38 percent, at a 6-to-8 percent throughput cost, completing every repetition.
+It is correctly specific: on the single-hot-slice workload it reclaims the cold band but cannot touch the live growing slice, and that run still dies.
+This sharpens the recycling advantage reported earlier.
+Recycling caps the footprint at the live band; page release lets the footprint track the instantaneous working set rather than the high-water band.
+
 \section{Summary of Results\label{sec:eval-summary}}
 
 % [7.7.1]
