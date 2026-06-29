@@ -202,17 +202,19 @@ This reframing drives the rest of the chapter.
 \begin{figure}[ht]
 \centering
 \widefig{img/fig_race.pdf}
-\caption[Completion as a race]{Completion as a race: one point per cell of the
-two grids (heap = engine-default configuration, bounded = corrected pooling
-flag). Filled markers are completing cells at their realized median throughput;
-hollow markers are all-fail cells, drawn at the workload's free-running
-reference rate because a dead run has no meaningful realized rate of its own.
-Two death causes overlap on the plot. Cells with $\rho > 1$ to the right of the
-2.5--2.7\,M tuples/s band are race losses, where ingest outruns the drain. The
-hollow cluster near 1.3--1.6\,M is the heaviest workloads (r500--r1000) dying by
-capacity, out-of-memory kill on heap and pool exhaustion on bounded, shown at
-their free-running rate. Below $\rho = 1$ sprinting is harmless because little
-or no state must drain.\methodsnote}
+\caption[Completion as a race]{Completion as a race: one point per cell of both
+grids, the heap and bounded architectures pooled together because the race holds
+for both. Filled markers are completing cells at their realized (throttled)
+throughput; hollow markers are all-fail cells, drawn at the workload's
+free-running demand rate because a dead run has no realized rate of its own. The
+plane reads as three regions. Below $\rho = 1$ the state fits in memory, little
+must drain, and sprinting is safe. Above $\rho = 1$ the state must spill, and the
+SD card sets a drain ceiling near 2.5--2.7\,M tuples/s: cells throttled below it
+survive (left), while cells whose demand out-sprints it die. That top-right death
+zone is the race, and it is clean, all 40 of its 40 cells fail. The remaining
+hollow points below and left of the ceiling are not race losses but capacity
+deaths (heavy workloads exceeding the pool and cap), governed by the geometry law
+of Figure~\ref{fig:geometry}.\methodsnote}
 \label{fig:race}
 \end{figure}
 
