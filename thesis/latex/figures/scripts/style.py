@@ -67,8 +67,8 @@ def caption(fig, extra: str = "") -> None:
     `extra` for a figure-specific note (e.g. the statistical test used).
     """
     source = _SOURCE if not extra else f"{extra}  ·  {_SOURCE}"
-    fig.supxlabel(f"{_METHODS}\n{source}", fontsize=6.4, color="#6f6f6f",
-                  linespacing=1.5)
+    fig.supxlabel(f"{_METHODS}\n{source}", fontsize=8.5, color="#5a5a5a",
+                  linespacing=1.4)
 
 
 def save(fig, name: str) -> None:

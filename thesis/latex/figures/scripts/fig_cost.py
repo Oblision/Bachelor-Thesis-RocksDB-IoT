@@ -34,7 +34,7 @@ def main() -> None:
     df = data.load_runs()
     stats = [[_cell_means(df, c) for c in coord[1:]] for coord in COORDS]
 
-    fig, axes = plt.subplots(1, 3, figsize=(9.6, 3.5))
+    fig, axes = plt.subplots(3, 1, figsize=(7.2, 9.0))
     x = np.arange(len(COORDS))
     width = 0.34
 

@@ -67,7 +67,7 @@ Output checksums match the uncapped in-memory reference under both architectures
 
 \begin{figure}[ht]
 \centering
-\includegraphics[width=0.78\textwidth]{img/fig_flagship.pdf}
+\includegraphics[width=\textwidth]{img/fig_flagship.pdf}
 \caption[Completion at the flagship cell (512\,MB)]{Completion at the flagship
 cell. Out-of-core (8 repetitions per workload) versus the capped in-memory
 engine (6 repetitions) at the three beyond-memory state pressures of the
@@ -199,7 +199,7 @@ This reframing drives the rest of the chapter.
 
 \begin{figure}[ht]
 \centering
-\includegraphics[width=0.88\textwidth]{img/fig_race.pdf}
+\includegraphics[width=\textwidth]{img/fig_race.pdf}
 \caption[Completion as a race]{Completion as a race: one point per cell of the
 two grids (heap = engine-default configuration, bounded = corrected pooling
 flag). Completing cells plot their realized median throughput; all-fail
@@ -216,6 +216,12 @@ because little or no state must drain.}
 The synthetic grid is the primary evidence.
 A Nexmark-style auction bid stream provides supporting evidence.
 The stream uses the canonical bid schema, hot-skewed auction popularity, and in-order event time.
+The configuration matrix mirrors the synthetic grid.
+Two queries run, \texttt{q3} and \texttt{q7}, across three state scenarios: A and B under the 512\,MB cap, B and C under 1024\,MB, so the beyond-memory point (C at 1024\,MB) is reached.
+Each cell runs three arms at eight repetitions: the capped in-memory engine, the bounded pooled backend (B2: 15\% pool reserve, paced restore, soft and hard thresholds at one tenth and one fifth of the cap), and the heap out-of-core backend (U8).
+The purpose is external validity.
+The synthetic grid is one stream shape, tuned with out-of-order jitter; a canonical benchmark with a different schema, hot-skewed auction popularity, and an in-order event stream tests whether the result holds beyond the conditions it was measured under.
+The scenario ladder grows the window state so the in-memory engine fits A and B and only the beyond-memory point C forces out-of-core work, which is where the backend's value can show.
 The bounded backend completes this workload where the capped in-memory engine cannot: 8 of 8 and 7 of 8 versus 0 of 8 ($p = 7.8 \times 10^{-5}$ and $7.0 \times 10^{-4}$).
 The runs perform verified out-of-core work: 610\,MB spilled, 234\,MB restored from the device.
 Figure~\ref{fig:nexmark-sweep} places this win in context across scenarios and caps: the capped in-memory engine fits the small and medium scenarios and fails only at the beyond-memory point at 1024\,MB, which is exactly where the bounded backend completes.
@@ -437,7 +443,7 @@ Taken together, the pooled lever arms complete 12 of 16 where levers without poo
 
 \begin{figure}[ht]
 \centering
-\includegraphics[width=0.85\textwidth]{img/fig_ladder.pdf}
+\includegraphics[width=\textwidth]{img/fig_ladder.pdf}
 \caption[The attribution ladder]{The attribution ladder at the decisive cell
 (1024\,MB / 32k pool / r150). Each arm changes exactly one factor:
 buffer granularity alone recovers 3/8; pooling without levers recovers
@@ -505,7 +511,7 @@ One workload shows the law directly: it completes 23 of 24 at cap 512\,MB and di
 
 \begin{figure}[ht]
 \centering
-\includegraphics[width=0.92\textwidth]{img/fig_regimes.pdf}
+\includegraphics[width=\textwidth]{img/fig_regimes.pdf}
 \caption[The three-regime feasibility law]{The three-regime feasibility law.
 The same-workload contrast pair (stars) shows the law directly: r200
 completes 23 of 24 under the tight 512\,MB cap, whose backpressure throttles

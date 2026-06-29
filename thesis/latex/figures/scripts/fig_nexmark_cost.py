@@ -29,7 +29,7 @@ def _tps(df, cell: str) -> float:
 def main() -> None:
     style.use_style()
     df = data.load_runs()
-    fig, axes = plt.subplots(1, 2, figsize=(11.0, 4.2), sharey=True)
+    fig, axes = plt.subplots(2, 1, figsize=(7.2, 7.0), sharey=True)
     for qi, (q, qlabel) in enumerate(QUERIES):
         ax = axes[qi]
         x = np.arange(len(POINTS))

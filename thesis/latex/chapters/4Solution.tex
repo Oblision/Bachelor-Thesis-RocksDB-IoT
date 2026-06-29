@@ -162,8 +162,8 @@ The growth signal closes the first gap.
 It re-evaluates the same soft and hard thresholds on the existing-slice write path, sampled every $N$ writes so the budget read never runs per record.
 Placement is the difficulty.
 The per-worker slice cache, an engine default (Section~\ref{sec:geometry-valley}), serves steady-state writes without re-entering the store, so a check inside the store's lookup is reached only on a cache miss --- the path the growth never takes.
-The signal is therefore sampled from the data-structure lookup the build operator calls on every record, hit or miss.
-A typical value is a few thousand writes; zero disables the signal and restores the byte-identical baseline.
+The signal is therefore placed on the data-structure lookup the build operator calls for every record, whether the slice cache hits or misses.
+A typical stride $N$ is a few thousand writes; $N = 0$ disables the signal and restores the byte-identical baseline.
 
 % [5.14]
 Page release closes the second gap.
@@ -214,8 +214,8 @@ Together, the six probes let Chapter~\ref{cha:evaluation} separate working-set f
 \section{Evaluation Harness and Reproducibility\label{sec:reproducibility}}
 
 % [6.5]
-The experiments ran on a desktop machine (Intel Core i7-10700K, \textbf{[?]}\,GB RAM) rather than a real edge node.
-Docker imposes the edge constraints: a cgroup memory hard cap with swap disabled, a CPU limit of four cores, and a consumer-grade SD card bind-mounted as the spill target.
+The experiments ran on a desktop machine (Intel Core i7-10700K: eight physical cores, sixteen logical threads; 32\,GB RAM) rather than a real edge node.
+Docker imposes the edge constraints: a cgroup memory hard cap with swap disabled, a two-core CPU budget pinned to a fixed pair of physical cores, and a consumer-grade SD card bind-mounted as the spill target.
 Together these three levers make the container's resource view match a memory-constrained edge device without requiring one.
 Table~\ref{tab:edge-profile} summarises the resulting device profile.
 
@@ -228,9 +228,9 @@ Table~\ref{tab:edge-profile} summarises the resulting device profile.
 \hline
 Memory & 512 / 1024 / 2048\,MB, no swap & \texttt{--memory=Xm --memory-swap=Xm} \\
 \hline
-CPU & 4 cores & \texttt{--cpus=4} \\
+CPU & 2 cores, pinned & \texttt{--cpus=2 --cpuset-cpus=0,1,8,9} \\
 \hline
-Spill storage & SD card (\textbf{[model]}, ext4) & host \texttt{/mnt/sd-spill} bind-mounted at \texttt{/spill} \\
+Spill storage & SD card (SanDisk Extreme Pro, 128\,GB, ext4) & host \texttt{/mnt/sd-spill} bind-mounted at \texttt{/spill} \\
 \hline
 Input data & RAM-backed tmpfs & \texttt{/dev/shm} bind-mounted at \texttt{/input} (read-only) \\
 \hline

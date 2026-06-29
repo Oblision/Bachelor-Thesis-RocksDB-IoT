@@ -23,7 +23,7 @@ def main() -> None:
     rho_mb = data.rho_table(df)
     cells = data.per_cell(df)
 
-    fig, axes = plt.subplots(1, 3, figsize=(11.2, 4.2), sharey=True)
+    fig, axes = plt.subplots(3, 1, figsize=(7.2, 9.0), sharey=True)
     for col, cap in enumerate(CAPS):
         ax = axes[col]
         inm = cells[(cells["campaign"] == "L") & (cells["arm"] == "inmem")
