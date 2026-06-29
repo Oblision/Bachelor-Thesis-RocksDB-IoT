@@ -61,13 +61,15 @@ Synthetic Zipfian sensor stream ($s\approx1.0$, 1.5\,M-key universe, top-10
 $\approx20\%$ of traffic); tumbling window 50k tuples, emit-lag 4\,M ($N_w=80$
 retained windows); 2 pinned cores, hard cgroup cap, lz4 spill to SD card.
 $n=8$ to 10 repetitions per cell unless labelled otherwise. Source:
-lag-validation campaign (3{,}133 runs, 457 cells), debug build, single host.}}
+lag-validation campaign (3{,}133 runs, 457 cells), debug build, single host; full
+setup in Section~\ref{sec:setup}, device profile in Table~\ref{tab:edge-profile}.}}
 \newcommand{\nexmarknote}{\par\smallskip{\footnotesize\color{black!55}%
 Nexmark bid stream: canonical bid schema, hot-skewed auction popularity (Zipf
 head), in-order event time. Two tumbling-window aggregations, \texttt{q3} (sum
 per auction) and \texttt{q7}, the \emph{Highest Bid} (maximum per auction).
 Arms: capped in-memory engine, bounded pooled backend (B2), heap backend (U8);
-$n=8$ repetitions per cell. Source: Nexmark V2 campaign (210 cells), single host.}}
+$n=8$ repetitions per cell. Source: Nexmark V2 campaign (210 cells), single host;
+setup in Section~\ref{sec:nexmark}, device profile in Table~\ref{tab:edge-profile}.}}
 
 % Float placement: keep section-5 figures near their references instead of
 % drifting to the end. Relax the default fractions so a near-page-width plot may

@@ -39,7 +39,7 @@ def main() -> None:
     rho_mb = data.rho_table(df)
     free = _free_running(df)
 
-    fig, ax = plt.subplots(figsize=(7.8, 4.9))
+    fig, ax = plt.subplots(figsize=(7.8, 4.4))
     grid = df[df["campaign"].isin(["L", "W"]) & df["arm"].isin(["heap", "bounded"])
               & df["workload"].notna() & df["pool_buffers"].notna()
               & df["cap_mb"].notna()]
@@ -48,9 +48,14 @@ def main() -> None:
     pool_rank = grid.groupby(["arm", "cap_mb", "workload"])["pool_buffers"].rank(method="dense")
     grid = grid.assign(pool_rank=pool_rank)
 
-    cx, cy, fx, fy = [], [], [], []   # complete / fail point coords
+    # Group by (architecture, outcome): shape encodes the arm (circle = heap,
+    # square = bounded), fill encodes the outcome (filled = completes, hollow =
+    # fails). The race regions hold for both arms; keeping the arm visible shows
+    # which architecture survives where (bounded throttles into the left band).
+    pts = {(a, o): ([], []) for a in ("heap", "bounded") for o in (True, False)}
     death_fail = death_total = 0
     for cell, runs in grid.groupby("cell"):
+        arm = runs["arm"].iloc[0]
         w = int(runs["workload"].iloc[0])
         rho = rho_mb[w] / runs["cap_mb"].iloc[0]
         n_ok, reps = int(runs["ok"].sum()), len(runs)
@@ -62,28 +67,38 @@ def main() -> None:
         if not n_ok:  # dodge only proxy-rate points
             rate *= 1 + 0.012 * (runs["pool_rank"].iloc[0] - 2)
         rateM = rate / 1e6
-        (cx if completes else fx).append(rateM)
-        (cy if completes else fy).append(rho)
+        xs, ys = pts[(arm, completes)]
+        xs.append(rateM)
+        ys.append(rho)
         if rho > 1 and rateM >= CEILING:        # the race death zone
             death_total += 1
             death_fail += not completes
 
     xlo, xhi, ylo, yhi = 0.6, 3.6, 0.3, 3.3
 
-    # Region shading: the "fits" band (rho<1) and the race death zone (rho>1 and
-    # ingest past the drain ceiling). The shading IS the message; the points fall
-    # into it.
-    ax.axhspan(ylo, 1.0, color=style.GREEN, alpha=0.06, zorder=0)
+    # Three shaded regions, split by the rho=1 memory boundary and the SD drain
+    # ceiling. The shading IS the message; the points fall into it.
+    #   green  rho<1        : state fits in memory, spilling is rare.
+    #   blue   rho>1, slow  : must spill, but ingest is below the drain rate.
+    #   red    rho>1, fast  : must spill and ingest outruns the drain (the race).
+    ax.axhspan(ylo, 1.0, color=style.GREEN, alpha=0.07, zorder=0)
+    ax.add_patch(Rectangle((xlo, 1.0), BAND[0] - xlo, yhi - 1.0,
+                           facecolor=style.SKY, alpha=0.14, zorder=0, linewidth=0))
     ax.add_patch(Rectangle((CEILING, 1.0), xhi - CEILING, yhi - 1.0,
-                           facecolor=style.RED, alpha=0.09, zorder=0, linewidth=0))
+                           facecolor=style.RED, alpha=0.10, zorder=0, linewidth=0))
     ax.axvspan(*BAND, color=style.GREY, alpha=0.22, zorder=1)
     ax.axhline(1.0, color="#666666", lw=0.9, ls="--", zorder=2)
 
-    # Points: single shape, colored by outcome (the race is arm-independent).
-    ax.scatter(fx, fy, marker="o", facecolors="none", edgecolors=style.RED,
-               s=44, linewidths=1.15, zorder=3, alpha=0.9)
-    ax.scatter(cx, cy, marker="o", c=style.GREEN, s=40, alpha=0.9,
-               edgecolors="black", linewidths=0.4, zorder=4)
+    # Points: shape = arm, fill = outcome. Fails drawn first so completes sit on top.
+    mark = {"heap": "o", "bounded": "s"}
+    for arm in ("heap", "bounded"):
+        fx, fy = pts[(arm, False)]
+        ax.scatter(fx, fy, marker=mark[arm], facecolors="none", edgecolors=style.RED,
+                   s=46, linewidths=1.15, zorder=3, alpha=0.9)
+    for arm in ("heap", "bounded"):
+        cx, cy = pts[(arm, True)]
+        ax.scatter(cx, cy, marker=mark[arm], c=style.GREEN, s=42, alpha=0.9,
+                   edgecolors="black", linewidths=0.4, zorder=4)
 
     # Reference-line labels.
     ax.text(sum(BAND) / 2, 2.35, "SD drain ceiling $\\approx$2.5–2.7 M/s",
@@ -92,17 +107,23 @@ def main() -> None:
     ax.text(2.62, 1.04, "$\\rho = 1$: above, state must spill",
             ha="left", va="bottom", fontsize=8.3, color="#444444")
 
-    # Region narration.
-    ax.text(xhi - 0.05, yhi - 0.06,
-            f"the race: spill + out-sprint the drain\n"
-            f"$\\rightarrow$ {death_fail} of {death_total} cells die",
-            ha="right", va="top", fontsize=8.8, color="#8a1500", fontweight="bold")
-    ax.text(1.18, 1.92, "must spill, but throttled below\nthe ceiling $\\rightarrow$ survives",
-            ha="center", va="center", fontsize=8.4, color="#0b5c46",
-            bbox=dict(boxstyle="round,pad=0.25", fc="white", ec="none", alpha=0.7))
-    ax.text(1.5, 0.52, "fits in memory ($\\rho<1$): little to drain, sprinting is safe",
-            ha="center", va="center", fontsize=8.4, color="#0b5c46",
-            bbox=dict(boxstyle="round,pad=0.25", fc="white", ec="none", alpha=0.7))
+    # Region narration: three parallel labels, each colored to its region. Every
+    # label names the rho regime, the spill-vs-drain relation, and the outcome.
+    GREEN_T, BLUE_T, RED_T = "#0b5c46", "#0a4a6e", "#8a1500"
+    ax.text(3.12, 2.5,
+            f"$\\rho>1$ and ingest outruns\n"
+            f"the drain $\\rightarrow$ {death_fail}/{death_total} fail",
+            ha="center", va="center", fontsize=8.6, color=RED_T, fontweight="bold")
+    ax.text(1.55, 2.45,
+            "$\\rho>1$: must spill, but ingest stays below the\n"
+            "drain rate, so the spiller keeps up $\\rightarrow$ completes",
+            ha="center", va="center", fontsize=8.4, color=BLUE_T,
+            bbox=dict(boxstyle="round,pad=0.3", fc="white", ec=style.SKY, alpha=0.9, lw=0.7))
+    ax.text(1.32, 0.46,
+            "$\\rho<1$: state fits in memory, almost nothing\n"
+            "spills, so even fast ingest is safe",
+            ha="center", va="center", fontsize=8.4, color=GREEN_T,
+            bbox=dict(boxstyle="round,pad=0.3", fc="white", ec=style.GREEN, alpha=0.9, lw=0.7))
 
     ax.set_xlim(xlo, xhi)
     ax.set_ylim(ylo, yhi)
@@ -110,12 +131,13 @@ def main() -> None:
                   "free-running demand for all-fail cells)")
     ax.set_ylabel("state pressure $\\rho$")
     handles = [
-        Line2D([], [], marker="o", ls="", mfc=style.GREEN, mec="black",
-               label="completes (plotted at its realized, throttled rate)"),
-        Line2D([], [], marker="o", ls="", mfc="none", mec=style.RED, mew=1.15,
-               label="fails (plotted at its free-running demand rate)"),
+        Line2D([], [], marker="o", ls="", mfc=style.GREEN, mec="black", label="heap, completes"),
+        Line2D([], [], marker="s", ls="", mfc=style.GREEN, mec="black", label="bounded, completes"),
+        Line2D([], [], marker="o", ls="", mfc="none", mec=style.RED, mew=1.15, label="heap, fails"),
+        Line2D([], [], marker="s", ls="", mfc="none", mec=style.RED, mew=1.15, label="bounded, fails"),
     ]
-    ax.legend(handles=handles, loc="upper left", fontsize=8.3, framealpha=0.9)
+    ax.legend(handles=handles, loc="upper left", fontsize=8.2, framealpha=0.9, ncol=2,
+              columnspacing=1.0, handletextpad=0.4)
     fig.suptitle("Completion is a race between ingest rate and spill-drain rate",
                  fontsize=11, fontweight="bold")
     style.caption(fig)

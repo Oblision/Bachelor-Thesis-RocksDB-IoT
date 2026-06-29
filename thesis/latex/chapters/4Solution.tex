@@ -215,9 +215,12 @@ Together, the six probes let Chapter~\ref{cha:evaluation} separate working-set f
 
 % [6.5]
 The experiments ran on a desktop machine (Intel Core i7-10700K: eight physical cores, sixteen logical threads; 32\,GB RAM) rather than a real edge node.
-Docker imposes the edge constraints: a cgroup memory hard cap with swap disabled, a two-core CPU budget pinned to a fixed pair of physical cores, and a consumer-grade SD card bind-mounted as the spill target.
-Together these three levers make the container's resource view match a memory-constrained edge device without requiring one.
-Table~\ref{tab:edge-profile} summarises the resulting device profile.
+Docker constrains the container to an edge-class resource envelope; it does not reproduce any specific device.
+The memory cap is the central constraint and the only one varied across experiments: a cgroup hard limit with swap disabled, set to 512, 1024, or 2048\,MB, so the backend is held to a fixed memory budget it may never exceed.
+The 512\,MB floor is chosen to sit at the low end of the memory budgets reported for constrained \ac{IoT} and edge-class devices~\cite{ojo2019,shi2016}, the regime where in-memory state no longer fits and out-of-core processing becomes necessary; the larger caps trace how the behaviour changes as the budget grows.
+Two further levers complete the envelope: a two-core CPU budget pinned to a fixed pair of physical cores, and a consumer-grade SD card bind-mounted as the spill target.
+Together these constraints make the container \emph{resemble}, not replicate, a memory-constrained edge device: they reproduce its resource limits, not its hardware, and Section~\ref{sec:threats} states what this does and does not license.
+Table~\ref{tab:edge-profile} summarises the resulting profile.
 
 \begin{table}[ht]
 \centering
@@ -235,7 +238,10 @@ Spill storage & SD card (SanDisk Extreme Pro, 128\,GB, ext4) & host \texttt{/mnt
 Input data & RAM-backed tmpfs & \texttt{/dev/shm} bind-mounted at \texttt{/input} (read-only) \\
 \hline
 \end{tabular}
-\caption{Container device profile: the four imposed constraints that approximate an edge node's resource view.}
+\caption{Container device profile: the four imposed constraints that emulate the
+resource envelope of a memory-constrained edge device, not a specific device.
+The memory cap is varied per experiment (512, 1024, 2048\,MB); the other three
+are held fixed.}
 \label{tab:edge-profile}
 \end{table}
 

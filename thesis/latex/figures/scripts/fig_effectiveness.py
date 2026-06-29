@@ -76,8 +76,9 @@ def main() -> None:
         ax.set_title(f"cap {cap} MB")
         ax.set_xlabel("workload (ρ at cap)")
         ax.set_ylim(0, 1.20)
-        if col == 0:
-            ax.set_ylabel("completion fraction (completed / attempted)")
+    # One figure-level y-label centered across all three panels: a per-panel
+    # label is taller than a single panel and gets clipped.
+    fig.supylabel("completion fraction (completed / attempted)", fontsize=10)
     axes[0].legend(loc="lower left", fontsize=8)
 
     fig.suptitle("Out-of-core extends beyond-memory completion at every cap",

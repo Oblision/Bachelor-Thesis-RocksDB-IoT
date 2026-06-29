@@ -203,18 +203,20 @@ This reframing drives the rest of the chapter.
 \centering
 \widefig{img/fig_race.pdf}
 \caption[Completion as a race]{Completion as a race: one point per cell of both
-grids, the heap and bounded architectures pooled together because the race holds
-for both. Filled markers are completing cells at their realized (throttled)
-throughput; hollow markers are all-fail cells, drawn at the workload's
-free-running demand rate because a dead run has no realized rate of its own. The
-plane reads as three regions. Below $\rho = 1$ the state fits in memory, little
-must drain, and sprinting is safe. Above $\rho = 1$ the state must spill, and the
-SD card sets a drain ceiling near 2.5--2.7\,M tuples/s: cells throttled below it
-survive (left), while cells whose demand out-sprints it die. That top-right death
-zone is the race, and it is clean, all 40 of its 40 cells fail. The remaining
-hollow points below and left of the ceiling are not race losses but capacity
-deaths (heavy workloads exceeding the pool and cap), governed by the geometry law
-of Figure~\ref{fig:geometry}.\methodsnote}
+grids. Marker shape is the architecture (circle = heap, square = bounded); fill
+is the outcome (filled = completes, plotted at its realized throttled throughput;
+hollow = fails, plotted at the workload's free-running demand rate because a dead
+run has no realized rate of its own). The race holds for both architectures. The
+plane reads as three shaded regions, split by the $\rho = 1$ memory boundary and
+the SD drain ceiling near 2.5--2.7\,M tuples/s. Green ($\rho < 1$): the state
+fits in memory, little spills, and even fast ingest is safe. Blue ($\rho > 1$,
+ingest below the ceiling): the state must spill, but ingest stays under the rate
+the spiller can drain, so it keeps up and the run completes. Red ($\rho > 1$,
+ingest above the ceiling): ingest outruns the drain, the spiller falls behind,
+and the cell fails. That red zone is the race, and it is clean, all 40 of its 40
+cells fail. The remaining hollow points outside it are not race losses but
+capacity deaths (heavy workloads exceeding the pool and cap), governed by the
+geometry law of Figure~\ref{fig:geometry}.\methodsnote}
 \label{fig:race}
 \end{figure}
 
@@ -724,7 +726,10 @@ RQ5 & Met with a stated proxy & headers 51\% of state; write amplification 1.0--
 
 % [8.1]
 Seven limits bound these results.
-All experiments ran on one physical machine with one SD card.
+The hardware setup emulates an edge device's resource envelope but is not one.
+All experiments ran on one desktop host with one SD card, under a cgroup memory cap, a pinned two-core budget, and SD-card spill storage (Section~\ref{sec:reproducibility}); this reproduces the resource limits of a constrained edge node, not its hardware.
+A real device with a different processor, memory subsystem, or flash controller may behave differently, so the absolute figures here, throughput, latency, and the exact position of the failure boundaries, should be read as the backend's behaviour under a controlled budget, not as a prediction for any specific device.
+What is expected to transfer is the direction of the contrasts between configurations, which is what the research questions ask; the absolute magnitudes are not claimed to.
 The primary workloads are synthetic; this is in scope by design, and the Nexmark-style stream provides the transfer test.
 Between measurement sessions, throughput drifts 4--17\%; all key contrasts are therefore within-session.
 $\rho$ for the largest workloads is derived from in-memory footprints at 2048\,MB.
