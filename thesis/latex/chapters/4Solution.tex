@@ -161,14 +161,14 @@ The pool is one fixed slab reserved at startup, so a recycled buffer only return
 The growth signal closes the first gap.
 It re-evaluates the same soft and hard thresholds on the existing-slice write path, sampled every $N$ writes so the budget read never runs per record.
 Placement is the difficulty.
-The per-worker slice cache, an engine default (Section~\ref{sec:geometry-valley}), serves steady-state writes without re-entering the store, so a check inside the store's lookup is reached only on a cache miss --- the path the growth never takes.
+The per-worker slice cache, an engine default (Section~\ref{sec:geometry-valley}), serves steady-state writes without re-entering the store, so a check inside the store's lookup is reached only on a cache miss, the path the growth never takes.
 The signal is therefore placed on the data-structure lookup the build operator calls for every record, whether the slice cache hits or misses.
 A typical stride $N$ is a few thousand writes; $N = 0$ disables the signal and restores the byte-identical baseline.
 
 % [5.14]
 Page release closes the second gap.
 On recycle the buffer manager advises the kernel to drop a recycled buffer's physical pages, and does so only while the free list already holds a configured fraction of the pool.
-This free-list gate --- a pool-occupancy condition, unrelated to the event-time watermark of Section~\ref{sec:bg-windows} --- confines the release to the idle, post-drain state and spares the fast-cycling input buffers.
+This free-list gate (a pool-occupancy condition, unrelated to the event-time watermark of Section~\ref{sec:bg-windows}) confines the release to the idle, post-drain state and spares the fast-cycling input buffers.
 The advice is issued before the buffer re-enters the free list, so no concurrent allocation can fault the page underneath it.
 The default sixty-four-byte buffer alignment is too coarse for a per-buffer page operation, so the flag also switches the pool to a page-aligned layout that keeps the control blocks in a separate region.
 Both mechanisms are off by default, and page release extends the buffer manager rather than the store.

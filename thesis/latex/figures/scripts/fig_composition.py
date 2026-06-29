@@ -26,7 +26,7 @@ def main() -> None:
     df = data.load_runs()
     rho_mb = data.rho_table(df)
 
-    fig, axes = plt.subplots(1, 2, figsize=(8.8, 3.7), width_ratios=[1, 1.5])
+    fig, axes = plt.subplots(1, 2, figsize=(8.8, 4.6), width_ratios=[1, 1.5])
 
     ax = axes[0]
     bottom = 0.0

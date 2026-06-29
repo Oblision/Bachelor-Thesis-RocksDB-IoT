@@ -33,7 +33,7 @@ def main() -> None:
     p = data.fisher_one_sided(ok_a, n_a, ok_b, n_b)
     print(f"flagship: ooc {ok_a}/{n_a} vs inm {ok_b}/{n_b}, Fisher p = {p:.2e}")
 
-    fig, ax = plt.subplots(figsize=(6.8, 4.0))
+    fig, ax = plt.subplots(figsize=(6.8, 4.8))
     x = np.arange(len(workloads))
     width = 0.36
     frac_ooc = [o / n for o, n in counts["ooc"]]

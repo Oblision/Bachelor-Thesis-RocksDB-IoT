@@ -67,7 +67,7 @@ Output checksums match the uncapped in-memory reference under both architectures
 
 \begin{figure}[ht]
 \centering
-\includegraphics[width=\textwidth]{img/fig_flagship.pdf}
+\widefig{img/fig_flagship.pdf}
 \caption[Completion at the flagship cell (512\,MB)]{Completion at the flagship
 cell. Out-of-core (8 repetitions per workload) versus the capped in-memory
 engine (6 repetitions) at the three beyond-memory state pressures of the
@@ -94,7 +94,7 @@ Every resident slice carries directory bytes outside the pool, so memory grows f
 % Design rule for all figures: generous spacing, no overlapping labels or items.
 \begin{figure}[ht]
 \centering
-\includegraphics[width=\textwidth]{img/fig_geometry.pdf}
+\widefig[1.0]{img/fig_geometry.pdf}
 \caption[The two-sided geometry law]{The two-sided geometry law: outcome per
 pool size, cap, workload, and architecture, regenerated from the final grid
 (L\_ and W\_ campaigns; heap = engine-default 4096-byte buffers, pooled =
@@ -122,11 +122,11 @@ One workload marks the absolute edge: r1000 at 2048\,MB ($\rho \approx 1.03$) fa
 
 \begin{figure}[ht]
 \centering
-\includegraphics[width=\textwidth]{img/fig_heatmap.pdf}
+\widefig[1.0]{img/fig_heatmap.pdf}
 \caption[Operating windows of both architectures]{Operating windows of both
 architectures: completions per cell over cap $\times$ pool $\times$ workload
 (state pressure $\rho$ in parentheses). Top row: unbounded heap architecture
-(L\_ matrix) with its capped in-memory baseline --- this is the engine-default
+(L\_ matrix) with its capped in-memory baseline, the engine-default
 configuration whose 4096-byte buffers keep all window state outside the pool
 (Section~\ref{sec:rq3}); bottom row: bounded pooled architecture (W\_ grid)
 under the corrected 8192-byte flag. Dots mark untested cells.}
@@ -145,7 +145,7 @@ Table~\ref{tab:windows} summarizes the operating windows.
 \begin{table}[ht]
 \centering
 \small
-\begin{tabular}{|l|l|l|l|}
+\begin{tabular}{|p{1.4cm}|p{2.5cm}|>{\raggedright\arraybackslash}p{3.2cm}|>{\raggedright\arraybackslash}p{4.3cm}|}
 \hline
 \textbf{Cap} & \textbf{Architecture} & \textbf{Demonstrated window} & \textbf{Headline evidence} \\
 \hline
@@ -179,7 +179,7 @@ At 2048\,MB the single beyond-memory workload, r1000 at $\rho \approx 1$, defeat
 
 \begin{figure}[ht]
 \centering
-\includegraphics[width=\textwidth]{img/fig_effectiveness.pdf}
+\widefig[1.0]{img/fig_effectiveness.pdf}
 \caption[Beyond-memory completion at every cap]{Out-of-core completion at
 every cap. Per cap, the capped in-memory baseline (which fails once
 $\rho > 1$) against the best out-of-core operating point (maximum completion
@@ -199,7 +199,7 @@ This reframing drives the rest of the chapter.
 
 \begin{figure}[ht]
 \centering
-\includegraphics[width=\textwidth]{img/fig_race.pdf}
+\widefig{img/fig_race.pdf}
 \caption[Completion as a race]{Completion as a race: one point per cell of the
 two grids (heap = engine-default configuration, bounded = corrected pooling
 flag). Completing cells plot their realized median throughput; all-fail
@@ -217,18 +217,25 @@ The synthetic grid is the primary evidence.
 A Nexmark-style auction bid stream provides supporting evidence.
 The stream uses the canonical bid schema, hot-skewed auction popularity, and in-order event time.
 The configuration matrix mirrors the synthetic grid.
-Two queries run, \texttt{q3} and \texttt{q7}, across three state scenarios: A and B under the 512\,MB cap, B and C under 1024\,MB, so the beyond-memory point (C at 1024\,MB) is reached.
+Two queries run. Both are pure tumbling-window aggregations, the operator whose state this backend spills.
+\texttt{q3} computes a sum of bid price per auction over each tumbling window; \texttt{q7}, Nexmark's \emph{Highest Bid}, computes the maximum bid per auction over each window.
+They are chosen because aggregation is exactly the mechanism under test, and because the two differ only in the aggregate function: sum versus maximum.
+Any difference between them therefore isolates the aggregate rather than the state machinery, so a matching result across both shows the finding does not depend on one particular reduction.
+Nexmark's join queries (for example q8) fall outside the tumbling-window scope of this thesis and are not run.
+
+Each query runs across three state scenarios, A, B, and C, that grow the per-window state by widening the window: A is the smallest, C the largest.
+Each memory cap pairs one scenario the in-memory engine can hold with one that stresses it: A and B under the 512\,MB cap, B and C under the 1024\,MB cap.
+Only the largest scenario at the larger cap, C at 1024\,MB, drives the window state past what the in-memory engine can fit; that single cell is the beyond-memory point, the coordinate where out-of-core processing is not merely an option but the only way the workload completes.
 Each cell runs three arms at eight repetitions: the capped in-memory engine, the bounded pooled backend (B2: 15\% pool reserve, paced restore, soft and hard thresholds at one tenth and one fifth of the cap), and the heap out-of-core backend (U8).
 The purpose is external validity.
 The synthetic grid is one stream shape, tuned with out-of-order jitter; a canonical benchmark with a different schema, hot-skewed auction popularity, and an in-order event stream tests whether the result holds beyond the conditions it was measured under.
-The scenario ladder grows the window state so the in-memory engine fits A and B and only the beyond-memory point C forces out-of-core work, which is where the backend's value can show.
 The bounded backend completes this workload where the capped in-memory engine cannot: 8 of 8 and 7 of 8 versus 0 of 8 ($p = 7.8 \times 10^{-5}$ and $7.0 \times 10^{-4}$).
 The runs perform verified out-of-core work: 610\,MB spilled, 234\,MB restored from the device.
 Figure~\ref{fig:nexmark-sweep} places this win in context across scenarios and caps: the capped in-memory engine fits the small and medium scenarios and fails only at the beyond-memory point at 1024\,MB, which is exactly where the bounded backend completes.
 
 \begin{figure}[ht]
 \centering
-\includegraphics[width=\textwidth]{img/fig_nexmark_sweep.pdf}
+\widefig{img/fig_nexmark_sweep.pdf}
 \caption[Nexmark completion across scenarios and caps]{Nexmark completion
 across scenarios and caps for queries q3 and q7. Bars are completion fraction
 (completed over attempted, labelled) for the capped in-memory engine, the
@@ -254,7 +261,7 @@ Figure~\ref{fig:nexmark-cost} quantifies the cost: every out-of-core point runs 
 
 \begin{figure}[ht]
 \centering
-\includegraphics[width=\textwidth]{img/fig_nexmark_cost.pdf}
+\widefig{img/fig_nexmark_cost.pdf}
 \caption[Nexmark throughput cost]{Nexmark throughput cost: median throughput of
 each out-of-core arm (bounded B2, heap U8) relative to the uncapped reference
 for the same scenario, per query. In-order streams pay the full spill-and-restore
@@ -302,7 +309,7 @@ Spill and restore latencies are distributions, not single numbers.
 
 \begin{figure}[ht]
 \centering
-\includegraphics[width=\textwidth]{img/fig_cost.pdf}
+\widefig[1.0]{img/fig_cost.pdf}
 \caption[The cost of out-of-core processing]{The cost of out-of-core processing
 at matched I/O granularity ($\sim$8\,K buffers in every variant, same pool per
 coordinate; means over completing repetitions). The heap $-28\%$ at 512/r075 is
@@ -320,7 +327,7 @@ Table~\ref{tab:cost} summarizes the bands.
 \begin{table}[ht]
 \centering
 \small
-\begin{tabular}{|l|l|l|l|}
+\begin{tabular}{|>{\raggedright\arraybackslash}p{4.4cm}|>{\raggedright\arraybackslash}p{2.9cm}|>{\raggedright\arraybackslash}p{3.0cm}|>{\raggedright\arraybackslash}p{2.3cm}|}
 \hline
 \textbf{Comparison} & \textbf{Throughput} & \textbf{p99} & \textbf{Coverage} \\
 \hline
@@ -328,9 +335,9 @@ Matched granularity ($\sim$8\,K all variants) & $-11$ to $-15\%$ & 1.1--1.6$\tim
 \hline
 Default architecture (own 4096 baselines) & $-3$ to $-22\%$ & $\mu$s $\to$ ms at $10^7$ keys & 6 coordinates \\
 \hline
-Bounded vs in-memory, anonymous-memory footprint & $-33\%$ (924 vs 1387\,MB) & --- & 2048/r200 \\
+Bounded vs in-memory, anonymous-memory footprint & $-33\%$ (924 vs 1387\,MB) & n/a & 2048/r200 \\
 \hline
-Nexmark transfer (in-order, supporting) & $-46$ to $-59\%$ & --- & Nexmark C@1024 \\
+Nexmark transfer (in-order, supporting) & $-46$ to $-59\%$ & n/a & Nexmark C@1024 \\
 \hline
 \end{tabular}
 \caption{Cost bands per comparison class (numbers per the data audit).}
@@ -351,13 +358,13 @@ The SD card's write bandwidth bounds the drain rate in the race from Section~\re
 
 \begin{figure}[ht]
 \centering
-\includegraphics[width=\textwidth]{img/fig_cpu_io.pdf}
+\widefig{img/fig_cpu_io.pdf}
 \caption[Processor and disk behavior across state pressure]{Processor and disk
 behavior across state pressure (completing cells of the grids; cgroup CPU and
 I/O accounting, medians per cell). The in-memory engine runs at 91--97\%
 utilization with zero disk traffic; spilling winners stay at 89--92\% with
 write-dominated traffic; the throttled and heavy bounded regimes drop to
-63\% and 54\% --- the idle share is disk wait and pool backpressure.}
+63\% and 54\%; the idle share is disk wait and pool backpressure.}
 \label{fig:cpu-io}
 \end{figure}
 
@@ -391,7 +398,7 @@ The pool plus its unpooled overhead plus the base footprint must stay below 90\%
 
 \begin{figure}[ht]
 \centering
-\includegraphics[width=\textwidth]{img/fig_composition.pdf}
+\widefig{img/fig_composition.pdf}
 \caption[Composition of the state footprint]{Composition of the state
 footprint. (a) Hash-map state decomposition at the 26-million-entry working
 set from the per-map gauge census: headers 51\%, payload 34\%, bucket
@@ -443,7 +450,7 @@ Taken together, the pooled lever arms complete 12 of 16 where levers without poo
 
 \begin{figure}[ht]
 \centering
-\includegraphics[width=\textwidth]{img/fig_ladder.pdf}
+\widefig{img/fig_ladder.pdf}
 \caption[The attribution ladder]{The attribution ladder at the decisive cell
 (1024\,MB / 32k pool / r150). Each arm changes exactly one factor:
 buffer granularity alone recovers 3/8; pooling without levers recovers
@@ -488,14 +495,14 @@ Every worker thread is blocked allocating.
 
 \begin{figure}[ht]
 \centering
-\includegraphics[width=\textwidth]{img/fig_gridlock.pdf}
+\widefig[1.0]{img/fig_gridlock.pdf}
 \caption[Anatomy of the allocation deadlock]{Anatomy of the allocation
 deadlock at a failing backpressure cell (1024\,MB / 32k pool / r200, all
 eight repetitions die by allocation abort). (a) The 0.2-second memory
 sampler of one repetition: the working set climbs until no worker can
 allocate. (b) Pool occupancy at its peak and at death across all
 repetitions: the pre-allocated 250\,MB pool fills and stays pinned by
-emitted-but-unprocessed window state --- draining it needs the very worker
+emitted-but-unprocessed window state; draining it needs the very worker
 threads that are blocked allocating. The stall instrumentation recorded no
 returned buffer anywhere in the pool for two full seconds in 118 of 138
 stalls.}
@@ -511,7 +518,7 @@ One workload shows the law directly: it completes 23 of 24 at cap 512\,MB and di
 
 \begin{figure}[ht]
 \centering
-\includegraphics[width=\textwidth]{img/fig_regimes.pdf}
+\widefig{img/fig_regimes.pdf}
 \caption[The three-regime feasibility law]{The three-regime feasibility law.
 The same-workload contrast pair (stars) shows the law directly: r200
 completes 23 of 24 under the tight 512\,MB cap, whose backpressure throttles
@@ -619,7 +626,7 @@ The growth signal observes the crossing; the creation-time check, firing only at
 % [7.6z]
 Acting on the signal clips the slice and defends the pool, yet converts no failing run.
 The armed signal holds the largest slice below the threshold and keeps the pool from filling; the run still dies.
-The death moves rather than vanishes --- to an out-of-memory kill where resident memory binds, or to a self-inflicted allocation stall where the synchronous eviction blocks the thread that ingests.
+The death moves rather than vanishes: to an out-of-memory kill where resident memory binds, or to a self-inflicted allocation stall where the synchronous eviction blocks the thread that ingests.
 A softer variant that only wakes the background spiller is worse: it sheds the backpressure the synchronous eviction supplied, and the pool fills at full ingest speed.
 The signal is necessary to see intra-slice growth and insufficient to survive it; the binding limits remain the un-spillable hot slice and the resident floor.
 

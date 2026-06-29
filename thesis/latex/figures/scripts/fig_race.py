@@ -28,7 +28,7 @@ def main() -> None:
     rho_mb = data.rho_table(df)
     free = _free_running(df)
 
-    fig, ax = plt.subplots(figsize=(7.6, 4.6))
+    fig, ax = plt.subplots(figsize=(7.6, 5.4))
     seen: set[tuple[str, bool]] = set()
     grid = df[df["campaign"].isin(["L", "W"]) & df["arm"].isin(["heap", "bounded"])
               & df["workload"].notna() & df["pool_buffers"].notna()

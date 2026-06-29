@@ -41,7 +41,7 @@ def main() -> None:
                                      counts[2][0], counts[2][1])
     print(f"levers within pooling (7/8 vs 0/8): Fisher one-sided p = {p_levers:.1e}")
 
-    fig, ax = plt.subplots(figsize=(7.4, 4.2))
+    fig, ax = plt.subplots(figsize=(7.4, 5.0))
     x = np.arange(len(STEPS))
     fracs = [o / n for o, n in counts]
     bars = ax.bar(x, fracs, 0.62, color=[s[2] for s in STEPS])

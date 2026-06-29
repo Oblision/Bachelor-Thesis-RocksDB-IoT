@@ -45,8 +45,16 @@
     \label{#3}
   \end{figure}}
 
+% Wide figure: the KOMA text block is only ~70% of the A4 sheet, so a plot at
+% width=\textwidth leaves ~3cm of margin each side. \widefig centers an
+% oversized image on the text block, letting the plot bleed symmetrically into
+% the margins so it approaches page width while body text is untouched.
+% Optional first arg overrides the scale factor (default 1.2 -> ~1.7cm margin).
+\newcommand{\widefig}[2][1.2]{\makebox[\textwidth][c]{\includegraphics[width=#1\textwidth]{#2}}}
+
 % for tables
 \usepackage{multirow}
+\usepackage{array}            % p-column tweaks (\raggedright + \arraybackslash)
 \usepackage[table]{xcolor}
 \usepackage{xcolor}
 

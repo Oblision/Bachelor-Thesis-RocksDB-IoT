@@ -6,6 +6,8 @@ bounding boxes for titles, ticks, and legends.
 """
 from __future__ import annotations
 
+import textwrap
+
 import matplotlib
 
 matplotlib.use("Agg")
@@ -61,14 +63,25 @@ _SOURCE = ("n = 8–10 repetitions per cell unless labelled otherwise  ·  "
 
 
 def caption(fig, extra: str = "") -> None:
-    """Stamp the standard two-line methods/provenance footnote on a figure.
+    """Stamp the standard methods/provenance footnote on a figure.
 
-    Uses supxlabel so constrained_layout reserves space (no overlap). Pass
-    `extra` for a figure-specific note (e.g. the statistical test used).
+    The text is wrapped onto several short lines on purpose. With
+    savefig.bbox="tight", a single long caption line would stretch the saved
+    canvas sideways to fit the text, leaving the actual plot a small fraction of
+    the width; scaled to the page, the plot then looks tiny. Wrapping each
+    provenance clause to a narrow column keeps the canvas width governed by the
+    plot, not the footnote. Uses supxlabel so constrained_layout reserves space.
+    Pass `extra` for a figure-specific note (e.g. the statistical test used).
     """
-    source = _SOURCE if not extra else f"{extra}  ·  {_SOURCE}"
-    fig.supxlabel(f"{_METHODS}\n{source}", fontsize=8.5, color="#5a5a5a",
-                  linespacing=1.4)
+    clauses = _METHODS.split("  ·  ")
+    if extra:
+        clauses.append(extra)
+    clauses += _SOURCE.split("  ·  ")
+    lines = []
+    for clause in clauses:
+        lines.extend(textwrap.wrap(clause, width=80) or [clause])
+    fig.supxlabel("\n".join(lines), fontsize=8.5, color="#5a5a5a",
+                  linespacing=1.3)
 
 
 def save(fig, name: str) -> None:

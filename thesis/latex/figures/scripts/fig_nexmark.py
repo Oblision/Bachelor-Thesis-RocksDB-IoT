@@ -28,7 +28,7 @@ def main() -> None:
     style.use_style()
     df = data.load_runs()
 
-    fig, ax = plt.subplots(figsize=(8.2, 4.7))
+    fig, ax = plt.subplots(figsize=(8.2, 5.5))
     x = np.arange(len(QUERIES))
     width = 0.26
 

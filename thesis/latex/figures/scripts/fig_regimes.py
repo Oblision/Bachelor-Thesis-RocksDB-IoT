@@ -25,7 +25,7 @@ def _box(ax, x0, y0, w, h, color) -> None:
 
 def main() -> None:
     style.use_style()
-    fig, ax = plt.subplots(figsize=(8.2, 4.6))
+    fig, ax = plt.subplots(figsize=(8.2, 5.4))
     ax.set_xlim(-0.02, 2.08)
     ax.set_ylim(-0.10, 1.06)
     ax.axis("off")
