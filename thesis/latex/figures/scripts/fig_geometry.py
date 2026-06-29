@@ -49,9 +49,12 @@ def _panel(ax, df, rho_mb, cap: int, campaign: str, arm: str) -> None:
     y_of = {w: i for i, w in enumerate(workloads)}
     pools = sorted(sub["pool_buffers"].unique())
     plotted: set[tuple[float, float]] = set()
-    for cell, runs in sub.groupby("cell"):
-        pool_buf = runs["pool_buffers"].iloc[0]
-        w = runs["workload"].iloc[0]
+    # Aggregate per (workload, pool) COORDINATE, not per cell label: a coordinate
+    # is often covered by two run batches at the same configuration (e.g. the
+    # _b32_ re-run and the plain run, identical window/emit-lag/pool/cap), which
+    # otherwise draw two markers on top of each other. Merging their repetitions
+    # gives one marker per coordinate and a larger, honest sample.
+    for (w, pool_buf), runs in sub.groupby(["workload", "pool_buffers"]):
         n_ok, reps = int(runs["ok"].sum()), len(runs)
         color, marker = _cell_marker(n_ok, reps, _modal_rc(runs))
         ax.scatter(pool_buf * 8192 / 2**20, y_of[w], s=110, c=color, marker=marker,
