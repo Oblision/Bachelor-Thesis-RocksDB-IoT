@@ -51,9 +51,22 @@ def main() -> None:
             label="anon working set (cgroup)")
     ax.plot(trace[:, 0], trace[:, 1], color=style.GREY, lw=1.0, ls=":",
             label="memory.current (incl. cache)")
+    # Shade the pool floor: the 250 MB pool is only the operator buffer arena,
+    # the anonymous-memory floor, NOT the whole footprint. Everything above the
+    # line is windowed state held on the heap outside the pool.
+    ax.axhspan(0, POOL_MB, color=style.ORANGE, alpha=0.06, zorder=0)
     ax.axhline(POOL_MB, color=style.ORANGE, lw=1.2, ls="--")
-    ax.text(0.3, POOL_MB + 18, "pool allocation (250 MB, pinned)",
-            fontsize=8, color=style.ORANGE)
+    ax.text(0.3, POOL_MB - 45, "pool allocation (250 MB, pinned)",
+            fontsize=8, color=style.ORANGE, va="center")
+    # Label the band between the pool line and the anon curve in place: that gap
+    # is windowed state (emitted-but-unprocessed slices) on the heap, outside the
+    # pool. The pool is the floor; the climb above it is state, not pool.
+    ax.text(2.6, 360, "everything above the pool line is\n"
+            "windowed state on the heap, outside\n"
+            "the 250 MB pool (only the floor)",
+            fontsize=7.0, ha="left", va="center", color=style.BLUE,
+            bbox=dict(boxstyle="round,pad=0.3", fc="white",
+                      ec=style.BLUE, alpha=0.92, lw=0.7))
     t_end = trace[-1, 0]
     ax.axvline(t_end, color=style.RED, lw=1.2, ls="--")
     ax.annotate("allocation abort\n(rc 141)", xy=(t_end, trace[-1, 2]),

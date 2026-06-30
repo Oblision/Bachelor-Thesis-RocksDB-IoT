@@ -458,8 +458,19 @@ The pool plus its unpooled overhead plus the base footprint must stay below 90\%
 \caption[Composition of the state footprint]{Composition of the state
 footprint. (a) Hash-map state decomposition at the 26-million-entry working
 set from the per-map gauge census: headers 51\%, payload 34\%, bucket
-directory 14\%, slack below 1\%. (b) On-disk spill directory size (lz4) of
-completing spilling cells against state pressure.\methodsnote}
+directory 14\%, slack below 1\%. The 51\% is the headers' \emph{share} of
+state; the $\approx$20\% noted on the bar is a separate quantity, the state
+that dropping the unused 8-byte vtable pointer from each 24-byte header would
+\emph{recover}: those 8 bytes are one third of each header, about 20\% of an
+entry's 40-byte header-plus-payload record (about 17\% of the full state once
+the bucket directory is included), see Section~\ref{sec:rq5}. (b) On-disk spill directory size (lz4)
+of completing spilling cells against state pressure. Heap contributes fewer
+points than the bounded backend: the bounded campaign probed more pool and cap
+coordinates, and heap loses the high-$\rho$, high-ingest cells to the race
+(Section~\ref{sec:rq3}), so those never complete to appear here. Where heap does
+complete its on-disk volume matches the bounded backend's (the spilled volume is
+a workload and compression property, not an architecture one), so the markers
+coincide; heap is drawn on top with a white edge to keep it visible.\methodsnote}
 \label{fig:composition}
 \end{figure}
 
