@@ -9,4 +9,5 @@ The backend completes workloads whose state exceeds memory where the in-memory e
 Against the in-memory engine, on workloads both complete, the throughput cost is 11--15\%.
 The evaluation also uncovers an engine default that silently kept all window state outside the buffer pool.
 Correcting it with one flag, plus new pool-pressure levers, recovers most of the failing workloads and matches the in-memory engine's throughput at 25\% less anonymous memory.
+The same pooled-versus-heap distinction also governs how the storage backend should be sized.
 The remaining failures follow a three-regime feasibility law and end in a precisely diagnosed allocation deadlock, whose fix is specified as future work.

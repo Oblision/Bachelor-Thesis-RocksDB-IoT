@@ -10,6 +10,11 @@ OUT = os.path.join(os.path.dirname(__file__), "appendixA_cells.tex")
 cells = collections.defaultdict(list)
 for fn in sorted(os.listdir(RES)):
     if not fn.endswith(".tsv"): continue
+    # Exclude the 32/32 backend-size contrast (sec:rb32) and its drift control:
+    # they reuse the core campaign prefixes but are a different RocksDB config and
+    # are tabulated separately in Appendix E.6. Keeping them here would inflate the
+    # core 3,136-run / 460-cell count and mix two configurations in one campaign.
+    if "_b32_" in fn or re.match(r"D(?:16|32)_", fn): continue
     row = open(os.path.join(RES, fn)).read().split("\t")
     if len(row) < 31: continue
     label = row[0]

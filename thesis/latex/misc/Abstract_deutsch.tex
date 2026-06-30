@@ -1,12 +1,13 @@
 % Deutsche Zusammenfassung (~200 Wörter), inhaltsgleich mit dem englischen Abstract.
 Stream-Processing-Systeme auf Edge-Ger\"aten halten Operatorzustand im Hauptspeicher.
-W\"achst der Zustand von Fensteraggregationen \"uber den verf\"ugbaren Speicher hinaus, beendet das Betriebssystem den Prozess.
+W\"achst der Zustand von Fensteraggregationen \"uber den verf\"ugbaren Speicher hinaus, beendet das Betriebssystem den Prozess und bringt die Stream-Verarbeitung zum Stillstand.
 Diese Arbeit entwickelt und evaluiert ein Out-of-Core-Zustands-Backend f\"ur NebulaStream, ein Datenmanagementsystem f\"ur das Internet der Dinge.
 Fensterzustand wird unter weichen und harten Speicher-Schwellenwerten in RocksDB ausgelagert, einen eingebetteten Key-Value-Speicher, und f\"ur die Ergebnisausgabe zur\"uckgeladen.
 
 Die Evaluation umfasst rund 3{.}100 gemessene Durchl\"aufe unter harten Speichergrenzen von 512 bis 2048\,MB mit vorregistrierten Hypothesen.
-Das Backend verarbeitet Arbeitslasten, deren Zustand den Speicher \"ubersteigt, dort, wo die In-Memory-Engine stets scheitert (14/24 gegen\"uber 0/18 bei 512\,MB, Fisher $p = 4{,}1 \times 10^{-5}$); die Korrektheit ist w\"ahrend des Auslagerns per Pr\"ufsumme verifiziert.
+Das Backend verarbeitet Arbeitslasten, deren Zustand den Speicher \"ubersteigt, dort, wo die In-Memory-Engine stets scheitert (14/24 gegen\"uber 0/18 bei 512\,MB, Fisher $p = 4{,}1 \times 10^{-5}$); die Ergebnisse sind per Pr\"ufsumme gegen eine unbeschr\"ankte, ausreichend dimensionierte Baseline verifiziert.
 Gegen\"uber der In-Memory-Engine betragen die Durchsatzkosten auf gemeinsam bew\"altigten Arbeitslasten 11--15\,\%.
 Die Evaluation deckt zudem eine Engine-Voreinstellung auf, die s\"amtlichen Fensterzustand am Pufferpool vorbeileitete.
 Ihre Korrektur durch ein einziges Flag stellt zusammen mit neuen Pool-Druck-Hebeln die meisten fehlgeschlagenen Arbeitslasten wieder her und erreicht den Durchsatz der In-Memory-Engine bei 25\,\% weniger anonymem Speicher.
-Die verbleibenden Fehler folgen einem Drei-Regime-Gesetz und enden in einer pr\"azise diagnostizierten Allokations-Verklemmung, deren Behebung als zuk\"unftige Arbeit spezifiziert ist.
+Dieselbe Unterscheidung zwischen Pufferpool und Heap bestimmt auch, wie das Speicher-Backend zu dimensionieren ist.
+Die verbleibenden Fehler folgen einem Drei-Regime-Machbarkeitsgesetz und enden in einer pr\"azise diagnostizierten Allokations-Verklemmung, deren Behebung als zuk\"unftige Arbeit spezifiziert ist.
