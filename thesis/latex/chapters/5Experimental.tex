@@ -704,6 +704,78 @@ It is correctly specific: on the single-hot-slice workload it reclaims the cold 
 This sharpens the recycling advantage reported earlier.
 Recycling bounds the pool to what is concurrently live, reusing freed buffers instead of growing it; page release acts on the resident side, returning freed pages to the operating system so anonymous memory falls back with the working set instead of staying pinned at the peak it once reached.
 
+\subsection{Backend Sizing Across the Two Architectures\label{sec:rb32}}
+
+% [RB32-1] Second experiment: a one-variable contrast on the RocksDB backend size.
+The backend runs with a 16\,MB write buffer and an 8\,MB block cache throughout this chapter.
+The microbenchmark behind that choice (Section~\ref{sec:rocksdb-config}) predicted that the larger 32\,MB / 32\,MB configuration, which roughly halves write amplification, should drain fewer bytes and complete more runs once a cap leaves room for it.
+A second experiment tests the prediction inside NebulaStream.
+It is a single-variable contrast: the write buffer and block cache move together from 16/8 to 32/32, while every other knob, lever, pool size, and workload is held identical.
+The hypotheses were pre-registered before the runs: the larger configuration wins at 1024 and 2048\,MB (H1), loses at the 512\,MB floor (H2), and does so by writing about a third fewer bytes to the device (H3).
+The contrast spans 1{,}938 paired cells.
+
+% [RB32-2] The effect is architecture-gated, not cap-gated.
+The result refutes the pre-registration in an informative way.
+The effect is gated by the memory architecture of Section~\ref{sec:rq3}, not by the cap alone.
+At the tight 512\,MB cap the sign of the effect follows where the window-map pages live (Figure~\ref{fig:rb32-arch}).
+Where they live in the buffer pool, the larger configuration helps: the pooled grid W\_ gains 15 percentage points and the pooled lever grid N\_ gains 33 (McNemar $p = 0.002$ and $p < 0.001$).
+Where they live on the heap, it hurts: the matched-granularity heap control U\_ loses 38 points ($p < 0.001$).
+H2 is therefore refuted for the pooled store it was meant to describe and holds only for the heap arms, where the larger buffer is pure fixed overhead.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.6\textwidth]{img/fig_rb32_architecture.pdf}
+\caption[The backend-size effect is architecture-gated]{The backend-size effect
+is gated by the memory architecture, shown at the tight 512\,MB cap. Change in
+completion when the RocksDB write buffer and block cache move from 16/8 to
+32/32, per campaign, paired by cell. The pooled grids (W\_, N\_) gain; the heap
+arms (U\_, L\_) do not. Because both 32/32 arms ran in one session and both 16/8
+arms in another, the sign flip is a difference of differences, so the
+between-session drift that confounds the absolute numbers cancels in the
+contrast.}
+\label{fig:rb32-arch}
+\end{figure}
+
+% [RB32-3] H1 is a wash; the tight-cap pooled win is downgraded for drift.
+With headroom the larger configuration is a wash.
+In the pooled grid it gains 4 points at 1024\,MB and 0 at 2048\,MB, neither significant, so H1 is not supported.
+The 512\,MB pooled advantage needs an honest caveat of its own.
+Its two arms ran eleven days apart in separate sessions, and between-session throughput drift is a known confound (Section~\ref{sec:threats}).
+A same-session control re-ran the 512\,MB pooled grid with both configurations interleaved on one freshly formatted card ($n = 80$).
+It places 32/32 at 40\% completion against 32\% for 16/8: the same direction as the cross-session figure, but not individually significant (McNemar $p = 0.21$).
+The cross-session $+15\%$ is therefore reported as a consistent directional trend, not a significant single-cap win.
+
+% [RB32-4] What survives the drift: the contrast itself and the footprint mechanism.
+Two findings are robust to the drift.
+The architecture sign-flip is a difference of differences, so the session drift cancels in the pooled-versus-heap contrast.
+And the memory footprint is stable across sessions: median peak anonymous memory shifts by under one percent while only throughput drifts.
+Figure~\ref{fig:rb32-compartments} decomposes that footprint into the pool floor, the unpooled bucket directories, the RocksDB resident set, and the base.
+The RocksDB compartment is small at every cap; the pool floor and the base dominate the budget.
+A larger write buffer therefore moves completion only at the margin, because it enlarges the smallest compartment.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=\textwidth]{img/fig_rb32_compartments.pdf}
+\caption[Where the memory budget goes]{Median resident anonymous memory of the
+pooled grid (W\_) decomposed into the pool floor, the unpooled bucket
+directories and arena, the RocksDB resident set, and the base, per cap and
+outcome. The RocksDB compartment is small at every cap; the pool floor and the
+base dominate. Completing cells carry a higher resident footprint than the
+failing ones, which abort before the working set fills.}
+\label{fig:rb32-compartments}
+\end{figure}
+
+% [RB32-5] H3 did not transfer from the component benchmark to the system.
+The mechanism behind H3 did not survive the move from the component benchmark to the system.
+On pairs where both configurations complete, 32/32 writes about 11\% fewer bytes to the device at 1024\,MB ($p < 0.001$), far short of the microbenchmark's third; it writes more at 512\,MB and breaks even at 2048\,MB (Appendix~E).
+A byte-level gain measured on \texttt{db\_bench} in isolation does not predict the system-level drain under a memory cap.
+
+% [RB32-6] Method and error policy.
+The analysis is paired throughout.
+Each 32/32 cell is matched to its 16/8 twin on cap, pool, state pressure, and arm, and completion is compared with McNemar's test on the discordant pairs; the unpaired Fisher's test of the pre-registration is underpowered at this pairing.
+Cells that die by pool exhaustion or out-of-memory kill are counted as failures, not dropped, so the completion fractions carry no survivorship bias.
+The full per-arm tables are in Appendix~E.
+
 \section{Summary of Results\label{sec:eval-summary}}
 
 % [7.7.1]

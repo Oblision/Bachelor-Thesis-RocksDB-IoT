@@ -193,6 +193,88 @@ lz4    & 21.9 & 0.2  & 0.1  & 0.0 & 0.0 \\
 \end{center}
 Each write-buffer/block-cache combination aggregates 400 runs (4 compressions $\times$ 2 workloads $\times$ 50 repetitions); all 335 OOM kills fell in \texttt{readwhilewriting}.
 
+\subsection*{E.6\quad NES-level backend-size contrast: paired completion (32/32 vs.\ 16/8)}
+The five tables above characterize RocksDB in isolation.
+The contrast below runs the two configurations inside NebulaStream as a single-variable A/B (Section~\ref{sec:rb32}), paired per cell on cap, pool size, state pressure, and arm.
+Completion is the fraction of repetitions that finish; $\Delta$ is the percentage-point change from 16/8 to 32/32; $p$ is McNemar's test on the discordant pairs.
+The pooled campaigns (W\_, N\_) gain at the 512\,MB floor; the heap campaigns (U\_, L\_) do not.
+
+\begin{center}
+\begin{tabular}{|l|l|r|r|r|r|r|}
+\hline
+\textbf{Campaign} & \textbf{Cap} & \textbf{pairs} & \textbf{32/32 ok} & \textbf{16/8 ok} & \textbf{$\Delta$ (pp)} & \textbf{McNemar $p$} \\
+\hline
+W\_ pooled        & 512  & 80  & 42\% & 28\% & $+15$ & $0.002$ \\
+\hline
+W\_ pooled        & 1024 & 106 & 41\% & 37\% & $+4$  & $0.541$ \\
+\hline
+W\_ pooled        & 2048 & 160 & 23\% & 23\% & $+0$  & $1.000$ \\
+\hline
+N\_ pooled levers & 512  & 72  & 99\% & 65\% & $+33$ & $<0.001$ \\
+\hline
+N\_ pooled levers & 1024 & 96  & 7\%  & 12\% & $-5$  & $0.227$ \\
+\hline
+U\_ heap (8128)   & 512  & 40  & 18\% & 55\% & $-38$ & $<0.001$ \\
+\hline
+U\_ heap (8128)   & 1024 & 32  & 44\% & 78\% & $-34$ & $0.003$ \\
+\hline
+U\_ heap (8128)   & 2048 & 40  & 60\% & 60\% & $+0$  & $1.000$ \\
+\hline
+L\_ heap          & 512  & 200 & 25\% & 28\% & $-3$  & $0.263$ \\
+\hline
+L\_ heap          & 1024 & 200 & 36\% & 36\% & $+1$  & $1.000$ \\
+\hline
+L\_ heap          & 2048 & 200 & 40\% & 46\% & $-6$  & $0.004$ \\
+\hline
+\end{tabular}
+\end{center}
+The 2048\,MB row of N\_ is omitted: no repetition of either configuration completes there.
+This table is the data behind Figure~\ref{fig:rb32-arch}.
+
+\subsection*{E.7\quad Drift control and drain mechanism}
+Because the two arms ran in separate sessions, a same-session control re-ran the 512\,MB pooled grid with both configurations interleaved on one freshly formatted card ($n = 80$ each).
+It separates session drift from the configuration effect and bounds the absolute 512\,MB claim (Section~\ref{sec:rb32}).
+
+\begin{center}
+\begin{tabular}{|l|r|r|r|}
+\hline
+\textbf{Comparison (512\,MB, $n = 80$)} & \textbf{A ok} & \textbf{B ok} & \textbf{McNemar $p$} \\
+\hline
+drift: old 16/8 (A) vs.\ fresh 16/8 (B)  & 28\% & 32\% & $0.29$ \\
+\hline
+in-session: 16/8 (A) vs.\ 32/32 (B)      & 32\% & 40\% & $0.21$ \\
+\hline
+\end{tabular}
+\end{center}
+On cells both configurations complete, the footprint barely drifts between sessions (median peak anonymous memory $-0.3\%$, peak total $0\%$); only throughput drifts ($-49\%$).
+The drift-free in-session contrast is shown in Figure~\ref{fig:rb32-insession}, and the anonymous-memory trace of one completing run of each backend size in Figure~\ref{fig:rb32-trace}.
+
+The pre-registered drain mechanism (H3) is the bytes the backend writes to the device.
+On W\_ pairs where both configurations complete, the median device write of 32/32 relative to 16/8 is $1.60\times$ at 512\,MB, $0.89\times$ at 1024\,MB ($p < 0.001$), and $1.00\times$ at 2048\,MB.
+Only the 1024\,MB cap shows the predicted reduction, and at about 11\% rather than the third the component benchmark suggested.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.42\textwidth]{img/fig_rb32_insession512.pdf}
+\caption[In-session backend-size contrast at 512\,MB]{Drift-free in-session
+completion at the 512\,MB cap: 16/8 versus 32/32, both interleaved in one
+session on one freshly formatted card ($n = 80$). 32/32 completes 32 of 80
+against 26 of 80 (McNemar $p = 0.21$).}
+\label{fig:rb32-insession}
+\end{figure}
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.6\textwidth]{img/fig_rb32_trace512.pdf}
+\caption[Anonymous memory over time, 16/8 versus 32/32]{Anonymous memory over
+one completing run of each backend size at a 512\,MB / 16k-pool cell, sampled
+every 0.2\,s. Both configurations rise from the same pool-and-base floor near
+140\,MB and stay well below the cap; the larger 32/32 write buffer lifts the
+peak only slightly. This is the over-time view of the compartment
+decomposition in Figure~\ref{fig:rb32-compartments}.}
+\label{fig:rb32-trace}
+\end{figure}
+
 \addchap{Appendix F: AI-Generated Content}
 % Per DIMA policy: documentation of AI tool usage with links to the public archive.
 % The declaration-of-aids table (front matter) carries the per-phase links; this appendix
