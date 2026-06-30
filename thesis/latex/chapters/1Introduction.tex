@@ -68,6 +68,7 @@ This thesis makes seven contributions.
     The engine's default buffer size silently kept all window state outside the engine's buffer pool in every configuration.
     One flag corrects this.
     The corrected configuration, plus the new pool-pressure levers, reaches near in-memory engine's throughput at lower memory cost (Figure~\ref{fig:ladder}).
+    The same pooled-versus-heap distinction also decides how the RocksDB backend should be sized (Section~\ref{sec:rb32}).
   \item \textbf{C5 — A failure taxonomy with a diagnosed root cause.}
     Failures follow a three-regime feasibility law.
     The residual failure is an allocation deadlock, demonstrated by direct instrumentation.
