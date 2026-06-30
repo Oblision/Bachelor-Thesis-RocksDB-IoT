@@ -170,6 +170,7 @@ The mechanism is called a control group, or cgroup.
 A process group that exceeds its limit triggers the kernel's out-of-memory killer.
 The out-of-memory killer terminates the process.
 This thesis writes OOM for out of memory.
+In the evaluation this cgroup is the one Docker creates for the container, so its hard limit is set by a Docker flag (Section~\ref{sec:reproducibility}); the bare term ``cgroup'' below always refers to that Docker-imposed control group.
 
 % [2.17b] — how memory is measured, and why the distinction is load-bearing.
 The kernel accounts a cgroup's memory in two kinds.
