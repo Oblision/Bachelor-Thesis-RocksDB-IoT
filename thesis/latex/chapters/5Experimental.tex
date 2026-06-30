@@ -111,7 +111,7 @@ at 64k buffers) is annotated.\methodsnote}
 % [7.2.5]
 At geometry-correct pools of roughly 40\% of the cap, the bounded architecture covers nearly the full default-architecture window at the larger caps.
 It also adds cells that no heap variant completes.
-At 2048\,MB, the workloads r200 through r700 all complete; r300 completes 5 of 8 runs while both heap arms complete 0 of 8.
+At 2048\,MB, the bounded architecture completes the r200 through r700 workloads, with r300 marginal at 5 of 8 runs, a bounded-only cell where both heap arms complete 0 of 8.
 At 1024\,MB, r150 and r300 complete 8 of 8.
 At 512\,MB, the upper bound sits below the hot band of the beyond-memory workloads, so only fitting and throttled workloads complete.
 This small-cap limit is permanent and explained by the law above.
@@ -435,7 +435,7 @@ Slack is below 1\%.
 
 % [7.5.2]
 Eight bytes of every 24-byte header is a pointer for virtual dispatch that is never used.
-Removing it would cut state by 20\%.
+Removing it would cut about 20\% from each entry's header-plus-payload record, roughly 17\% of total state once the bucket directory is included.
 The removal requires an entry-inheritance refactor; it is documented and not implemented.
 
 % [7.5.3]
@@ -702,7 +702,7 @@ Page release attacks the resident floor.
 On a draining workload it cuts steady anonymous memory by 55 percent and peak by 38 percent, at a 6-to-8 percent throughput cost, completing every repetition.
 It is correctly specific: on the single-hot-slice workload it reclaims the cold band but cannot touch the live growing slice, and that run still dies.
 This sharpens the recycling advantage reported earlier.
-Recycling caps the footprint at the live band; page release lets the footprint track the instantaneous working set rather than the high-water band.
+Recycling bounds the pool to what is concurrently live, reusing freed buffers instead of growing it; page release acts on the resident side, returning freed pages to the operating system so anonymous memory falls back with the working set instead of staying pinned at the peak it once reached.
 
 \section{Summary of Results\label{sec:eval-summary}}
 
