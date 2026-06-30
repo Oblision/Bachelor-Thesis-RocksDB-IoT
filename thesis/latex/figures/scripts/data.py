@@ -63,15 +63,13 @@ def load_runs() -> pd.DataFrame:
     )
     df["pool_buffers"] = df["cell"].apply(_parse_pool)
     df["arm"] = df["cell"].apply(_classify_arm)
-    # The 32/32 backend-size contrast (sec:rb32) and its drift control reuse the
-    # core campaign prefixes (W_b32_..., N_b32_..., D16_/D32_...) but are a
-    # *different* RocksDB configuration sharing the same results/ tree. Exclude
-    # them so the core figures characterize the 16/8 baseline only; the contrast
-    # has its own loader under experiments/rb32-config-contrast/fig_rb32.py.
-    keep = ~df["label"].str.contains("_b32_", na=False) & ~df["label"].str.match(
-        r"D(?:16|32)_", na=False
-    )
-    return df[keep].reset_index(drop=True)
+    # NOTE: the 32/32 backend-size runs (label *_b32_*) and the drift control
+    # (D16_/D32_) are intentionally retained. The cap x pool x workload
+    # feasibility / operating-window figures pool them with the 16/8 baseline as
+    # additional repetitions (the gap-fill that completes those grids); the 32/32
+    # configuration is also analysed on its own in Section~ref{sec:rb32} /
+    # Appendix E. Do not filter them out here without revisiting that decision.
+    return df
 
 
 def _classify_arm(cell: str) -> str:
