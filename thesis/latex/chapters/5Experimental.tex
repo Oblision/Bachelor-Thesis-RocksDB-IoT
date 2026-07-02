@@ -399,23 +399,29 @@ bounded rows are the corrected 8192-byte flag that engages pooling.}
 \end{table}
 
 % [7.2.6c] Multi-cap completion headline (generalizes the 512\,MB flagship).
-Figure~\ref{fig:effectiveness} draws the headline of this table at every cap.
-The capped in-memory baseline collapses once state pressure passes $\rho = 1$.
+Figure~\ref{fig:effectiveness} draws the headline of this table in two focused panels.
+Panel (a) isolates the baseline: no capped in-memory cell completes once state pressure passes $\rho = 1$.
+Panel (b) compares the two arms at and beyond the boundary; the lighter workloads, which both arms complete in full, are omitted there because Figure~\ref{fig:heatmap} already shows the full grid.
 At 512 and 1024\,MB the best out-of-core operating point, taken over pool sizes and both architectures, extends completion past the memory boundary.
 At 2048\,MB the single beyond-memory workload, r1000 at $\rho \approx 1$, defeats every configuration; this cell is the edge of the demonstrated result and is marked as such.
 
 \begin{figure}[ht]
 \centering
 \widefig[1.0]{img/fig_effectiveness.pdf}
-\caption[Beyond-memory completion at every cap]{Out-of-core completion at
-every cap. Per cap, the capped in-memory baseline (which fails once
-$\rho > 1$) against the best out-of-core operating point (maximum completion
-over pool sizes and both architectures), one pair per workload, ordered by
-state pressure $\rho$. Bar labels are completed/attempted runs; the dashed
-line marks the $\rho = 1$ memory boundary. The out-of-core arm extends
-completion past the boundary at 512 and 1024\,MB; at 2048\,MB the lone
-beyond-memory workload (r1000, $\rho \approx 1$) fails under every
-configuration.\methodsnote}
+\caption[Completion at the memory boundary]{Completion at the memory
+boundary, in two panels. (a) The capped in-memory baseline alone: pooled
+completion per workload against state pressure $\rho$, all caps in one axis.
+No baseline cell completes past $\rho = 1$; below the boundary all
+coordinates complete in full except r700 at 2048\,MB (10 of 20). (b) The
+head-to-head at and beyond the boundary: pairs with $\rho \geq 0.75$ only,
+grouped by cap; the lighter workloads, which both arms complete in full, are
+omitted (Figure~\ref{fig:heatmap} shows the full grid). Bars compare the
+capped in-memory baseline with the best out-of-core operating point (maximum
+completion over pool sizes and both architectures); labels are
+completed/attempted runs; shaded spans mark the beyond-memory pairs
+($\rho > 1$). Out-of-core extends completion past the boundary at 512 and
+1024\,MB; at 2048\,MB the lone beyond-memory workload (r1000,
+$\rho \approx 1.01$) fails under every configuration.\methodsnote}
 \label{fig:effectiveness}
 \end{figure}
 

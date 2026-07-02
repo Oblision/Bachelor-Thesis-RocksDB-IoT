@@ -129,6 +129,11 @@ Open / author's call: Ch. 1 + Ch. 3 "1:1 an der Vorgabe" — template skeleton p
 - **No evaluation in Ch. 4**: RocksDB knob selection (incl. Table tab:rocksdb-config) merged into §5.2; Evaluation Harness & Reproducibility (incl. Table tab:edge-profile) moved to open §5.1. Labels `sec:rocksdb-config`/`sec:reproducibility` ride along, so every existing reference resolves. Ch. 4 ends with a bridge into the evaluation.
 - Skeleton deviations that remain deliberate: Ch. 4 section titles are customized (template allows this); §4.1 "Solution at a Glance" has no skeleton counterpart but serves the top-down presentation.
 
+## Round 4: heatmap data audit + Figure 7 split
+
+- **Heatmap completeness verified properly**: pooled gap-fill cells old vs. new = 103 vs. 103 — nothing missing (an earlier token-count comparison was flawed; split labels like "12 ok / 4 OOM" have no "16"/"20" token). The only cells absent vs. the fdbddcc PDF: 3 checksum/reference rerun cells (excluded on purpose — their rc141 teardown would fake pool-aborts in a failure-reason figure) and the N_ lever-campaign extra-pool coordinates (64k@1024 ×2, 128k@2048 ×1). **Open author decision:** re-adding the N_ cells would pool a different campaign into the "bounded" row; current selection keeps the rows single-campaign (L/W) as the caption states.
+- **Figure 7 (fig_effectiveness) split into two focused panels** per the density complaint (and the meeting note's subfigure suggestion): (a) capped in-memory baseline completion vs. ρ, all caps in one axis — the ρ=1 collapse isolated, with the one below-boundary exception (r700@2048, 10/20) visible; (b) in-memory vs. best out-of-core only at coordinates with ρ ≥ 0.75, grouped by cap, beyond-memory pairs shaded — the ~10 pairs that carry the message; trivially-complete fits-pairs dropped (full grid remains in the heatmap). Caption + §5.3 [7.2.6c] updated.
+
 ## AI-usage / declaration updates
 
 - Session archive entry: `nebulastream-…/docs/ai-usage/08-revising-thesis/2026-07-02-advisor-review-figures-pass.md` (verbatim prompts; transcript export to attach on sync).
