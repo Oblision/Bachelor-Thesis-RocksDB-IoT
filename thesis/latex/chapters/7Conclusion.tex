@@ -14,7 +14,7 @@ C3: the backend prevents out-of-memory failures inside characterized operating w
 C4: a single engine default kept all window state outside the buffer pool in every configuration; the one-flag correction with pool-pressure levers reaches the in-memory engine's throughput at 25\% less anonymous memory (517 versus 685\,MB, Figure~\ref{fig:ladder}); and the same architecture distinction decides how to size the RocksDB backend (Section~\ref{sec:rb32}).
 C5: the failures follow a three-regime feasibility law, and the residual failure is an allocation deadlock in which emitted state pins the buffer pool while the workers that would drain it are all blocked allocating, demonstrated by direct instrumentation (Figure~\ref{fig:gridlock}).
 C6: all mechanisms ship configuration-gated in an open branch; with gates closed the engine is byte-identical to the baseline.
-C7: a fourth design iteration adds a growth signal that makes intra-slice bloat visible on the production path once the slice cache is bypassed, and a page-release extension that cuts steady anonymous memory by a further 55\% on draining workloads; neither converts the residual deadlock, which stays bound by the un-spillable hot slice and the resident floor.
+C7: the growth signal makes intra-slice bloat visible on the production path once the slice cache is bypassed, and the page-release extension cuts steady anonymous memory by a further 55\% on draining workloads; neither converts the residual deadlock, which stays bound by the un-spillable hot slice and the resident floor.
 
 % [negative IoT finding — advisor note 2]
 The evaluation also yields one negative finding that no engine-side mechanism can remove.

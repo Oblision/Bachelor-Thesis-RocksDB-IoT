@@ -31,11 +31,6 @@ A component that does this is called an \ac{OOC} state backend.
 This thesis selects RocksDB, an embeddable storage engine and the industry-standard choice for this role~\cite{flink2021}.
 A backend of this kind must never change the query results that NebulaStream would produce in memory.
 
-% [1.4b — novelty]
-Comparable systems, such as Apache Flink, already use RocksDB as their out-of-core state backend~\cite{flink2021}.
-NebulaStream instead executes queries with a push-based model.
-No systematic evaluation of this push-based model in combination with such a storage backend has been conducted.
-
 \section{Research Challenge\label{sec:challenge}}
 
 % [1.5]
@@ -47,7 +42,13 @@ The main research challenge is to relieve memory pressure while keeping executio
 This thesis presents an \ac{OOC} implementation for enabling tumbling window state larger than the available memory in NebulaStream.
 It evaluates the backend implementation on edge-class memory budgets, from 512 megabytes to 2 gigabytes.
 
-\section{Results in Brief\label{sec:results-brief}}
+\section{Novelty and Impact\label{sec:novelty}}
+
+% [1.4b — novelty, moved here from Motivation per template structure (1.3 Novelty and Impact)]
+Comparable systems, such as Apache Flink, already use RocksDB as their out-of-core state backend~\cite{flink2021}.
+NebulaStream instead executes queries with a push-based model.
+No systematic evaluation of this push-based model in combination with such a storage backend has been conducted.
+This thesis provides that evaluation, and its impact is measured directly.
 
 % [1.7]
 The backend processes workloads whose state exceeds memory, without crashing, inside an operating window that this thesis characterizes (Table~\ref{tab:windows}).
@@ -83,7 +84,7 @@ This thesis makes seven contributions.
   \item \textbf{C6 — An open-source implementation.}
     All mechanisms are configuration-gated.
     With all gates closed, the engine is byte-identical to the unmodified baseline.
-  \item \textbf{C7 — A fourth design iteration: growth signal and page release.}
+  \item \textbf{C7 — A growth signal and page release.}
     A growth signal makes the growth of a single, still-open window's state visible to the spill controller on the production path.
     A page-release extension cuts steady anonymous memory by a further 55\% on draining workloads.
     Neither converts the residual deadlock: the window that is still being written cannot be spilled, and the resident memory floor remains.

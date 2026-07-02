@@ -1,13 +1,13 @@
 \chapter{A Spillable Slice Store for NebulaStream\label{cha:solution}}
 % Drafted per POINT-SEQUENCE.md Ch.4 (points 5.1–5.11 design, 6.1–6.6 implementation).
 
-This chapter presents the backend.
+This chapter presents the backend as one final design.
 It works top-down.
-The final solution comes first, at a high level.
-The chapter then decomposes it into components and describes each one.
-The design reached that solution over four iterations, and the later iterations exist because earlier ones fell short.
-The chapter presents each iteration as an alternative, with the reason it was needed, so the reader sees the development path as the justification for the final design.
-The last sections describe the implementation: the integration points, the instrumentation the system exposes, and the harness that runs the evaluation.
+The complete solution comes first, at a high level.
+The chapter then decomposes it into components and describes each one in detail.
+Where a component exists because a simpler design fell short, its section states the simpler alternative and why it is not enough, so the alternatives justify the final design.
+The last sections describe the implementation: the integration points and the instrumentation the system exposes.
+The harness that runs the evaluation belongs to the evaluation and opens Chapter~\ref{cha:evaluation}.
 
 \section{The Solution at a Glance\label{sec:solution-overview}}
 
@@ -18,10 +18,10 @@ A background spiller thread moves completed windows to a RocksDB backend on loca
 
 \input{figures/system_overview}
 Two thresholds drive it: a soft threshold triggers preemptive spilling, and a hard threshold forces synchronous spilling under acute pressure (Section~\ref{sec:architecture}).
-Three concerns are then layered onto this core.
-The spiller reacts to the slice budget alone, so a second iteration adds levers that react to pressure on the shared buffer pool (Section~\ref{sec:levers}).
-An allocation can still fail when the pool empties, so a third iteration adds allocation backpressure (Section~\ref{sec:backpressure}).
-The controller sees a slice only when it is created and never returns spilled memory to the operating system, so a fourth iteration adds a growth signal and page release (Section~\ref{sec:growth-release}).
+Three mechanism groups complete this core in the final design.
+The spiller reacts to the slice budget alone, so the design adds levers that react to pressure on the shared buffer pool (Section~\ref{sec:levers}).
+An allocation can still fail when the pool empties, so allocation backpressure lets it stall instead of abort (Section~\ref{sec:backpressure}).
+The controller sees a slice only when it is created, and spilled memory is never returned to the operating system, so a growth signal and page release close these two gaps (Section~\ref{sec:growth-release}).
 Every mechanism beyond the core is off by default, so the shipped baseline is byte-identical to the unmodified engine.
 
 \section{Requirements\label{sec:requirements}}
@@ -85,52 +85,19 @@ The spill controller observes one signal: the live byte count of slice data page
 Other consumers of the buffer pool, such as input buffers and emission buffers, are invisible to it.
 This is a design property, stated here openly: the controller defends the slice budget, not the whole pool.
 
-\section{Choosing the RocksDB Backend Configuration\label{sec:rocksdb-config}}
+% The RocksDB knob selection (three knobs + table) moved to the evaluation
+% (Section 5.2, sec:rocksdb-eval), per the advisor note: Chapter 4 does no evaluation.
+The store spills into RocksDB in one fixed configuration; selecting its values is a measurement question, and the experimental analysis that opens the evaluation answers it (Section~\ref{sec:rocksdb-eval}).
+The controller itself, however, still watches only the slice budget; the next section adds the levers that watch the pool.
 
-% Ch.4 keeps only the JUSTIFIED SELECTION of the backend knobs. The db_bench
-% evaluation (10,000-run sweep + results) now opens Chapter 5 (Section~\ref{sec:rocksdb-eval}).
-The store spills slices into RocksDB (Section~\ref{sec:architecture}).
-RocksDB exposes many tuning knobs, and prior work shows that three of them govern its behavior under a tight memory budget: the compression algorithm, the write buffer size, and the block cache size.
-Compression trades processor time for fewer bytes written to disk~\cite{jin2022}.
-The write buffer is the in-memory region RocksDB fills before flushing to disk; a larger buffer flushes less often but commits more memory that then competes with the window state~\cite{rocksdb-memory}.
-The block cache holds recently read blocks in memory and speeds up reads at the same memory cost~\cite{rocksdb-memory}.
-Based on these findings, this thesis fixes one backend configuration rather than searching the space per experiment.
-Table~\ref{tab:rocksdb-config} lists the three knobs, the reason each matters on an edge budget, and the value chosen.
-
-\begin{table}[ht]
-\centering
-\small
-\begin{tabular}{|l|p{8.2cm}|l|}
-\hline
-\textbf{Knob} & \textbf{Why it matters on an edge budget} & \textbf{Value} \\
-\hline
-Compression & fewer bytes written to the storage device per spilled slice, at a processor cost~\cite{jin2022} & lz4 \\
-\hline
-Write buffer & larger flushes less often but commits memory that competes with the window state~\cite{rocksdb-memory} & 16\,MB \\
-\hline
-Block cache & speeds up reads at the same memory cost; the spill duty cycle is write-heavy~\cite{rocksdb-memory} & 8\,MB \\
-\hline
-\end{tabular}
-\caption{The three RocksDB knobs that govern behavior under a tight memory
-budget, and the value chosen for each. The values are small so that the backend
-leaves the most memory for window state at the tightest 512\,MB cap. Section~\ref{sec:rocksdb-eval}
-reports the sweep that produced these values, and Section~\ref{sec:rb32} tests
-whether a larger backend helps once the cap grows.}
-\label{tab:rocksdb-config}
-\end{table}
-
-The three values are the smallest that still perform well under the tightest 512\,MB cap.
-A small write buffer and a small block cache leave the most memory for window state, which is the scarce resource on an edge device.
-The evaluation holds this configuration constant across all caps (Section~\ref{sec:setup}).
-It also measures whether a larger backend would help once a larger cap leaves room for it (Section~\ref{sec:rb32}).
-
-\section{Design Iteration Two: Pool-Pressure Levers\label{sec:levers}}
+\section{Pool-Pressure Levers\label{sec:levers}}
 
 % [5.9]
+A store with the core spiller alone would be simpler, but it falls short.
 The core spiller watches the slice budget alone.
 It stays blind to the shared buffer pool that every other part of the engine draws from.
 A run can therefore exhaust the pool and abort while the slice budget still looks healthy, because input buffers, queues, and emission buffers consumed the pool instead.
-The second iteration adds four levers that react to pool pressure directly.
+The design therefore adds four levers that react to pool pressure directly.
 Each one is gated behind its own configuration flag.
 Lever 1a lets the spiller also drain when the free buffers in the pool fall below a reserve.
 Lever 1b reacts to an allocation that finds the pool empty: it triggers an immediate spill of one cold slice instead of waiting passively.
@@ -138,7 +105,7 @@ Lever 1c paces restores: a restore before emission proceeds only when the pool h
 Lever 1d adds the bucket directories (Section~\ref{sec:bg-windows}) to the live slice budget.
 Whether these levers convert failing runs into completing ones is an empirical question; Section~\ref{sec:rq3} answers it.
 
-\section{Design Iteration Three: Allocation Backpressure\label{sec:backpressure}}
+\section{Allocation Backpressure\label{sec:backpressure}}
 
 % [5.10]
 The spiller can fall behind the arrival rate.
@@ -158,10 +125,10 @@ Every mechanism in this chapter is off by default.
 With all gates closed, the engine is byte-identical to the unmodified baseline.
 Every comparison in Chapter~\ref{cha:evaluation} is therefore an A/B test on one binary.
 
-\section{Design Iteration Four: The Growth Signal and Page Release\label{sec:growth-release}}
+\section{The Growth Signal and Page Release\label{sec:growth-release}}
 
 % [5.12]
-Two gaps survive the first three iterations.
+Two gaps survive the mechanisms so far.
 The controller checks the live budget only when a slice is created.
 A high-cardinality aggregation grows one slice between window boundaries without creating a new one, so that growth is unseen until the next safety-net spiller wake.
 And a spilled slice frees its logical state but not its resident memory.
@@ -226,50 +193,7 @@ A backpressure gauge logs each stall with its duration.
 
 Together, the six probes let Chapter~\ref{cha:evaluation} separate working-set footprint from spill artifacts, trace the controller's decisions under pressure, and cross-examine each claim against independent signals.
 
-\section{Evaluation Harness and Reproducibility\label{sec:reproducibility}}
-
-% [6.5]
-The experiments ran on a desktop machine (Intel Core i7-10700K: eight physical cores, sixteen logical threads; 32\,GB RAM) rather than a real edge node.
-Docker constrains the container to an edge-class resource envelope; it does not reproduce any specific device.
-The memory cap is the central constraint and the only one varied across experiments: a cgroup hard limit with swap disabled, set to 512, 1024, or 2048\,MB, so the backend is held to a fixed memory budget it may never exceed.
-Docker imposes this cap through the Linux kernel's control-group (cgroup) memory controller: the \texttt{--memory} flag of Table~\ref{tab:edge-profile} sets the cgroup's hard limit.
-The ``Docker memory limit'' and the ``cgroup cap'' named throughout this thesis are therefore the same mechanism seen at the container and kernel layers, not two independent limits, and the memory probes read their footprint from that same cgroup (Section~\ref{sec:bg-metrics}).
-The 512\,MB floor is chosen to sit at the low end of the memory budgets reported for constrained \ac{IoT} and edge-class devices~\cite{ojo2019,shi2016}, the regime where in-memory state no longer fits and out-of-core processing becomes necessary; the larger caps trace how the behavior changes as the budget grows.
-Two further levers complete the envelope: a two-core CPU budget pinned to a fixed pair of physical cores, and a consumer-grade SD card bind-mounted as the spill target.
-Together these constraints make the container \emph{resemble}, not replicate, a memory-constrained edge device: they reproduce its resource limits, not its hardware, and Section~\ref{sec:threats} states what this does and does not license.
-Table~\ref{tab:edge-profile} summarizes the resulting profile.
-
-\begin{table}[ht]
-\centering
-\small
-\begin{tabular}{|>{\raggedright\arraybackslash}p{2.2cm}|>{\raggedright\arraybackslash}p{4.7cm}|>{\raggedright\arraybackslash}p{6.0cm}|}
-\hline
-\textbf{Resource} & \textbf{Container view} & \textbf{Mechanism} \\
-\hline
-Memory & 512 / 1024 / 2048\,MB, no swap & \texttt{--memory=Xm --memory-swap=Xm} \\
-\hline
-CPU & 2 cores, pinned & \texttt{--cpus=2 --cpuset-cpus=0,1,8,9} \\
-\hline
-Spill storage & SD card (SanDisk Extreme Pro, 128\,GB, ext4) & host \texttt{/mnt/sd-spill} bind-mounted at \texttt{/spill} \\
-\hline
-Input data & RAM-backed tmpfs & \texttt{/dev/shm} bind-mounted at \texttt{/input} (read-only) \\
-\hline
-\end{tabular}
-\caption{Container device profile: the four imposed constraints that emulate the
-resource envelope of a memory-constrained edge device, not a specific device.
-The memory cap is varied per experiment (512, 1024, 2048\,MB); the other three
-are held fixed.}
-\label{tab:edge-profile}
-\end{table}
-
-Input data sits on a RAM-backed filesystem, keeping input reads off the SD card.
-The spiller owns all SD card traffic: writes during eviction, reads during restore before emission.
-Cells run sequentially: the SD card is a single physical device and concurrent spill I/O across cells would contaminate the per-cell latency measurements.
-Each cell writes one row with 34 measured columns.
-
-% [6.6]
-Correctness is verified with output checksums against the in-memory baseline.
-The gated binary itself is verified with a levers-off regression arm, which must behave identically to the unmodified engine.
-
-The backend, the levers, and the instrumentation are in place.
-The next chapter evaluates them.
+% The evaluation harness and reproducibility material moved to Section 5.1
+% (start of the Experimental Setup), per the advisor note: Chapter 4 does no evaluation.
+The backend, its levers, and its probes are in place.
+The next chapter sets up the evaluation harness and evaluates them.

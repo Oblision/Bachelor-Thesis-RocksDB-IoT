@@ -1,10 +1,11 @@
 \chapter{Research Problem\label{cha:problem}}
 % Drafted per POINT-SEQUENCE.md Ch.3 (points 4.1–4.8, re-homed from WP Ch.4).
 
-\section{Goal\label{sec:goal}}
+\section{Problem Statement\label{sec:goal}}
 
 % [4.1]
-The goal of this thesis is to store tumbling-window operator state larger than memory in NebulaStream.
+NebulaStream keeps all window state in main memory, so a tumbling-window aggregation whose state outgrows the memory of its device is killed by the operating system (Section~\ref{sec:bg-metrics}).
+The problem of this thesis is to store tumbling-window operator state larger than memory in NebulaStream.
 The state backend is RocksDB in one research-informed configuration (Section~\ref{sec:bg-rocksdb}).
 The backend must preserve query results.
 It must work inside the push-based execution model and its shared global buffer pool (Section~\ref{sec:bg-nes}).

@@ -121,6 +121,14 @@ Done this session: statistics test definitions removed from Ch. 2 (now only §5.
 
 Open / author's call: Ch. 1 + Ch. 3 "1:1 an der Vorgabe" — template skeleton prescribes 1.1 Motivation / 1.2 Research Challenge; current Ch. 1 adds Results-in-Brief + Contributions + Structure (standard practice, and the skeleton itself says structure "should be customized"). Confirm with advisor whether stricter conformance is wanted. Ch. 4 forward references to Ch. 5 sections remain where they are pointers rather than dependencies ("kann auch": §4.8/§4.9 stay in Ch. 4). "Corrected flag" repetition reduced but not eliminated everywhere.
 
+## Round 3: structural conformance + content reorganization (user decision)
+
+- **Ch. 1 = skeleton 1:1**: §1.3 "Results in Brief" → "Novelty and Impact"; the novelty paragraph moved there from Motivation; the headline numbers stay as impact evidence.
+- **Ch. 3 = skeleton 1:1**: §3.1 "Goal" → "Problem Statement", opening now states the problem before the goal.
+- **Ch. 4 presents one final design, not a chronology**: "Design Iteration Two/Three/Four" → "Pool-Pressure Levers" / "Allocation Backpressure" / "The Growth Signal and Page Release"; intro and §4.1 reframed top-down (complete solution first, per-component detail after); each mechanism keeps its "the simpler design falls short because…" justification. All "iteration" cross-references in Ch. 1/5/7, Annex D, and the final-status figure updated.
+- **No evaluation in Ch. 4**: RocksDB knob selection (incl. Table tab:rocksdb-config) merged into §5.2; Evaluation Harness & Reproducibility (incl. Table tab:edge-profile) moved to open §5.1. Labels `sec:rocksdb-config`/`sec:reproducibility` ride along, so every existing reference resolves. Ch. 4 ends with a bridge into the evaluation.
+- Skeleton deviations that remain deliberate: Ch. 4 section titles are customized (template allows this); §4.1 "Solution at a Glance" has no skeleton counterpart but serves the top-down presentation.
+
 ## AI-usage / declaration updates
 
 - Session archive entry: `nebulastream-…/docs/ai-usage/08-revising-thesis/2026-07-02-advisor-review-figures-pass.md` (verbatim prompts; transcript export to attach on sync).

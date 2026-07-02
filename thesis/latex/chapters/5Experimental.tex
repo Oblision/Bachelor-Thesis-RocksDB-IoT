@@ -12,6 +12,50 @@ Section~\ref{sec:eval-summary} summarizes the verdicts.
 Section~\ref{sec:threats} states the threats to validity.
 
 \section{Experimental Setup\label{sec:setup}}
+\label{sec:reproducibility}
+
+% [6.5 — harness and reproducibility, moved here from Chapter 4]
+The experiments ran on a desktop machine (Intel Core i7-10700K: eight physical cores, sixteen logical threads; 32\,GB RAM) rather than a real edge node.
+Docker constrains the container to an edge-class resource envelope; it does not reproduce any specific device.
+The memory cap is the central constraint and the only one varied across experiments: a cgroup hard limit with swap disabled, set to 512, 1024, or 2048\,MB, so the backend is held to a fixed memory budget it may never exceed.
+Docker imposes this cap through the Linux kernel's control-group (cgroup) memory controller: the \texttt{--memory} flag of Table~\ref{tab:edge-profile} sets the cgroup's hard limit.
+The ``Docker memory limit'' and the ``cgroup cap'' named throughout this thesis are therefore the same mechanism seen at the container and kernel layers, not two independent limits, and the memory probes read their footprint from that same cgroup (Section~\ref{sec:bg-metrics}).
+The 512\,MB floor is chosen to sit at the low end of the memory budgets reported for constrained \ac{IoT} and edge-class devices~\cite{ojo2019,shi2016}, the regime where in-memory state no longer fits and out-of-core processing becomes necessary; the larger caps trace how the behavior changes as the budget grows.
+Two further levers complete the envelope: a two-core CPU budget pinned to a fixed pair of physical cores, and a consumer-grade SD card bind-mounted as the spill target.
+Together these constraints make the container \emph{resemble}, not replicate, a memory-constrained edge device: they reproduce its resource limits, not its hardware, and Section~\ref{sec:threats} states what this does and does not license.
+Table~\ref{tab:edge-profile} summarizes the resulting profile.
+
+\begin{table}[ht]
+\centering
+\small
+\begin{tabular}{|>{\raggedright\arraybackslash}p{2.2cm}|>{\raggedright\arraybackslash}p{4.7cm}|>{\raggedright\arraybackslash}p{6.0cm}|}
+\hline
+\textbf{Resource} & \textbf{Container view} & \textbf{Mechanism} \\
+\hline
+Memory & 512 / 1024 / 2048\,MB, no swap & \texttt{--memory=Xm --memory-swap=Xm} \\
+\hline
+CPU & 2 cores, pinned & \texttt{--cpus=2 --cpuset-cpus=0,1,8,9} \\
+\hline
+Spill storage & SD card (SanDisk Extreme Pro, 128\,GB, ext4) & host \texttt{/mnt/sd-spill} bind-mounted at \texttt{/spill} \\
+\hline
+Input data & RAM-backed tmpfs & \texttt{/dev/shm} bind-mounted at \texttt{/input} (read-only) \\
+\hline
+\end{tabular}
+\caption{Container device profile: the four imposed constraints that emulate the
+resource envelope of a memory-constrained edge device, not a specific device.
+The memory cap is varied per experiment (512, 1024, 2048\,MB); the other three
+are held fixed.}
+\label{tab:edge-profile}
+\end{table}
+
+Input data sits on a RAM-backed filesystem, keeping input reads off the SD card.
+The spiller owns all SD card traffic: writes during eviction, reads during restore before emission.
+Cells run sequentially: the SD card is a single physical device and concurrent spill I/O across cells would contaminate the per-cell latency measurements.
+Each cell writes one row with 34 measured columns.
+
+% [6.6]
+Correctness is verified with output checksums against the in-memory baseline.
+The gated binary itself is verified with a levers-off regression arm, which must behave identically to the unmodified engine.
 
 % [7.1.1]
 The workloads are synthetic sensor streams.
@@ -105,11 +149,16 @@ The paired backend-size contrast of Section~\ref{sec:rb32} uses McNemar's test i
 
 \section{Experimental Analysis of the RocksDB Backend\label{sec:rocksdb-eval}}
 
-% Moved here from Ch.4 §4.3. This is the db_bench evaluation (10,000-run sweep).
+% db_bench evaluation (10,000-run sweep) + the knob selection, both moved here from Ch.4.
 % Data: Microbenchmark-BA/results/constrained_512mb (10,000 runs); numbers verified vs raw CSV.
-The backend configuration of Section~\ref{sec:rocksdb-config} fixes three RocksDB knobs.
-This section reports the experimental analysis that produced those values.
-The analysis runs RocksDB on its own, so its behavior is measured without the confounding effects of the streaming engine.
+This section analyzes the RocksDB backend on its own and fixes the configuration that the rest of the evaluation uses.\label{sec:rocksdb-config}
+The store spills slices into RocksDB (Section~\ref{sec:architecture}).
+RocksDB exposes many tuning knobs, and prior work shows that three of them govern its behavior under a tight memory budget: the compression algorithm, the write buffer size, and the block cache size.
+Compression trades processor time for fewer bytes written to disk~\cite{jin2022}.
+The write buffer is the in-memory region RocksDB fills before flushing to disk; a larger buffer flushes less often but commits more memory that then competes with the window state~\cite{rocksdb-memory}.
+The block cache holds recently read blocks in memory and speeds up reads at the same memory cost~\cite{rocksdb-memory}.
+Based on these findings, the analysis varies exactly these three knobs and fixes one configuration rather than searching the space per experiment.
+The analysis runs RocksDB without the streaming engine, so its behavior is measured without confounding effects.
 
 The analysis uses the \texttt{db\_bench} tool, RocksDB's own benchmark driver, inside a Docker container that enforces the memory cap.
 Its dataset is ten million records, about 1.1\,GB, so it exceeds the cap and forces spilling to disk.
@@ -149,6 +198,30 @@ are in Appendix~E.}
 The analysis fixes the backend at the values of Table~\ref{tab:rocksdb-config}: lz4 compression, a 16\,MB write buffer, and an 8\,MB block cache.
 This is the memory-fit point for the tightest cap.
 Compression costs nothing, the small cache costs almost no throughput, and a 16\,MB write buffer already removes the write stalls while leaving the most memory for window state.
+The three values are the smallest that still perform well under the tightest 512\,MB cap; window state, not the storage backend, is the scarce consumer of memory on an edge device.
+The evaluation holds this configuration constant across all caps (Section~\ref{sec:setup}).
+
+\begin{table}[ht]
+\centering
+\small
+\begin{tabular}{|l|p{8.2cm}|l|}
+\hline
+\textbf{Knob} & \textbf{Why it matters on an edge budget} & \textbf{Value} \\
+\hline
+Compression & fewer bytes written to the storage device per spilled slice, at a processor cost~\cite{jin2022} & lz4 \\
+\hline
+Write buffer & larger flushes less often but commits memory that competes with the window state~\cite{rocksdb-memory} & 16\,MB \\
+\hline
+Block cache & speeds up reads at the same memory cost; the spill duty cycle is write-heavy~\cite{rocksdb-memory} & 8\,MB \\
+\hline
+\end{tabular}
+\caption{The three RocksDB knobs that govern behavior under a tight memory
+budget, and the value chosen for each. The values are small so that the backend
+leaves the most memory for window state at the tightest 512\,MB cap; the sweep
+of Table~\ref{tab:rocksdb-char} produced them, and Section~\ref{sec:rb32} tests
+whether a larger backend helps once the cap grows.}
+\label{tab:rocksdb-config}
+\end{table}
 
 A larger backend would in principle help once the cap grows.
 At 512\,MB a larger write buffer and cache compete with the window state for scarce memory, so 16 and 8\,MB are the safe choice.
@@ -668,7 +741,7 @@ The mechanism is recycling: pooled pages return to the pool on spill.
 The advantage grows as the pool shrinks.
 
 % [7.6c]
-The four levers of design iteration two worked mechanically.
+The four pool-pressure levers (Section~\ref{sec:levers}) worked mechanically.
 They converted no failing cell.
 The obvious conclusion was an un-spillable memory floor.
 That conclusion was wrong.
@@ -725,7 +798,7 @@ Bounding source admission changes nothing.
 Bounding the task queue changes nothing.
 
 % [7.6j]
-Allocation backpressure (design iteration three) also converted nothing.
+Allocation backpressure (Section~\ref{sec:backpressure}) also converted nothing.
 Its instrumentation supplied the diagnosis instead.
 In 118 of 138 stalls, no buffer returned anywhere in the pool for two full seconds.
 
@@ -853,7 +926,7 @@ Unmediated pointers into evictable state require an invalidation protocol.
 Flink's backend mediates every state access; NebulaStream's slice cache does not.
 The precise upstream fix is an epoch-stamped cache entry that is invalidated on spill, at the cost of one comparison per cache hit.
 
-\subsection{Design Iteration Four: The Growth Signal and Page Release\label{sec:growth-release-results}}
+\subsection{The Growth Signal and Page Release in Operation\label{sec:growth-release-results}}
 
 % [7.6x]
 The slice cache that causes the crash cluster also blinds the controller.
