@@ -31,7 +31,7 @@ This thesis therefore fixes one research-informed configuration instead of searc
 
 % [3.3]
 WindFlow demonstrates larger-than-memory windowed processing in a single-node engine~\cite{frassinelli2025}.
-Its existence shows that the problem is open beyond Flink.
+This shows that the problem is being worked on beyond Flink.
 
 % [3.4]
 AION keeps window state across memory and persistent storage so that late
@@ -53,7 +53,7 @@ Chapter~\ref{cha:evaluation} applies this discipline throughout.
 \section{Positioning\label{sec:rel-positioning}}
 
 % [3.7]
-No published work evaluates an out-of-core window state backend inside a push-based engine with one shared global buffer pool under hard memory caps.
+To the best of the author's knowledge, no published work evaluates an out-of-core window state backend inside a push-based engine with one shared global buffer pool under hard memory caps.
 This thesis provides this evaluation.
 Its contribution is evaluation-first: the backend exists to make the measurement possible.
 

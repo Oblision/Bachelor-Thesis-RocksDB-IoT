@@ -2,15 +2,36 @@
 % Drafted per POINT-SEQUENCE.md Ch.4 (points 5.1–5.11 design, 6.1–6.6 implementation).
 
 This chapter presents the backend.
-The first half covers the design: the requirements, the store, the spill mechanisms, and two further design iterations.
-The second half covers the implementation: the integration points, the instrumentation, and the evaluation harness.
+It works top-down.
+The final solution comes first, at a high level.
+The chapter then decomposes it into components and describes each one.
+The design reached that solution over four iterations, and the later iterations exist because earlier ones fell short.
+The chapter presents each iteration as an alternative, with the reason it was needed, so the reader sees the development path as the justification for the final design.
+The last sections describe the implementation: the integration points, the instrumentation the system exposes, and the harness that runs the evaluation.
+
+\section{The Solution at a Glance\label{sec:solution-overview}}
+
+The backend stores tumbling-window state that is larger than main memory.
+It replaces NebulaStream's in-memory slice store with a spillable slice store behind the same interface, so operators above it do not change (Section~\ref{sec:architecture}).
+Figure~\ref{fig:system-overview} shows the components involved and the path window state takes through them; the rest of this chapter describes each component in turn.
+A background spiller thread moves completed windows to a RocksDB backend on local disk before memory pressure becomes fatal.
+
+\input{figures/system_overview}
+Two thresholds drive it: a soft threshold triggers preemptive spilling, and a hard threshold forces synchronous spilling under acute pressure (Section~\ref{sec:architecture}).
+Three concerns are then layered onto this core.
+The spiller reacts to the slice budget alone, so a second iteration adds levers that react to pressure on the shared buffer pool (Section~\ref{sec:levers}).
+An allocation can still fail when the pool empties, so a third iteration adds allocation backpressure (Section~\ref{sec:backpressure}).
+The controller sees a slice only when it is created and never returns spilled memory to the operating system, so a fourth iteration adds a growth signal and page release (Section~\ref{sec:growth-release}).
+Every mechanism beyond the core is off by default, so the shipped baseline is byte-identical to the unmodified engine.
 
 \section{Requirements\label{sec:requirements}}
 
 % [5.1]
 Four requirements follow from the goal in Chapter~\ref{cha:problem}.
 First, the backend spills state before memory pressure becomes fatal: a soft threshold triggers preemptive background spilling so that cold state leaves memory while the system is still healthy.
-Second, when preemptive spilling cannot keep up and pressure crosses a hard threshold despite it, the backend pulls an emergency lever: it forces a synchronous spill on the allocating thread that evicts state as quickly as the storage device permits, so an \ac{OOM} failure is averted rather than merely deferred.
+Second, preemptive spilling can fall behind.
+When pressure crosses a hard threshold despite it, the backend forces a synchronous spill on the allocating thread.
+The forced spill evicts state as quickly as the storage device permits, so an \ac{OOM} failure is averted rather than merely deferred.
 Third, it never changes query results.
 Fourth, it leaves the just-in-time compilation pipeline untouched.
 
@@ -35,7 +56,8 @@ Figure~\ref{fig:ooc-integration} shows the store, its new components, and their 
 
 % [5.3b — emit lag: the thesis's addition that creates the cold-slice population]
 Standard NebulaStream emits a completed window without delay.
-This backend instead holds it for a configured emit lag $L$, while no operator still writes to it, giving the spiller time to move it to storage.
+This backend instead holds it for a configured emit lag $L$.
+During the lag no operator writes to the window anymore, so the spiller has time to move it to storage.
 With window length $W$, the store then holds $N_w = L/W$ completed windows as cold slices at any time.
 
 % [5.4]
@@ -60,73 +82,60 @@ Before a window's results are emitted, the store restores its spilled slices.
 % [5.8]
 The spill controller observes one signal: the live byte count of slice data pages.
 Other consumers of the buffer pool, such as input buffers and emission buffers, are invisible to it.
-This is a design property, stated here openly.
-Chapter~\ref{cha:evaluation} measures its consequences.
+This is a design property, stated here openly: the controller defends the slice budget, not the whole pool.
 
-\section{Configuring the RocksDB Backend\label{sec:rocksdb-config}}
+\section{Choosing the RocksDB Backend Configuration\label{sec:rocksdb-config}}
 
-% RocksDB characterization — sets the spill backend config from a separate db_bench sweep.
-% Data: Microbenchmark-BA/results/constrained_512mb (10,000 runs); all numbers verified vs raw CSV.
+% Ch.4 keeps only the JUSTIFIED SELECTION of the backend knobs. The db_bench
+% evaluation (10,000-run sweep + results) now opens Chapter 5 (Section~\ref{sec:rocksdb-eval}).
 The store spills slices into RocksDB (Section~\ref{sec:architecture}).
-RocksDB exposes several tuning knobs with which configurations can be optimized; prior work surveys their effects~\cite{jin2022,rocksdb-memory}.
-The characterization below (Table~\ref{tab:rocksdb-char}) sweeps those knobs under a 512\,MB edge memory constraint and finds three dominate both throughput and footprint: the compression algorithm, the write buffer size, and the block cache size.
-The backend configuration is therefore chosen from a characterization, not left at default settings.
-
-The characterization runs RocksDB on its own through the \texttt{db\_bench} tool, outside NebulaStream with a docker container to enforce the memory constraint.
-It sweeps the three knobs under a hard memory cap that Docker enforces.
-Its dataset is ten million records, about 1.1\,GB, so it exceeds the cap and forces spilling.
-Two workloads stand in for the backend's duty cycle: \texttt{fillrandom} writes continuously and models ingestion, and \texttt{readwhilewriting} reads and writes at once and models an operator that restores and spills state concurrently.
-A pilot at a 256\,MB cap completes only 58 of 100 runs, too few to tell the knobs apart, so the main sweep uses a 512\,MB cap.
-The main sweep is 200 configurations at 50 repetitions, 10{,}000 runs in total, of which 9{,}665 complete.
-
-Table~\ref{tab:rocksdb-char} reports the result.
-Compression is the dominant knob: lz4 raises concurrent throughput 4.4-fold over no compression, and together with a write buffer of at least 16\,MB it holds write stalls below one percent.
-The block cache barely matters: enlarging it from 8 to 256\,MB leaves throughput flat although its hit rate climbs from 6 to 77 percent, because the write path dominates the run time.
-A larger write buffer lowers write amplification, from 2.68 at 4\,MB to 0.91 at 32\,MB, and raises concurrent throughput, but the memory it commits competes with the window state.
-Every OOM kill in the sweep occurs only as the write buffer and the block cache together approach the cap.
+RocksDB exposes many tuning knobs, and prior work shows that three of them govern its behavior under a tight memory budget: the compression algorithm, the write buffer size, and the block cache size.
+Compression trades processor time for fewer bytes written to disk~\cite{jin2022}.
+The write buffer is the in-memory region RocksDB fills before flushing to disk; a larger buffer flushes less often but commits more memory that then competes with the window state~\cite{rocksdb-memory}.
+The block cache holds recently read blocks in memory and speeds up reads at the same memory cost~\cite{rocksdb-memory}.
+Based on these findings, this thesis fixes one backend configuration rather than searching the space per experiment.
+Table~\ref{tab:rocksdb-config} lists the three knobs, the reason each matters on an edge budget, and the value chosen.
 
 \begin{table}[ht]
 \centering
 \small
 \begin{tabular}{|l|p{8.2cm}|l|}
 \hline
-\textbf{Knob} & \textbf{Measured effect under the 512\,MB cap} & \textbf{Choice} \\
+\textbf{Knob} & \textbf{Why it matters on an edge budget} & \textbf{Value} \\
 \hline
-Compression & lz4 vs.\ none: $38{,}072$ vs.\ $8{,}723$ ops/s on the concurrent workload ($4.4\times$); with lz4 and a $\geq 16$\,MB buffer, stalls stay below $1\%$ & lz4 \\
+Compression & fewer bytes written to the storage device per spilled slice, at a processor cost~\cite{jin2022} & lz4 \\
 \hline
-Block cache & throughput stays flat near $25{,}000$ ops/s from 8 to 256\,MB while the hit rate rises from $6\%$ to $77\%$ & 8\,MB \\
+Write buffer & larger flushes less often but commits memory that competes with the window state~\cite{rocksdb-memory} & 16\,MB \\
 \hline
-Write buffer & from 4 to 32\,MB, write amplification falls $2.68 \to 0.91$ and concurrent throughput rises $13{,}435 \to 27{,}187$ ops/s & 16\,MB \\
+Block cache & speeds up reads at the same memory cost; the spill duty cycle is write-heavy~\cite{rocksdb-memory} & 8\,MB \\
 \hline
 \end{tabular}
-\caption{RocksDB characterization with \texttt{db\_bench} under a 512\,MB cap (10{,}000 runs, 9{,}665 completing; means over completing runs, concurrent workload \texttt{readwhilewriting}) and the resulting backend configuration. Full per-parameter tables are in Appendix~E.}
-\label{tab:rocksdb-char}
+\caption{The three RocksDB knobs that govern behavior under a tight memory
+budget, and the value chosen for each. The values are small so that the backend
+leaves the most memory for window state at the tightest 512\,MB cap. Section~\ref{sec:rocksdb-eval}
+reports the sweep that produced these values, and Section~\ref{sec:rb32} tests
+whether a larger backend helps once the cap grows.}
+\label{tab:rocksdb-config}
 \end{table}
 
-These findings fix the backend at lz4 compression, a 16\,MB write buffer, and an 8\,MB block cache.
-This is the memory-fit point for the tightest cap: compression costs nothing, the small cache costs almost no throughput, and a 16\,MB write buffer already removes the stalls while leaving the most memory for state.
+The three values are the smallest that still perform well under the tightest 512\,MB cap.
+A small write buffer and a small block cache leave the most memory for window state, which is the scarce resource on an edge device.
 The evaluation holds this configuration constant across all caps (Section~\ref{sec:setup}).
-
-The memory-fit point is specific to the tightest cap.
-At 512\,MB a larger write buffer and cache compete with the window state for scarce memory, so 16 and 8\,MB are the safe choice.
-Once the cap rises to 1024 or 2048\,MB, a 32\,MB write buffer and a 32\,MB block cache fit, and the characterization above shows the larger write buffer roughly halves write amplification.
-The evaluation establishes that the storage device's write bandwidth bounds the drain rate (Section~\ref{sec:rq4}), so writing fewer bytes should, in principle, let more runs finish where the larger configuration fits.
-A dedicated single-variable contrast tests this prediction inside NebulaStream, holding every other knob fixed (Section~\ref{sec:rb32}).
-The prediction does not hold in general.
-The larger configuration helps only when window-map pages live in the buffer pool (Section~\ref{sec:rq3}), and even there only as a directional trend under the tight cap; with headroom it is neutral, and for the heap architecture its fixed memory cost makes it a net loss.
-The evaluation therefore holds the backend at 16 and 8\,MB across all caps, now as a measured choice rather than a deferred question.
-% RB32 contrast (32/32 vs 16/8): measured result lives in Section~\ref{sec:rb32}; full tables in Appendix E.
+It also measures whether a larger backend would help once a larger cap leaves room for it (Section~\ref{sec:rb32}).
 
 \section{Design Iteration Two: Pool-Pressure Levers\label{sec:levers}}
 
 % [5.9]
-The first evaluation round motivates four additional mechanisms.
-Each one reacts to pressure on the global buffer pool instead of live slice bytes.
+The core spiller watches the slice budget alone.
+It stays blind to the shared buffer pool that every other part of the engine draws from.
+A run can therefore exhaust the pool and abort while the slice budget still looks healthy, because input buffers, queues, and emission buffers consumed the pool instead.
+The second iteration adds four levers that react to pool pressure directly.
 Each one is gated behind its own configuration flag.
 Lever 1a lets the spiller also drain when the free buffers in the pool fall below a reserve.
 Lever 1b reacts to an allocation that finds the pool empty: it triggers an immediate spill of one cold slice instead of waiting passively.
 Lever 1c paces restores: a restore before emission proceeds only when the pool has headroom.
 Lever 1d adds the bucket directories (Section~\ref{sec:bg-windows}) to the live slice budget.
+Whether these levers convert failing runs into completing ones is an empirical question; Section~\ref{sec:rq3} answers it.
 
 \section{Design Iteration Three: Allocation Backpressure\label{sec:backpressure}}
 
@@ -175,17 +184,22 @@ Both mechanisms are off by default, and page release extends the buffer manager 
 
 \section{Integration into NebulaStream\label{sec:integration}}
 
+% [6.0 — provenance: the upstream state all changes build on]
+The implementation builds on a public fork of the NebulaStream repository.
+The base state is commit \texttt{cc754a94} of the fork's \texttt{main} branch, taken on May 20, 2026, before any change of this thesis.
+This base was verified clean: the unmodified tree builds and passes all 752 unit tests.
+Every mechanism in this chapter is a change against that state, and the byte-identical baseline of Section~\ref{sec:backpressure} refers to it.
+
 % [6.1]
 The store is created when the query is lowered into its physical plan.
 Its configuration travels from the worker configuration through the engine builder into the store and the buffer manager.
 
 % [6.2]
-One implementation detail deserves its own statement.
-Whether a hash map page is pooled is decided by one comparison inside ChainedHashMap.
+One comparison inside ChainedHashMap decides whether a hash map page is pooled.
 A page is pooled if the configured page size fits into the engine's buffer size.
 The engine's default buffer size is 4096 bytes.
 The page size in this thesis is 8192 bytes.
-This fact is stated here; Chapter~\ref{cha:evaluation} measures its consequence.
+The default therefore keeps every hash map page unpooled, on the process heap rather than in the global buffer pool.
 
 % [6.3]
 The buffer manager gains three extensions.
@@ -209,7 +223,7 @@ A map gauge captures the exact page-count composition of every hash map at its d
 A spill gauge records the controller's state at every 100-millisecond spiller wake.
 A backpressure gauge logs each stall with its duration.
 
-Together, the six probes let Chapter~\ref{cha:evaluation} separate working-set footprint from spill artefacts, trace the controller's decisions under pressure, and cross-examine each claim against independent signals.
+Together, the six probes let Chapter~\ref{cha:evaluation} separate working-set footprint from spill artifacts, trace the controller's decisions under pressure, and cross-examine each claim against independent signals.
 
 \section{Evaluation Harness and Reproducibility\label{sec:reproducibility}}
 
@@ -219,10 +233,10 @@ Docker constrains the container to an edge-class resource envelope; it does not 
 The memory cap is the central constraint and the only one varied across experiments: a cgroup hard limit with swap disabled, set to 512, 1024, or 2048\,MB, so the backend is held to a fixed memory budget it may never exceed.
 Docker imposes this cap through the Linux kernel's control-group (cgroup) memory controller: the \texttt{--memory} flag of Table~\ref{tab:edge-profile} sets the cgroup's hard limit.
 The ``Docker memory limit'' and the ``cgroup cap'' named throughout this thesis are therefore the same mechanism seen at the container and kernel layers, not two independent limits, and the memory probes read their footprint from that same cgroup (Section~\ref{sec:bg-metrics}).
-The 512\,MB floor is chosen to sit at the low end of the memory budgets reported for constrained \ac{IoT} and edge-class devices~\cite{ojo2019,shi2016}, the regime where in-memory state no longer fits and out-of-core processing becomes necessary; the larger caps trace how the behaviour changes as the budget grows.
+The 512\,MB floor is chosen to sit at the low end of the memory budgets reported for constrained \ac{IoT} and edge-class devices~\cite{ojo2019,shi2016}, the regime where in-memory state no longer fits and out-of-core processing becomes necessary; the larger caps trace how the behavior changes as the budget grows.
 Two further levers complete the envelope: a two-core CPU budget pinned to a fixed pair of physical cores, and a consumer-grade SD card bind-mounted as the spill target.
 Together these constraints make the container \emph{resemble}, not replicate, a memory-constrained edge device: they reproduce its resource limits, not its hardware, and Section~\ref{sec:threats} states what this does and does not license.
-Table~\ref{tab:edge-profile} summarises the resulting profile.
+Table~\ref{tab:edge-profile} summarizes the resulting profile.
 
 \begin{table}[ht]
 \centering

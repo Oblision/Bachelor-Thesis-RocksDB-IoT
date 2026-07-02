@@ -12,9 +12,24 @@ C1: the backend integrates behind the unchanged store interface and operated acr
 C2: the harness reproduces every result from one binary, with pre-registered hypotheses and six memory probes; the evaluation data and analysis documents are versioned with the code.
 C3: the backend prevents out-of-memory failures inside characterized operating windows per memory budget (Table~\ref{tab:windows}), and completion is a race between ingest and drain rather than a state-size threshold.
 C4: a single engine default kept all window state outside the buffer pool in every configuration; the one-flag correction with pool-pressure levers reaches the in-memory engine's throughput at 25\% less anonymous memory (517 versus 685\,MB, Figure~\ref{fig:ladder}); and the same architecture distinction decides how to size the RocksDB backend (Section~\ref{sec:rb32}).
-C5: the failures follow a three-regime feasibility law, and the residual failure is a role-blind allocation deadlock, demonstrated by direct instrumentation (Figure~\ref{fig:gridlock}).
+C5: the failures follow a three-regime feasibility law, and the residual failure is an allocation deadlock in which emitted state pins the buffer pool while the workers that would drain it are all blocked allocating, demonstrated by direct instrumentation (Figure~\ref{fig:gridlock}).
 C6: all mechanisms ship configuration-gated in an open branch; with gates closed the engine is byte-identical to the baseline.
 C7: a fourth design iteration adds a growth signal that makes intra-slice bloat visible on the production path once the slice cache is bypassed, and a page-release extension that cuts steady anonymous memory by a further 55\% on draining workloads; neither converts the residual deadlock, which stays bound by the un-spillable hot slice and the resident floor.
+
+% [negative IoT finding — advisor note 2]
+The evaluation also yields one negative finding that no engine-side mechanism can remove.
+In the Internet of Things, the ingestion rate and the storage device are not fixed.
+A deployment must assume that both vary widely from node to node.
+The ingestion rate is set by the sensors and the network, not by the engine.
+The storage device is whatever SD card the node carries, and SD-card write bandwidth differs by an order of magnitude across cards.
+This matters because completion is a race between ingest and drain (C3).
+The spiller can only drain state to disk as fast as the card accepts writes.
+The SD card's write bandwidth therefore bounds the drain rate (Section~\ref{sec:rq4}).
+When the card is slow, the drain ceiling drops, and the band of ingest rates the engine can sustain shrinks with it.
+The practical consequence is that the I/O path, not the engine, sets the limit once storage is the bottleneck.
+A slow card cannot be tuned away by any of the in-engine levers, because none of them makes the device write faster.
+The deployment must instead attack the I/O path directly: choose a faster device, reduce the bytes written per window, or throttle ingest to stay under the drain ceiling.
+This is the same conclusion the three-regime law reaches from the other side (Section~\ref{sec:rq3}): in the disk-bound regime the run survives only by holding ingest below the rate the device can drain.
 
 \section{Limitations and Generalizability\label{sec:generalizability}}
 
@@ -59,6 +74,17 @@ Fourth, an exception-safe restore path.
 Fifth, epoch-stamped slice-cache invalidation, the upstream fix for the diagnosed corruption and for the controller-blindness the growth signal exposed (Section~\ref{sec:growth-release-results}).
 Sixth, open-window spilling, which requires changes to the compilation pipeline and is out of scope here; it is the one remaining lever for the un-spillable hot slice that page release cannot reclaim.
 Seventh, sliding windows and a fuller Nexmark suite.
+
+% [future work — advisor notes 3 and 4]
+Two device- and resource-sensitivity experiments follow from the limitations above.
+First, a core-count sensitivity experiment.
+Every run in this thesis used a fixed two-core budget (Section~\ref{sec:reproducibility}).
+Raising the number of pinned cores beyond two would show how the contention and the allocation deadlock scale with available parallelism.
+The deadlock does not distinguish build-path from drain-path allocations (C5), so more cores may shift the point at which the two collide rather than remove it; the experiment would settle this.
+Second, a direct storage-device study.
+This thesis ran on one SD card and treated its write bandwidth as a fixed bound (Section~\ref{sec:rq4}).
+Profiling the SD card's read and write throughput directly, and re-running the best configurations on faster storage such as an SSD, would separate the device limit from the architecture limit.
+It would show how much of the residual failure is the card and how much is the engine.
 
 % [9.3]
 Three recommendations go upstream to NebulaStream independently of out-of-core processing.

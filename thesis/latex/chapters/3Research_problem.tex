@@ -11,7 +11,7 @@ It must work inside the push-based execution model and its shared global buffer 
 
 \section{Research Questions\label{sec:rqs}}
 
-The evaluation answers three core questions and two additional questions.
+The design and evaluation answer six research questions.
 
 % [4.2]
 \textbf{RQ0 (design).}
@@ -34,11 +34,11 @@ How does memory behave as state grows past the cap?
 Why do the remaining failures happen?
 
 % [4.6]
-\textbf{RQ4 (additional).}
+\textbf{RQ4 (resource use).}
 How do processor utilization and disk traffic evolve with growing state?
 
 % [4.7]
-\textbf{RQ5 (additional).}
+\textbf{RQ5 (storage efficiency).}
 How efficiently is storage used?
 This covers write amplification and the composition of the memory footprint.
 
@@ -52,8 +52,8 @@ It changes neither the query compiler nor the just-in-time compilation pipeline.
 It excludes fault tolerance, durability guarantees, sliding windows, state migration, and automatic parameter tuning.
 Cross-system comparisons are out of scope.
 
-The success criterion follows the signed proposal.
-The backend succeeds if it completes workloads whose state exceeds physical memory, without out-of-memory failures, with results verified against the in-memory engine with sufficient memory.
+The backend succeeds if it completes workloads whose state exceeds physical memory, without out-of-memory failures.
+Its results must match those of the in-memory engine given sufficient memory.
 Efficiency is measured against the same in-memory engine under identical processor constraints without memory limits.
 
 The next chapter presents the backend that this goal requires.

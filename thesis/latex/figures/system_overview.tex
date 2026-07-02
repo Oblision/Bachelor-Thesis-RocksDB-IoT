@@ -1,0 +1,117 @@
+% Conceptual system overview: the path window state takes through the components.
+% Companion to figures/spillable_slice_store.tex (class-level integration view):
+% this figure is the DATA-FLOW view for the non-expert reader, placed in Section 4.1.
+% Same color legend as fig:ooc-integration: grey = existing NES, blue = this thesis,
+% orange = storage engine / persistent storage.
+% Preamble requirements already in Template.tex (tikz + positioning,arrows.meta,fit,backgrounds,calc).
+
+\begin{figure}[ht]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+  font=\sffamily\small,
+  every node/.style={align=center},
+  box/.style     ={rectangle, draw, thick, minimum height=1.5cm, inner sep=5pt, rounded corners=1pt, minimum width=3.2cm},
+  existing/.style={box, fill=black!12},
+  newcomp/.style ={box, fill=blue!18},
+  storage/.style ={box, fill=orange!28},
+  slice/.style   ={rectangle, draw, thick, minimum width=2.6cm, minimum height=1.5cm, inner sep=4pt, rounded corners=1pt, fill=blue!18},
+  flow/.style    ={-{Latex[length=2.6mm]}, very thick},
+  watch/.style   ={-{Latex[length=2.4mm]}, thick, dashed, black!60},
+  lbl/.style     ={fill=white, draw=black!30, line width=0.2pt, rounded corners=1pt,
+                   inner sep=2.5pt, font=\sffamily\footnotesize\itshape, text=black!75},
+]
+
+% ================= NODES =================
+% ---- outside the cap, left: the input ----
+\node[existing, minimum width=2.9cm] (src) at (-0.4,0)
+  {Sensor stream\\\footnotesize\itshape unbounded tuples};
+
+% ---- row A: processing path ----
+\node[existing] (workers) at (4.2,0)
+  {Worker threads\\\footnotesize\itshape execute pipeline tasks};
+\node[slice] (hot) at (9.0,0)
+  {Hot slice\\\footnotesize\itshape window still filling\\\footnotesize\itshape (never spillable)};
+\node[slice, minimum width=3.4cm] (cold) at (13.8,0)
+  {Cold slices ($\sim N_w$)\\\footnotesize\itshape complete, held for\\\footnotesize\itshape emit lag $L$};
+
+% ---- outside the cap, right: results ----
+\node[existing, minimum width=2.9cm] (emit) at (19.6,0)
+  {Emission\\\footnotesize\itshape results downstream};
+
+% ---- row B: memory suppliers + movers ----
+\node[existing, minimum width=4.6cm] (pool) at (4.2,-4.0)
+  {Global buffer pool\\\footnotesize\itshape fixed size, allocated at start;\\\footnotesize\itshape buffers recycle, never grow};
+\node[existing, minimum width=3.0cm] (heap) at (0.0,-4.0)
+  {Process heap\\\footnotesize\itshape grows on demand};
+\node[newcomp] (spiller) at (9.0,-4.0)
+  {Spiller thread\\\footnotesize\itshape wakes every 100\,ms\\\footnotesize\itshape soft / hard thresholds};
+\node[storage, minimum width=4.2cm] (rocksmem) at (14.4,-4.0)
+  {RocksDB (in-process)\\\footnotesize\itshape memtable 16\,MB\\\footnotesize\itshape block cache 8\,MB};
+
+% ---- below the cap: the storage device ----
+\node[storage, double, double distance=1pt, minimum width=4.2cm] (sd) at (14.4,-8.3)
+  {SD card\\\footnotesize\itshape RocksDB spill files};
+
+% ================= GROUP BOX: the memory cap =================
+\begin{pgfonlayer}{background}
+  \node[draw, dashed, thick, rounded corners, fit=(heap)(pool)(hot)(cold)(spiller)(rocksmem),
+        inner xsep=7mm, inner ysep=12mm, fill=black!3] (capbox) {};
+\end{pgfonlayer}
+\node[anchor=south west, font=\sffamily\footnotesize\bfseries, text=black!70]
+  at (capbox.north west) {One engine process under the hard memory cap (cgroup)};
+\node[anchor=north west, font=\sffamily\footnotesize\itshape, text=black!60]
+  at ([xshift=3mm]capbox.south west) {anonymous memory above the cap $\Rightarrow$ the kernel kills the process (OOM)};
+
+% ---- slice store group box ----
+\begin{pgfonlayer}{background}
+  \node[draw, thick, rounded corners, fit=(hot)(cold), inner sep=4.5mm, fill=blue!6] (store) {};
+\end{pgfonlayer}
+\node[anchor=south, font=\sffamily\footnotesize\bfseries, text=blue!40!black]
+  at (store.north) {Spillable slice store \textnormal{\footnotesize\itshape (state = hash maps on pages)}};
+
+% ================= EDGES =================
+% processing path
+\draw[flow] (src) -- node[lbl]{tuples} (workers);
+\draw[flow] (workers) -- node[lbl]{writes\\(build)} (hot);
+\draw[flow] (hot) -- node[lbl]{watermark\\passes} (cold);
+\draw[flow] (cold.east) -- node[lbl, pos=0.5]{restore spilled\\slices, then emit} (emit.west);
+
+% memory supply
+\draw[flow] (pool.north) -- node[lbl, pos=0.72]{buffers for\\input and output} (workers.south);
+\draw[flow] (pool.north east) -- node[lbl, pos=0.55]{pages\\(bounded allocation)} (hot.south west);
+\draw[flow] (heap.north) -- ++(0,0.7) -| node[lbl, pos=0.08]{bucket directories; all pages\\under the 4096-byte default} (hot.south);
+
+% spilling and restoring
+\draw[watch] (spiller.north) -- node[lbl, pos=0.42]{watches live\\slice bytes} (store.south);
+\draw[flow] (spiller.east) -- node[lbl, below=9mm]{evicts cold slices:\\pages as key--value pairs} (rocksmem.west);
+\draw[flow] ([xshift=-9mm]rocksmem.south) -- node[lbl, pos=0.62]{flush,\\compaction} ([xshift=-9mm]sd.north);
+\draw[flow] ([xshift=9mm]sd.north) -- node[lbl, pos=0.38]{read on\\restore} ([xshift=9mm]rocksmem.south);
+\draw[flow] (rocksmem.north) -- node[lbl, pos=0.45]{restored slices\\(byte copy into pages)} (cold.south);
+
+% ================= LEGEND =================
+\node[draw, thick, rounded corners, inner sep=5pt, font=\sffamily\footnotesize]
+  at (2.6,-8.3)
+  {\tikz\node[draw, thick, fill=black!12, minimum width=9mm, minimum height=4mm, inner sep=0pt]{};\,existing NebulaStream\quad
+   \tikz\node[draw, thick, fill=blue!18, minimum width=9mm, minimum height=4mm, inner sep=0pt]{};\,this thesis\quad
+   \tikz\node[draw, thick, fill=orange!28, minimum width=9mm, minimum height=4mm, inner sep=0pt]{};\,storage engine / device\quad
+   \begin{tikzpicture}\draw[watch](0,0)--(0.8,0);\end{tikzpicture}\,observes\quad
+   \begin{tikzpicture}\draw[flow](0,0)--(0.8,0);\end{tikzpicture}\,data / control flow};
+
+\end{tikzpicture}%
+}
+\caption[System overview: the path of window state through the components]{%
+System overview: the path window state takes through the components. Worker
+threads write arriving tuples into the hot slice of the current window; its
+state lives in hash maps whose pages come from the global buffer pool (bounded
+allocation) or, under the engine's 4096-byte default, from the process heap.
+Once the watermark passes, the completed window becomes a cold slice and is
+held for the emit lag $L$. The spiller thread watches the live slice bytes
+against the soft and hard thresholds and evicts cold slices into RocksDB,
+which flushes them to the SD card. Before emission, spilled slices are read
+back and restored by a plain byte copy into pages, and the results leave the
+engine. Everything above the SD card runs in one process under the hard memory
+cap; if its anonymous memory exceeds the cap, the kernel kills the process.
+Figure~\ref{fig:ooc-integration} shows the same components at the class level.}
+\label{fig:system-overview}
+\end{figure}

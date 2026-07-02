@@ -6,38 +6,46 @@
 \section{Motivation\label{sec:motivation}}
 
 % [1.1]
-IoT Sensors in cities, factories, and vehicles produce heterogeneous data without end, as data streams.
-These streams need to be continuously processed efficiently in real time.
+\ac{IoT} sensors in cities, factories, and vehicles produce heterogeneous data without end, as data streams.
+These streams must be processed continuously and in real time.
 Using a cloud infrastructure alone is not an option for these applications, because of bandwidth and latency issues faced at scale~\cite{horowitz2014,zeuch2020}.
-NebulaStream's general approach, enabling processing on edge devices near the source, significantly reduces the amount of data being transmitted, while preserving the benefits of cloud processing~\cite{zeuch2020,zeuch2022}.
+NebulaStream, a data management system for the \ac{IoT}, therefore processes data on edge devices near the source~\cite{zeuch2020,zeuch2022}.
+This reduces the amount of data being transmitted, while preserving the benefits of cloud processing~\cite{zeuch2020,zeuch2022}.
 
 % [1.2]
 Many useful computations need memory of recent past.
 A system that reports an average temperature per sensor and per minute must collect values until each minute is complete.
-These collected partial results are called state and NebulaStream keeps all state in main memory.
-State grows with the number of sensors and the window of the observed time range.
+These collected partial results are called state.
+NebulaStream keeps all state in main memory.
+State grows with the number of sensors and with the length of the observed time window.
 When state grows beyond the available memory, the operating system terminates the process due to an \ac{OOM} failure, halting processing.
 
 % [1.3]
-Two trivial answers to this problem fail at the edge.
+Two obvious answers to this problem fail at the edge.
 Provisioning more memory is not possible on constrained hardware.
 Moving the computation to the cloud forces the raw data to travel, and data movement dominates the cost of edge deployments~\cite{horowitz2014,zeuch2020}.
 
 % [1.4]
-Another approach is to spill completed state to storage when memory runs short and unspill when it is required.
-An \ac{OOC} state backend describes this approach.
-RocksDB, an embeddable storage engine, is selected as an industry standard for this role~\cite{flink2021}.
+Another approach is to spill completed state to storage when memory runs short and to load it back when it is required.
+A component that does this is called an \ac{OOC} state backend.
+This thesis selects RocksDB, an embeddable storage engine and the industry-standard choice for this role~\cite{flink2021}.
+A backend of this kind must never change the query results that NebulaStream would produce in memory.
+
+% [1.4b — novelty]
+Comparable systems, such as Apache Flink, already use RocksDB as their out-of-core state backend~\cite{flink2021}.
+NebulaStream instead executes queries with a push-based model.
+No systematic evaluation of this push-based model in combination with such a storage backend has been conducted.
 
 \section{Research Challenge\label{sec:challenge}}
 
 % [1.5]
-NebulaStream executes queries with a push-based model.
-Data is pushed through the operators at in-memory processing speed.
-Storage is orders of magnitude slower than memory. Maintaining stability during spilling and unspilling whilst alleviating memory pressure is the main research challenge.
+In the push-based model, data is pushed through the operators at in-memory processing speed.
+Storage is orders of magnitude slower than memory.
+The main research challenge is to relieve memory pressure while keeping execution stable as state moves to storage and back.
 
 % [1.6]
 This thesis presents an \ac{OOC} implementation for enabling tumbling window state larger than the available memory in NebulaStream.
-It evaluates the backend-implementation on edge-class memory budgets, from 512 megabytes to 2 gigabytes.
+It evaluates the backend implementation on edge-class memory budgets, from 512 megabytes to 2 gigabytes.
 
 \section{Results in Brief\label{sec:results-brief}}
 
@@ -46,7 +54,7 @@ The backend processes workloads whose state exceeds memory, without crashing, in
 Against the in-memory engine, on workloads where both complete, the throughput cost is measured at 11\% to 15\% (Table~\ref{tab:cost}).
 During the evaluation, one engine configuration default turned out to silently disable the engine's intended memory architecture.
 Correcting it requires one flag (Section~\ref{sec:disambiguation}). 
-The correction, combined with new pool-pressure levers, recovers most of the failing workloads and matches the in-memory engine's throughput at 25\% less anonymous memory, 517 versus 685\,MB (Figure~\ref{fig:ladder}).
+The correction, combined with new pool-pressure levers, recovers most of the failing workloads and matches the in-memory engine's throughput at 25\% less anonymous memory (working memory the kernel cannot reclaim; Section~\ref{sec:bg-metrics}), 517 versus 685\,MB (Figure~\ref{fig:ladder}).
 The one remaining failure mode is diagnosed precisely, and its fix is specified as future work (Figure~\ref{fig:gridlock}).
 
 \section{Contributions\label{sec:contributions}}
@@ -63,11 +71,11 @@ This thesis makes seven contributions.
     The evaluation covers roughly 3{,}100 measured runs.
   \item \textbf{C3 — Empirical operating windows for out-of-core processing on edge budgets.}
     The evaluation maps where the backend succeeds and where it fails, per memory budget.
-    It shows that completion is a race between data arrival and storage ingestion, not dictated by a fixed state-size threshold.
+    It shows that completion is a race between data arrival and the rate at which state drains to storage, not dictated by a fixed state-size threshold.
   \item \textbf{C4 — A load-bearing architecture finding.}
     The engine's default buffer size silently kept all window state outside the engine's buffer pool in every configuration.
     One flag corrects this.
-    The corrected configuration, plus the new pool-pressure levers, reaches near in-memory engine's throughput at lower memory cost (Figure~\ref{fig:ladder}).
+    The corrected configuration, plus the new pool-pressure levers, reaches near-parity with the in-memory engine's throughput at lower memory cost (Figure~\ref{fig:ladder}).
     The same pooled-versus-heap distinction also decides how the RocksDB backend should be sized (Section~\ref{sec:rb32}).
   \item \textbf{C5 — A failure taxonomy with a diagnosed root cause.}
     Failures follow a three-regime feasibility law.
@@ -76,9 +84,9 @@ This thesis makes seven contributions.
     All mechanisms are configuration-gated.
     With all gates closed, the engine is byte-identical to the unmodified baseline.
   \item \textbf{C7 — A fourth design iteration: growth signal and page release.}
-    A growth signal makes intra-slice bloat visible on the production path once the slice cache is bypassed.
+    A growth signal makes the growth of a single, still-open window's state visible to the spill controller on the production path.
     A page-release extension cuts steady anonymous memory by a further 55\% on draining workloads.
-    Neither converts the residual deadlock; it stays bound by the un-spillable hot slice and the resident floor.
+    Neither converts the residual deadlock: the window that is still being written cannot be spilled, and the resident memory floor remains.
 \end{enumerate}
 
 \section{Thesis Structure\label{sec:structure}}

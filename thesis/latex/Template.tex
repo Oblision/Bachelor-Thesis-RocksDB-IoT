@@ -58,8 +58,8 @@
 % the Nexmark transfer figures (different stream, schema, and arms).
 \newcommand{\methodsnote}{\par\smallskip{\footnotesize\color{black!55}%
 Synthetic Zipfian sensor stream ($s\approx1.0$, 1.5\,M-key universe, top-10
-$\approx20\%$ of traffic); tumbling window 50k tuples, emit-lag 4\,M ($N_w=80$
-retained windows); 2 pinned cores, hard cgroup cap, lz4 spill to SD card.
+$\approx20\%$ of traffic); tumbling window 50{,}000\,ms of event time, emit lag
+4\,M\,ms ($N_w=80$ retained windows); 2 pinned cores, hard cgroup cap, lz4 spill to SD card.
 $n=8$ to 10 repetitions per cell unless labelled otherwise. Source:
 lag-validation campaign (3{,}133 runs, 457 cells), debug build, single host; full
 setup in Section~\ref{sec:setup}, device profile in Table~\ref{tab:edge-profile}.}}
@@ -180,7 +180,9 @@ setup in Section~\ref{sec:nexmark}, device profile in Table~\ref{tab:edge-profil
  \acro{CPU}{central processing unit}
  \acro{DIMA}{Chair of Database Systems and Information Management}
  \acro{DSPS}{data stream processing system}
+ \acro{GB}{gigabyte}
  \acro{IoT}{Internet of Things}
+ \acro{IO}[I/O]{input/output}
  \acro{KV}{key-value}
  \acro{LSM}{log structured merge tree}
  \acro{MB}{megabyte}

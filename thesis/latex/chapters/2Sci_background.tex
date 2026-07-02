@@ -96,7 +96,7 @@ The pages of a hash map come from one of two sources.
 With \emph{bounded allocation}, pages are taken from the fixed global buffer pool and are returned to it on release.
 With \emph{unbounded allocation}, pages come from the general-purpose memory of the process, the heap.
 Heap memory is limited only by what the operating system grants the process.
-Which of the two allocation types are chosen depends on the configured page size relative to the engine's set buffer size.
+Which of the two allocation types is chosen depends on the configured page size relative to the engine's configured buffer size.
 Chapter~\ref{cha:evaluation} measures the differences between these two types of allocation.
 
 % [2.11]
@@ -117,11 +117,11 @@ The next section introduces the storage system that provides this feature.
 
 \section{RocksDB and the Log-Structured Merge Tree\label{sec:bg-rocksdb}}
 
-A \ac{KV} store is a data structure that saves a value to a unique key.
-A database using \ac{KV} can write, read, and delete a value quickly using this key.
+A \ac{KV} store is a data structure that stores a value under a unique key.
+It can write, read, and delete the value for a given key quickly.
 
 % [2.13]
-RocksDB is a persistent \ac{KV} store database~\cite{borthakur2013}.
+RocksDB is a persistent \ac{KV} store~\cite{borthakur2013}.
 Persistent means that the data survives on storage.
 RocksDB originates at Facebook and runs embedded inside another program.
 Its design follows the \ac{LSM}~\cite{oneil1996}.
@@ -136,6 +136,15 @@ A background process called compaction keeps this read cost bounded.
 It merges sorted files into fewer, larger ones and discards values that a later write has overwritten or deleted.
 Compaction therefore rewrites data that the application already wrote once.
 The ratio of bytes written to storage over bytes written by the application is the write amplification~\cite{jin2022,wei2025}.
+
+% [2.15b] — background-only survey of the parameters RocksDB exposes.
+RocksDB exposes several parameters that control this behavior.
+The write buffer size sets how large a memtable grows before RocksDB flushes it to storage.
+The block cache size sets how much memory RocksDB keeps for caching data read from storage.
+The compression algorithm sets how RocksDB encodes the data in its files, which trades processor work against file size.
+The compaction style sets how RocksDB merges files, which trades read cost against write amplification.
+A column family is a named partition of the keys with its own memtable and files, so different data can use different settings.
+These parameters together govern how much memory RocksDB uses and how much it writes~\cite{jin2022,pamarthi2024,adao2025,wei2025}.
 
 Prior studies show that RocksDB's parameters affect its memory use and its write behavior, and that tuning cannot remove these costs entirely~\cite{jin2022,pamarthi2024,adao2025,wei2025}.
 Careful configuration is therefore necessary under a tight memory budget, and the evaluation is set up informed by these studies.
@@ -156,7 +165,7 @@ The cost of the storage is then paid only for data that is rarely needed.
 On a large server, memory for the hot data is usually available.
 On an edge device, memory is scarce.
 The machinery that moves data to and from storage also needs memory.
-On a small fixed buffer pool, the hot data therefore includes the input and output path itself.
+With a small fixed buffer pool, the hot data therefore includes the input and output path itself.
 Chapter~\ref{cha:evaluation} returns to this point.
 
 The evaluation measures memory, completion, and statistical confidence with a small set of terms.
@@ -194,22 +203,10 @@ It aborts because the buffer pool is exhausted (Section~\ref{sec:bg-nes}).
 Or it exceeds the time limit.
 
 % [2.20]
-Completion counts are compared with Fisher's exact test.
-Fisher's exact test computes the probability that two completion proportions differ by chance.
-Mean values, such as throughput, are compared with Welch's t-test~\cite{welch1947}.
-Welch's t-test compares two means without assuming that their variances are equal.
-For two samples with means $\bar{x}_1$ and $\bar{x}_2$, variances $s_1^2$ and $s_2^2$, and sizes $n_1$ and $n_2$, the test statistic is
-\[
-  t = \frac{\bar{x}_1 - \bar{x}_2}{\sqrt{\dfrac{s_1^2}{n_1} + \dfrac{s_2^2}{n_2}}} .
-\]
-The numerator is the observed difference between the two means.
-The denominator is its standard error, in which each sample keeps its own variance instead of a single pooled estimate.
-This separate-variance form is what lets the test compare samples of unequal variance and unequal size, where Student's t-test would not.
-The statistic follows a t-distribution whose degrees of freedom $\nu$ are approximated by the Welch--Satterthwaite equation
-\[
-  \nu \approx \frac{\left( \dfrac{s_1^2}{n_1} + \dfrac{s_2^2}{n_2} \right)^2}{\dfrac{(s_1^2/n_1)^2}{n_1 - 1} + \dfrac{(s_2^2/n_2)^2}{n_2 - 1}} .
-\]
-A small resulting p-value means a difference in means unlikely to arise if the two true means were equal.
+The evaluation compares two kinds of quantities between variants.
+Completion proportions are compared with Fisher's exact test, which tests whether two proportions differ by more than chance.
+Mean values, such as throughput, are compared with Welch's t-test, which compares two means without assuming that their variances are equal~\cite{welch1947}.
+Chapter~\ref{cha:evaluation} states how each test is computed and which measurements it is applied to.
 
 These terms complete the background.
 The next chapter states the problem of this thesis and the questions the evaluation answers.
