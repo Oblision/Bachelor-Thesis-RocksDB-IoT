@@ -81,7 +81,7 @@ def main() -> None:
     fig.supylabel("completion fraction (completed / attempted)", fontsize=10)
     axes[0].legend(loc="lower left", fontsize=8)
 
-    fig.suptitle("Out-of-core extends beyond-memory completion at every cap",
+    fig.suptitle("Completion by state pressure: capped in-memory baseline vs. best out-of-core point",
                  fontsize=11, fontweight="bold")
     style.caption(fig, extra="bar labels = completed/attempted · out-of-core = best operating point over pool sizes and both architectures")
     style.save(fig, "fig_effectiveness")

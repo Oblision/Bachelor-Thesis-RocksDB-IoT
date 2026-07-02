@@ -101,3 +101,28 @@ New conceptual TikZ figure `fig:system-overview` in §4.1: the path of window st
 5. Session drift 4–17 % disclosed; all key contrasts within-session ✓.
 6. German abstract content-equivalent ✓ (first sentence generalizes to "Stream-Processing-Systeme"; acceptable).
 7. Repo hygiene: `Template_test.*`, `chk2.*`, `_verify.*`, `_compile_check.*` build leftovers in `thesis/latex/` — consider pruning before submission (not touched here).
+
+---
+
+# Addendum (same day): second round — figure fixes + resubmitted advisor list
+
+## Round-2 fixes (user reports)
+
+- **Figure "race"** decluttered: three in-plot prose boxes → three short region tags; legend moved above the axes (collision removed); ceiling label horizontal; suptitle made descriptive ("Cell outcomes across ingest rate and state pressure ρ").
+- **Figure "heatmap" gap-fill restored**: the session-regenerated PDFs had lost the 32/32 gap-fill reps (data.py was already correct; the PDFs were stale). All 14 data figures regenerated from `make_all` scripts; heatmap cells read /16–/20 again. New clarifying sentence in the caption **and** §5.1 setup: figures pool the backend-size twins; headline statistics use the 16/8 arms alone.
+- **Listing 1 (SQL query)** was overflowing the page unwrapped; global `\lstset` added (tt font, breaklines, fullflexible columns, upquote, thin frame).
+- **New Ch. 2 figure** `fig:nes-components`: unmodified NES components (workers, slice store, pages, pool vs. heap, watermark, emission); referenced from §2.2; caption bridges to the §4.1 overview figure.
+
+## Resubmitted advisor meeting list — status map
+
+Already covered by the overhaul branch (verified this session): p-values figure (Fig. 4); OOM in abbreviation list + defined in §2.5; RQ4/5 no longer "additional"; "sweeps those knobs" gone; db_bench evaluation moved to §5.2 and runs first in Ch. 5; RocksDB parameters surveyed in §2.3 + justified selection table in §4.4; top-down solution presentation with iterations as alternatives (§4 intro); workload-as-query with LaTeX listing; SD/SSD device study + core-count experiment in future work (§7.6); non-monotone 6/8-vs-8/8 completion explained with small-sample variance + Wilson intervals (§5.3); heatmap carries per-cell failure counts ("5 ok / 20 OOM"), dual-mode cells hatched, old Figure 3 retired into it; ρ explained in captions with MB equivalents; drain-ceiling line documented as empirical, ρ=1 as exact by definition; composition caption clarifies control-block spill + names the census experiment (r150, 996 maps); IoT ingestion/SD-variability negative finding highlighted in §7.1; "role-blind" wording absent from Fig. captions (plain-language deadlock description); rb32 compartment figure explains directories-as-NES-buffers; §5.8 summary written out.
+
+Done this session: statistics test definitions removed from Ch. 2 (now only §5.1 [7.1.8], next to what they test); "characterization" → experimental analysis (Appendix E title/intro, §5.1 reference); conclusion-style figure titles reworded (fig_effectiveness, fig_race); sentence added under requirement "Third" (byte-identical results + pointer to verification); JIT-probe reasoning added to fig:ooc-integration caption (compiled code reads raw pointers → state must be resident before the probe runs); JIT/CSV/SSD added to abbreviations; pooled-vs-heap heavy-end throughput mechanism named in §5.3 (allocation stalls, pointer to §5.5 idle share); system-graphic extension gap → two new diagrams (Ch. 2 baseline + §4.1 extended overview).
+
+Open / author's call: Ch. 1 + Ch. 3 "1:1 an der Vorgabe" — template skeleton prescribes 1.1 Motivation / 1.2 Research Challenge; current Ch. 1 adds Results-in-Brief + Contributions + Structure (standard practice, and the skeleton itself says structure "should be customized"). Confirm with advisor whether stricter conformance is wanted. Ch. 4 forward references to Ch. 5 sections remain where they are pointers rather than dependencies ("kann auch": §4.8/§4.9 stay in Ch. 4). "Corrected flag" repetition reduced but not eliminated everywhere.
+
+## AI-usage / declaration updates
+
+- Session archive entry: `nebulastream-…/docs/ai-usage/08-revising-thesis/2026-07-02-advisor-review-figures-pass.md` (verbatim prompts; transcript export to attach on sync).
+- Declaration: Revising-phase level raised 3 → 4 (this session implements revisions directly) — **confirm before signing**; new Reflection section added.
+- Appendix F TODO updated with the concrete pre-submission sync steps.

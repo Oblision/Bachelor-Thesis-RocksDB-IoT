@@ -98,6 +98,9 @@ With \emph{unbounded allocation}, pages come from the general-purpose memory of 
 Heap memory is limited only by what the operating system grants the process.
 Which of the two allocation types is chosen depends on the configured page size relative to the engine's configured buffer size.
 Chapter~\ref{cha:evaluation} measures the differences between these two types of allocation.
+Figure~\ref{fig:nes-components} summarizes the components introduced so far and where window state lives among them.
+
+\input{figures/nes_components}
 
 % [2.11]
 Tuples can arrive out of order.
@@ -168,7 +171,7 @@ The machinery that moves data to and from storage also needs memory.
 With a small fixed buffer pool, the hot data therefore includes the input and output path itself.
 Chapter~\ref{cha:evaluation} returns to this point.
 
-The evaluation measures memory, completion, and statistical confidence with a small set of terms.
+The evaluation measures memory and completion with a small set of terms.
 The last section of this chapter defines them.
 
 \section{Metrics and Terms\label{sec:bg-metrics}}
@@ -202,11 +205,8 @@ It is killed by the OOM killer because the cap is exceeded.
 It aborts because the buffer pool is exhausted (Section~\ref{sec:bg-nes}).
 Or it exceeds the time limit.
 
-% [2.20]
-The evaluation compares two kinds of quantities between variants.
-Completion proportions are compared with Fisher's exact test, which tests whether two proportions differ by more than chance.
-Mean values, such as throughput, are compared with Welch's t-test, which compares two means without assuming that their variances are equal~\cite{welch1947}.
-Chapter~\ref{cha:evaluation} states how each test is computed and which measurements it is applied to.
+% [2.20] The statistical tests are introduced in the evaluation itself
+% (Section 5.1, [7.1.8]), next to the measurements they are applied to.
 
 These terms complete the background.
 The next chapter states the problem of this thesis and the questions the evaluation answers.

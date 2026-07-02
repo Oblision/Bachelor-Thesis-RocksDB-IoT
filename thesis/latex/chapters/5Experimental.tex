@@ -26,7 +26,7 @@ The query is a single tumbling-window aggregation, the operator whose state this
 It groups the stream by key and sums a value field per key per window (Listing~\ref{lst:query}).
 Table~\ref{tab:workload} lists the workload parameters.
 
-\begin{lstlisting}[language=SQL,caption={The synthetic tumbling-window aggregation evaluated across the grid (NebulaStream systest dialect). \texttt{s} is a pre-generated CSV stream of Zipfian sensor keys with out-of-order event timestamps.},label={lst:query}]
+\begin{lstlisting}[language=SQL,float=ht,caption={The synthetic tumbling-window aggregation evaluated across the grid (NebulaStream systest dialect). \texttt{s} is a pre-generated CSV stream of Zipfian sensor keys with out-of-order event timestamps.},label={lst:query}]
 CREATE LOGICAL SOURCE s(key UINT64 NOT NULL, val UINT64 NOT NULL, ts UINT64 NOT NULL);
 CREATE PHYSICAL SOURCE FOR s TYPE File SET('${FILECSV}' AS `SOURCE`.FILE_PATH, 'CSV' AS PARSER.`TYPE`, ',' AS PARSER.FIELD_DELIMITER);
 CREATE SINK out(s.start UINT64 NOT NULL, s.end UINT64 NOT NULL, s.key UINT64 NOT NULL, s.sumVal UINT64 NOT NULL) TYPE Void;
@@ -78,10 +78,11 @@ The out-of-core backend runs under the same cap.
 The measurement matrix spans memory caps of 512, 1024, and 2048\,MB, several pool sizes, and $\rho$ from 0.45 to about 3.
 Each cell runs 8 to 10 times.
 The core evaluation comprises about 460 cells and roughly 3{,}100 measured runs; the backend-size contrast of Section~\ref{sec:rb32} adds a further 1{,}938 paired cells (Appendix~E).
+The operating-window figures additionally pool each grid cell with its backend-size twin from Section~\ref{sec:rb32}, so their cells carry 16 to 20 runs; the headline statistics quoted in the text use the 16/8 baseline arms alone.
 
 % [7.1.5]
 The fixed configuration: window length $W$ = 50{,}000\,ms of event time, emit lag $L$ = 4 million\,ms ($N_w$ = 80 retained windows), page size 8192 bytes, lz4 compression, 16\,MB write buffer, 8\,MB block cache, 4 partitions, 2 processor cores.
-The RocksDB parameters follow the characterization in Section~\ref{sec:rocksdb-config}.
+The RocksDB parameters follow the experimental analysis behind Section~\ref{sec:rocksdb-config}.
 
 % [7.1.6]
 Every follow-up experiment was preceded by a written hypothesis.
@@ -243,7 +244,7 @@ This small-cap limit is permanent and explained by the law above.
 
 % [7.2.5b]
 The two architectures divide the territory.
-The heap keeps the smallest cap, the fast-ingest cells, and the throughput edge at the heavy end.
+The heap keeps the smallest cap, the fast-ingest cells, and the throughput edge at the heavy end; at those heavy cells the pooled arms lose their edge to allocation stalls on the shared pool, visible as backpressure idle time in Section~\ref{sec:rq4}.
 The bounded architecture keeps the footprint guarantee, the bounded-only cells, and graceful degradation.
 One workload marks the absolute edge: r1000 at 2048\,MB ($\rho \approx 1.03$) fails under every configuration tested.
 
@@ -263,7 +264,10 @@ plus the unpooled directory bytes each resident slice induces breaks the cap. Th
 knife edge is visible at 512\,MB, r75: 10/10 at a 16k-buffer pool, 6/10 at 32k, and
 0/10 at 64k, a single workload swept from full completion to total OOM by enlarging
 the pool alone. A few high-churn heap cells fail by both modes across their runs; these
-are hatched and colored by their dominant mode. Top row: heap architecture (engine-default, all window state outside
+are hatched and colored by their dominant mode. Grid cells pool the 16/8 baseline
+with its 32/32 backend-size twin (Section~\ref{sec:rb32}) as additional repetitions,
+so counts read out of 16 or 20; the headline statistics in the text use the 16/8
+arms alone. Top row: heap architecture (engine-default, all window state outside
 the pool) with its capped in-memory baseline; bottom row: pooled architecture. Dots
 mark untested cells.\methodsnote}
 \label{fig:heatmap}

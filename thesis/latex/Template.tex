@@ -31,6 +31,26 @@
 }
 \renewcommand\lstlistingname{Code Fragment}
 
+% Listings: monospace, wrapped long lines with a hanging indent, no overflow.
+% upquote keeps '...' string quotes vertical (systest dialect), keepspaces +
+% fullflexible stop the default column alignment from shredding identifiers
+% like s.key into "s . key".
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\bfseries,
+  columns=fullflexible,
+  keepspaces=true,
+  upquote=true,
+  showstringspaces=false,
+  breaklines=true,
+  breakatwhitespace=true,
+  breakindent=12pt,
+  frame=single,
+  framerule=0.3pt,
+  xleftmargin=2pt,
+  xrightmargin=2pt,
+}
+
 %for adding comments
 \usepackage{verbatim}
 
@@ -183,14 +203,17 @@ setup in Section~\ref{sec:nexmark}, device profile in Table~\ref{tab:edge-profil
  \acro{GB}{gigabyte}
  \acro{IoT}{Internet of Things}
  \acro{IO}[I/O]{input/output}
+ \acro{JIT}{just-in-time (compilation)}
  \acro{KV}{key-value}
  \acro{LSM}{log structured merge tree}
  \acro{MB}{megabyte}
  \acro{OOC}{out-of-core}
  \acro{OOM}{out of memory}
  \acro{RAM}{random access memory}
+ \acro{CSV}{comma-separated values}
  \acro{RQ}{research question}
  \acro{SD}{Secure Digital (memory card)}
+ \acro{SSD}{solid-state drive}
  \acro{TSV}{tab-separated values}
 \end{acronym}
 \onecolumn

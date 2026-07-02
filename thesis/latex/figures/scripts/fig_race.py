@@ -61,7 +61,7 @@ def main() -> None:
     rho_mb = data.rho_table(df)
     free = _free_running(df)
 
-    fig, ax = plt.subplots(figsize=(7.8, 4.4))
+    fig, ax = plt.subplots(figsize=(8.2, 4.7))
     grid = df[df["campaign"].isin(["L", "W"]) & df["arm"].isin(["heap", "bounded"])
               & df["workload"].notna() & df["pool_buffers"].notna()
               & df["cap_mb"].notna()]
@@ -153,35 +153,25 @@ def main() -> None:
         ax.scatter(cx, cy, marker=mark[arm], c=style.GREEN, s=42, alpha=0.9,
                    edgecolors="black", linewidths=0.4, zorder=4)
 
-    # Reference-line labels.
-    ax.text(drain_ceiling - 0.05, 2.9,
-            f"empirical drain ceiling $\\approx${drain_ceiling:.1f} M/s\n"
-            f"(fastest surviving spilling cell)",
-            rotation=90, ha="right", va="center", fontsize=7.8, style="italic",
-            color="#3a3a3a")
-    ax.text(2.62, 1.04, "$\\rho = 1$ (exact: footprint $\\div$ cap): above, state must spill",
-            ha="left", va="bottom", fontsize=8.3, color="#444444")
+    # Reference-line labels: one short tag per line, horizontal, in empty space.
+    # The caption carries the full explanation; the plot only names the regions.
+    ax.text(drain_ceiling, 3.16,
+            f"drain ceiling $\\approx${drain_ceiling:.1f} M/s",
+            ha="center", va="center", fontsize=8.2, style="italic", color="#3a3a3a",
+            bbox=dict(boxstyle="round,pad=0.22", fc="white", ec="#bbbbbb", lw=0.5, alpha=0.9))
+    ax.text(0.66, 1.05, "$\\rho = 1$: above, state must spill",
+            ha="left", va="bottom", fontsize=8.2, color="#444444")
 
-    # Region narration: three parallel labels, each colored to its region. Every
-    # label names the rho regime, the spill-vs-drain relation, and the outcome.
+    # Region tags: three short labels, colored to their region, kept away from
+    # the data clusters (upper strip and lower-left corner are point-free).
     GREEN_T, BLUE_T, RED_T = "#0b5c46", "#0a4a6e", "#8a1500"
-    ax.text(3.12, 2.55,
-            f"$\\rho>1$ and demand outruns the\n"
-            f"$\\approx${drain_ceiling:.1f} M/s ceiling $\\rightarrow$ "
-            f"{death_fail}/{death_total} fail\n"
-            f"(no $\\rho>1$ cell demanding $>${CEILING} M/s survives)",
-            ha="center", va="center", fontsize=8.0, color=RED_T, fontweight="bold")
-    ax.text(1.55, 2.45,
-            "$\\rho>1$: must spill, but ingest stays below the\n"
-            "drain rate, so the spiller keeps up $\\rightarrow$ completes",
-            ha="center", va="center", fontsize=8.4, color=BLUE_T,
-            bbox=dict(boxstyle="round,pad=0.3", fc="white", ec=style.SKY, alpha=0.9, lw=0.7))
-    ax.text(1.30, 0.50,
-            "$\\rho<1$: state fits in memory. Most cells complete, but two\n"
-            "failure populations remain: heavy slow cells (true capacity)\n"
-            "and fast cells killed by a mis-sized pool (pool geometry)",
-            ha="center", va="center", fontsize=7.9, color=GREEN_T,
-            bbox=dict(boxstyle="round,pad=0.3", fc="white", ec=style.GREEN, alpha=0.9, lw=0.7))
+    ax.text(1.45, 3.05, "throttled: spiller keeps up",
+            ha="center", va="center", fontsize=8.6, color=BLUE_T, fontweight="bold")
+    ax.text(3.14, 2.62,
+            f"the race: ingest outruns drain\n{death_fail}/{death_total} fail",
+            ha="center", va="center", fontsize=8.6, color=RED_T, fontweight="bold")
+    ax.text(0.72, 0.44, "state fits\nin memory",
+            ha="left", va="center", fontsize=8.6, color=GREEN_T, fontweight="bold")
 
     ax.set_xlim(xlo, xhi)
     ax.set_ylim(ylo, yhi)
@@ -189,16 +179,18 @@ def main() -> None:
                   "free-running demand for all-fail cells)")
     ax.set_ylabel("state pressure $\\rho$")
     handles = [
-        Line2D([], [], marker="o", ls="", mfc=style.GREEN, mec="black", label="heap, completes"),
-        Line2D([], [], marker="s", ls="", mfc=style.GREEN, mec="black", label="bounded, completes"),
-        Line2D([], [], marker="o", ls="", mfc="none", mec=style.RED, mew=1.15, label="$\\rho>1$ fails (the race)"),
-        Line2D([], [], marker="v", ls="", mfc=style.ORANGE, mec="black", label="$\\rho<1$ fails: true capacity (heavy, slow)"),
-        Line2D([], [], marker="P", ls="", mfc=style.PURPLE, mec="black", label="$\\rho<1$ fails: pool geometry (fast, mis-sized pool)"),
+        Line2D([], [], marker="o", ls="", mfc=style.GREEN, mec="black", label="completes (heap)"),
+        Line2D([], [], marker="s", ls="", mfc=style.GREEN, mec="black", label="completes (bounded)"),
+        Line2D([], [], marker="o", ls="", mfc="none", mec=style.RED, mew=1.15, label="fails, $\\rho>1$: the race"),
+        Line2D([], [], marker="v", ls="", mfc=style.ORANGE, mec="black", label="fails, $\\rho<1$: capacity (slow, heavy)"),
+        Line2D([], [], marker="P", ls="", mfc=style.PURPLE, mec="black", label="fails, $\\rho<1$: pool geometry (fast)"),
     ]
-    ax.legend(handles=handles, loc="upper left", fontsize=7.6, framealpha=0.9, ncol=1,
-              columnspacing=1.0, handletextpad=0.4)
-    fig.suptitle("Completion is a race between ingest rate and spill-drain rate",
-                 fontsize=11, fontweight="bold")
+    ax.legend(handles=handles, loc="lower left", bbox_to_anchor=(0.0, 1.015),
+              fontsize=7.9, framealpha=1.0, ncol=3, borderpad=0.45,
+              columnspacing=1.2, handletextpad=0.4, labelspacing=0.4,
+              borderaxespad=0.0)
+    fig.suptitle("Cell outcomes across ingest rate and state pressure $\\rho$",
+                 fontsize=11, fontweight="bold", y=1.02)
     style.caption(fig)
     print(f"drain ceiling (max realized tps of a surviving rho>1 spilling cell) = {drain_ceiling:.3f} M/s")
     print(f"race death zone (rho>1 & rate>={CEILING}): {death_fail}/{death_total} fail")

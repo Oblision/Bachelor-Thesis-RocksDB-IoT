@@ -98,11 +98,11 @@ ADMQ & default / 8 & refuted task queue bound \\
 \hline
 \end{longtable}
 
-\addchap{Appendix E: RocksDB Characterization Tables}
+\addchap{Appendix E: RocksDB Experimental-Analysis Tables}
 % Full per-parameter breakdown behind Section sec:rocksdb-config. Source: Microbenchmark-BA
 % results/constrained_512mb/parsed/summary.csv (10,000 runs); all values verified vs raw CSV.
 
-These tables give the full per-parameter breakdown of the RocksDB characterization summarized in Section~\ref{sec:rocksdb-config}.
+These tables give the full per-parameter breakdown of the experimental RocksDB analysis summarized in Section~\ref{sec:rocksdb-config}.
 The data is the 512\,MB \texttt{db\_bench} sweep: 200 configurations (5 write buffer sizes $\times$ 5 block cache sizes $\times$ 4 compression algorithms $\times$ 2 workloads) at 50 repetitions each, 10{,}000 runs, of which 9{,}665 complete.
 Throughput and write-amplification figures are means over completing runs; write-stall percentages treat the absent \texttt{db\_bench} stall field as zero, since the tool emits that field only when stalls occur.
 
@@ -289,5 +289,9 @@ Claude (Anthropic) was used during this thesis for implementation assistance on 
 The models used were Claude Opus 4.6 through 4.8 and Claude Fable 5, accessed via Claude Code and the Claude desktop application; the exact model per conversation is recorded in the archive.
 All design decisions, interpretations, and the final text are the author's responsibility.
 Every substantive conversation is archived as one Markdown file (verbatim prompt and full transcript) in the public repository folder \url{https://github.com/Oblision/nebulastream-Out-of-Core-Stream-Processing/tree/main/docs/ai-usage}, organized by the eight phases of the declaration of aids.
-% TODO (pending): add the link to the initial-draft folder (first 10k-experiment draft) once
-% pushed; verify all links resolve publicly before submission (public fork must carry docs/ai-usage).
+% TODO (pending) before submission:
+%  1. sync docs/ai-usage to the public fork, incl. the 2026-07-02 revision-session
+%     entry (08-revising-thesis/2026-07-02-advisor-review-figures-pass.md) and its
+%     exported desktop-app transcript;
+%  2. add the link to the initial-draft folder (first 10k-experiment draft);
+%  3. verify every declaration/appendix link resolves publicly.

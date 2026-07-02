@@ -156,9 +156,12 @@ the existing \texttt{BufferManager}: an availability query and the pool-pressure
 hooks the levers of Section~\ref{sec:levers} use. The optimizer rewrite rule
 \texttt{LowerToPhysicalWindowedAggregation} picks the store implementation per
 aggregation operator. \texttt{SpillableAggregationSlice} is a \emph{subclass} of
-\texttt{HashMapSlice} (not a wrapper), so the Nautilus-JIT build path can keep
+\texttt{HashMapSlice} (not a wrapper), so the Nautilus just-in-time (JIT) build path can keep
 using \texttt{getHashMapPtr(WorkerId)} unchanged; only the probe path is aware of
-unspill. A slice holds one hashmap per worker thread and becomes eligible for
+unspill. The probe path must force-unspill \emph{before} the compiled probe
+pipeline runs: the query compiler emits machine code that reads the hash map
+through raw pointers, so the state must be resident in memory before that code
+executes, and the compiled code itself stays unchanged. A slice holds one hashmap per worker thread and becomes eligible for
 spilling once its end timestamp falls below the watermark and its state has left
 \texttt{WINDOW\_FILLING}. The \texttt{SpillBackend} interface keeps the RocksDB
 backend swappable for evaluation. \texttt{MemoryBudgetTracker} observes the
