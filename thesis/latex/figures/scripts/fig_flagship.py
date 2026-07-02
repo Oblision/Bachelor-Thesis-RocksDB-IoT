@@ -48,11 +48,11 @@ def main() -> None:
                                      rect.get_height() + 0.02),
                         ha="center", va="bottom", fontsize=9)
 
-    labels = [f"r{w}\n" r"$\rho \approx $" f"{rho_mb[w] / cap:.2f}" for w in workloads]
+    labels = [r"$\rho \approx $" f"{rho_mb[w] / cap:.2f}\n(r{w})" for w in workloads]
     ax.set_xticks(x, labels)
     ax.set_ylim(0, 1.18)
     ax.set_ylabel("completion fraction (completed / attempted)")
-    ax.set_xlabel("workload (state pressure ρ at the 512 MB cap)")
+    ax.set_xlabel("state pressure ρ at the 512 MB cap (workload id in parentheses)")
     ax.set_title("Out-of-core completes beyond the budget where capped in-memory cannot\n"
                  "512 MB cap · output verified by checksum against the uncapped reference",
                  fontsize=10)

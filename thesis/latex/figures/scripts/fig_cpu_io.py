@@ -43,10 +43,22 @@ def main() -> None:
         ax.scatter(cells["rho"], cells["cpu"], c=color, marker=marker, s=42,
                    alpha=0.8, edgecolors="black", linewidths=0.4, label=label)
     ax.set_xlabel("state pressure $\\rho$")
-    ax.set_ylabel("CPU utilization (%, 2 pinned cores)")
+    ax.set_ylabel("average CPU utilization (%, 2 pinned cores)")
     ax.set_ylim(0, 105)
-    ax.set_title("(a) processor utilization")
+    ax.set_title("(a) processor utilization (whole-run mean)")
     ax.legend(fontsize=8, loc="lower left")
+    # The plotted value is the whole-run MEAN utilisation. It folds in the one-off
+    # single-threaded Nautilus JIT compile phase at start-up, which pulls the mean
+    # down: short in-memory runs sit at 91-97%, long no-spill runs at ~99.6%; the
+    # 63%/54% points are genuine idle (backpressure-throttled), not the JIT.
+    ax.annotate("whole-run mean folds in the one-off\n"
+                "single-threaded Nautilus JIT compile\n"
+                "(short in-mem 91–97%, long no-spill $\\approx$99.6%;\n"
+                "63%/54% are genuine idle)",
+                xy=(0.98, 0.03), xycoords="axes fraction", ha="right", va="bottom",
+                fontsize=6.6, color="#444444", style="italic",
+                bbox=dict(boxstyle="round,pad=0.3", fc="white", ec=style.GREY,
+                          alpha=0.9, lw=0.6))
 
     ax = axes[1]
     spill = ok[(ok["arm"] != "inmem") & (ok["slices"] > 0)].groupby("cell").agg(

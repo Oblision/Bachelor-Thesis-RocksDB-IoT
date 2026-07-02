@@ -71,10 +71,10 @@ def main() -> None:
             ax.text(cross - 0.5, 1.14, "ρ = 1", ha="center", va="top",
                     fontsize=8, color="#555555")
 
-        ax.set_xticks(x, [f"r{int(w)}\n{rho_mb[int(w)] / cap:.2f}" for w in ws],
+        ax.set_xticks(x, [f"ρ {rho_mb[int(w)] / cap:.2f}\n(r{int(w)})" for w in ws],
                       fontsize=7.5)
         ax.set_title(f"cap {cap} MB")
-        ax.set_xlabel("workload (ρ at cap)")
+        ax.set_xlabel("state pressure ρ at cap (workload id)")
         ax.set_ylim(0, 1.20)
     # One figure-level y-label centered across all three panels: a per-panel
     # label is taller than a single panel and gets clipped.

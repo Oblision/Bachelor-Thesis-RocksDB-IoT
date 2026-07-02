@@ -7,18 +7,41 @@ import os, re, statistics, collections
 RES = os.path.join(os.path.dirname(__file__), "../../../nebulastream-Out-of-Core-Stream-Processing/.planning/eval-phase/lag-validation/results")
 OUT = os.path.join(os.path.dirname(__file__), "appendixA_cells.tex")
 
+# Claim-bearing campaign whitelist for the reduced appendix (advisor note:
+# "Appendix Rohdaten — kann reduziert sein"). The full raw set is 46 campaigns;
+# the appendix keeps only the campaigns that carry a headline claim, a
+# pre-registered falsification, or the diagnostic figures, and drops the
+# redundant exploratory / smoke / shakedown campaigns and the DEMOTED arms
+# (S, V/V2) on which no claim rests. The dropped campaigns remain in the
+# versioned repository for full reproducibility; this table is the curated view.
+KEEP = {
+    "L",   # primary cap x pool matrix (RQ1/RQ2, in-mem baselines)
+    "W",   # bounded final grid (corrected pooling flag)
+    "N",   # attribution ladder at the decisive cell
+    "U",   # matched-granularity heap control (cost attribution)
+    "I8",  # in-memory baseline at matched granularity (cost table)
+    "b",   # flagship 512 MB three-variant comparison (RQ1 headline)
+    "B3",  # allocation-backpressure / gridlock evidence (figure)
+    "GA", "GAmb", "GC",  # pre-registered gridlock alternative-explanation probes
+    "F",   # failure-probe investigation chain (RQ3)
+    "NX",  # Nexmark-style transfer workload
+    "P",   # pool-geometry probes
+    "unc", # uncapped footprint calibration (source of state pressures)
+}
+
 cells = collections.defaultdict(list)
 for fn in sorted(os.listdir(RES)):
     if not fn.endswith(".tsv"): continue
     # Exclude the 32/32 backend-size contrast (sec:rb32) and its drift control:
     # they reuse the core campaign prefixes but are a different RocksDB config and
     # are tabulated separately in Appendix E.6. Keeping them here would inflate the
-    # core 3,136-run / 460-cell count and mix two configurations in one campaign.
+    # core run/cell count and mix two configurations in one campaign.
     if "_b32_" in fn or re.match(r"D(?:16|32)_", fn): continue
     row = open(os.path.join(RES, fn)).read().split("\t")
     if len(row) < 31: continue
     label = row[0]
     cell = re.sub(r"_r\d+$", "", label)
+    if cell.split("_")[0] not in KEEP: continue
     cells[cell].append(row)
 
 def med(vals):

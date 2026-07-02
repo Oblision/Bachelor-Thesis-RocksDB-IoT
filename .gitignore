@@ -80,3 +80,11 @@ thesis/latex/*.fdb_latexmk
 thesis/latex/*.fls
 thesis/latex/*.synctex.gz
 .gstack/
+
+# build/scratch artifacts (uid-locked, do not commit)
+thesis/latex/Template_test.*
+thesis/latex/chk2.*
+thesis/latex/_compile_check.*
+thesis/latex/_verify.*
+thesis/fig_*.png
+thesis/latex/figures/scripts/__preview/

@@ -85,8 +85,10 @@ def fig_compartments():
     fig,ax=plt.subplots(figsize=(6.4,3.4)); x=range(len(groups));
     pool=[g[1] for g in groups]; unp=[g[2] for g in groups]; rdb=[g[3] for g in groups]; base=[g[4] for g in groups]; fil=[g[5] for g in groups]
     b=[0]*len(groups)
-    for vals,lab,col in [(pool,"pool floor","#4C72B0"),(unp,"unpooled (bucket dirs/arena)","#DD8452"),
-                         (rdb,"RocksDB","#C44E52"),(base,"base+transients","#937860")]:
+    for vals,lab,col in [(pool,"pool floor (pre-allocated global buffer pool)","#4C72B0"),
+                         (unp,"unpooled directories (bucket dirs + map arena, on heap)","#DD8452"),
+                         (rdb,"RocksDB (backend resident set)","#C44E52"),
+                         (base,"base (fixed engine/runtime footprint)","#937860")]:
         ax.bar(x,vals,bottom=b,label=lab,color=col,width=.7); b=[bi+vi for bi,vi in zip(b,vals)]
     ax.plot(x,[g[6] for g in groups],"k_",ms=18,mew=2,label="cap")
     ax.set_xticks(list(x)); ax.set_xticklabels([g[0] for g in groups],fontsize=7); ax.set_ylabel("resident anon (MB, median)")

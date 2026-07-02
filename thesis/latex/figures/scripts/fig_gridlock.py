@@ -1,4 +1,4 @@
-"""fig:gridlock — anatomy of the role-blind allocation deadlock (B3 cells).
+"""fig:gridlock — anatomy of the allocation deadlock (B3 cells).
 
 Panel (a): cgroup memory time series (0.2 s sampler) of one failing
 B3_bp_c1024_p32k_r200 rep: anon working set climbs, the pre-allocated pool
@@ -95,7 +95,14 @@ def main() -> None:
     ax.set_title("(b) the pool stays pinned")
     ax.legend(fontsize=7.5, loc="upper right", ncols=1)
 
-    fig.suptitle("Anatomy of the role-blind allocation deadlock (1024 MB / 32k pool / r200)",
+    # Descriptive statement of the failure (replaces the old "role-blind" wording).
+    axes[0].text(0.5, 1.10,
+                 "allocation deadlock: emitted state pins the pool; the workers\n"
+                 "that would drain it are all blocked allocating",
+                 transform=axes[0].transAxes, ha="center", va="bottom",
+                 fontsize=8.2, style="italic", color="#444444")
+
+    fig.suptitle("Anatomy of the allocation deadlock (1024 MB / 32k pool / r200)",
                  fontsize=11, fontweight="bold")
     style.caption(fig, extra="cgroup 0.2 s sampler · all 8 reps of the cell fail (rc 141)")
     style.save(fig, "fig_gridlock")

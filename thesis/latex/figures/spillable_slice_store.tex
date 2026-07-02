@@ -65,6 +65,10 @@
 \node[smnew]   (buildpath)    at (\cBL,\rThr) {Build path\\\footnotesize\itshape getHashMapPtr\\\footnotesize\itshape state == FILLING};
 \node[smnew]   (probepath)    at (\cBR,\rThr) {Probe path\\\footnotesize\itshape force-unspill\\\footnotesize\itshape before JIT probe};
 \node[newcomp] (backendiface) at (\cB,\rFou)  {SpillBackend\\\footnotesize\itshape interface (RocksDB / file / mmap)};
+% ---- THIS THESIS'S EXTENSIONS, called out explicitly ----
+% Background spiller thread: sits in the empty midpoint space between the existing
+% path and the spill path; drives preemptive/forced spilling off the thresholds.
+\node[smnew] (spiller) at (\cMid,\rFiv) {Background\\spiller\\\footnotesize\itshape 100\,ms poll\\\footnotesize\itshape soft / hard\\\footnotesize\itshape thresholds};
 % rocks + local disk merged into one storage node to save a row -- a thin
 % double rule conveys "physical storage" without needing a second box.
 \node[storage, double, double distance=1pt] (rocks) at (\cB,\rFiv)
@@ -73,7 +77,7 @@
 % ============ COLUMN C : config / memory / watermark ============
 \node[newcomp]  (cfg)    at (\cC,\rOne) {SpillConfig\\\footnotesize\itshape extends BaseConfiguration\\\footnotesize\itshape (YAML, nes-configurations)};
 \node[newcomp]  (budget) at (\cC,\rTwo) {MemoryBudgetTracker\\\footnotesize\itshape observes BufferManager\\\footnotesize\itshape (advisory, not parallel pool)};
-\node[existing] (bufmgr) at (\cC,\rThr) {BufferManager\\\footnotesize\itshape nes-memory};
+\node[existing] (bufmgr) at (\cC,\rThr) {BufferManager\\\footnotesize\itshape nes-memory\\\footnotesize\itshape\color{blue!60!black}+ availability query\\\footnotesize\itshape\color{blue!60!black}+ pool-pressure hooks};
 \node[existing] (wm)     at (\cC,\rFou) {Stream Watermark};
 
 % SpillConfig field detail -- sits next to the rocks row in otherwise empty
@@ -106,6 +110,10 @@
 \draw[flow] (probepath.south)  -- node[lbl, pos=0.55]{unspill} (backendiface.north);
 \draw[flow] (backendiface) -- (rocks);
 
+% ---- spiller thread edges: watches the store budget, drives eviction ----
+\draw[flow] (spiller.north) -- node[lbl, pos=0.55]{watches budget} (spillstore.west);
+\draw[flow] (spiller.east)  -- node[lbl, pos=0.55]{drives spill} (backendiface.west);
+
 % Sibling relation -- both slice types share the HashMapSlice base.
 \draw[sibling] (aggslice.east) -- node[lbl]{shared base} (spillslice.west);
 
@@ -120,7 +128,7 @@
 \begin{pgfonlayer}{background}
   \node[draw, dashed, rounded corners, fit=(defstore)(chained),
         inner sep=6mm, fill=black!3] (existingbox) {};
-  \node[draw, dashed, rounded corners, fit=(spillstore)(rocks)(buildpath)(probepath),
+  \node[draw, dashed, rounded corners, fit=(spillstore)(rocks)(buildpath)(probepath)(spiller),
         inner sep=6mm, fill=blue!4]  (newbox)      {};
 \end{pgfonlayer}
 
@@ -138,17 +146,22 @@
 \end{tikzpicture}%
 }
 \caption[NebulaStream out-of-core integration architecture]{%
-Integration of the spillable slice store into NebulaStream. The optimizer
-rewrite rule \texttt{LowerToPhysicalWindowedAggregation} picks the store
-implementation per aggregation operator. \texttt{SpillableAggregationSlice}
-is a \emph{subclass} of \texttt{HashMapSlice} (not a wrapper), so the
-Nautilus-JIT build path can keep using \texttt{getHashMapPtr(WorkerId)}
-unchanged; only the probe path is aware of unspill. A slice holds one
-hashmap per worker thread and becomes eligible for spilling once its end
-timestamp falls below the watermark and its state has left
-\texttt{WINDOW\_FILLING}. The \texttt{SpillBackend} interface keeps the
-RocksDB backend swappable for evaluation. \texttt{MemoryBudgetTracker}
-observes the existing \texttt{BufferManager} rather than maintaining a
-parallel memory pool.}
+Integration of the spillable slice store into NebulaStream. Blue nodes are the
+components this thesis adds; grey nodes are existing NebulaStream code. The
+extensions are the spillable slice store and its slice subclass, the background
+spiller thread that drives preemptive and forced spilling off the soft and hard
+thresholds, the \texttt{SpillBackend} interface with its RocksDB implementation,
+the \texttt{SpillConfig} and \texttt{MemoryBudgetTracker}, and two additions to
+the existing \texttt{BufferManager}: an availability query and the pool-pressure
+hooks the levers of Section~\ref{sec:levers} use. The optimizer rewrite rule
+\texttt{LowerToPhysicalWindowedAggregation} picks the store implementation per
+aggregation operator. \texttt{SpillableAggregationSlice} is a \emph{subclass} of
+\texttt{HashMapSlice} (not a wrapper), so the Nautilus-JIT build path can keep
+using \texttt{getHashMapPtr(WorkerId)} unchanged; only the probe path is aware of
+unspill. A slice holds one hashmap per worker thread and becomes eligible for
+spilling once its end timestamp falls below the watermark and its state has left
+\texttt{WINDOW\_FILLING}. The \texttt{SpillBackend} interface keeps the RocksDB
+backend swappable for evaluation. \texttt{MemoryBudgetTracker} observes the
+existing \texttt{BufferManager} rather than maintaining a parallel memory pool.}
 \label{fig:ooc-integration}
 \end{figure}
