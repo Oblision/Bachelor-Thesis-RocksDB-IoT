@@ -66,7 +66,12 @@ def fig_architecture():
     ax.bar(range(len(labs)),deltas,color=cols,width=.65)
     ax.axhline(0,color="k",lw=.8); ax.set_xticks(range(len(labs))); ax.set_xticklabels(labs,fontsize=8)
     ax.set_ylabel("Δ completion 32/32 − 16/8 (pp)"); ax.set_title("Architecture-gated effect @ cap 512")
-    for i,d in enumerate(deltas): ax.text(i,d+(1 if d>=0 else -1),f"{d:+.0f}",ha="center",va="bottom" if d>=0 else "top",fontsize=8)
+    for i,d in enumerate(deltas): ax.text(i,d+(2 if d>=0 else -2),f"{d:+.0f}",ha="center",va="bottom" if d>=0 else "top",fontsize=8)
+    # Extra headroom above/below the tallest bars so the value labels clear the
+    # axes frame instead of touching or crossing it.
+    ymax=max(deltas+[0]); ymin=min(deltas+[0])
+    pad=max(6,0.18*(ymax-ymin))
+    ax.set_ylim(ymin-pad,ymax+pad)
     save(fig,"fig_rb32_architecture.pdf")
 
 # ---- Fig 3: memory compartment decomposition (W_ b32), per cap, ok vs failed ----

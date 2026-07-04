@@ -83,11 +83,13 @@
 \draw[flow] (heap.north) -- ++(0,0.7) -| node[lbl, pos=0.08]{bucket directories; all pages\\under the 4096-byte default} (hot.south);
 
 % spilling and restoring
-\draw[watch] (spiller.north) -- node[lbl, pos=0.42]{watches live\\slice bytes} (store.south);
-\draw[flow] (spiller.east) -- node[lbl, below=9mm]{evicts cold slices:\\pages as key--value pairs} (rocksmem.west);
+% label positions: "watches" sits low near the spiller, "evicts" high near the
+% cold slices, so the two boxes occupy separate lanes and cannot collide.
+\draw[watch] (spiller.north) -- node[lbl, pos=0.24]{watches live\\slice bytes} (store.south);
+\draw[flow] ([xshift=-7mm]cold.south) -- node[lbl, pos=0.30, left]{spiller evicts:\\pages as key--value pairs} ([xshift=-7mm]rocksmem.north);
 \draw[flow] ([xshift=-9mm]rocksmem.south) -- node[lbl, pos=0.62]{flush,\\compaction} ([xshift=-9mm]sd.north);
 \draw[flow] ([xshift=9mm]sd.north) -- node[lbl, pos=0.38]{read on\\restore} ([xshift=9mm]rocksmem.south);
-\draw[flow] (rocksmem.north) -- node[lbl, pos=0.45]{restored slices\\(byte copy into pages)} (cold.south);
+\draw[flow] ([xshift=7mm]rocksmem.north) -- node[lbl, pos=0.45, right]{restored slices\\(byte copy into pages)} ([xshift=7mm]cold.south);
 
 % ================= LEGEND =================
 \node[draw, thick, rounded corners, inner sep=5pt, font=\sffamily\footnotesize]

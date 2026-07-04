@@ -15,7 +15,9 @@
 
 \begin{figure}[p]
 \centering
-\resizebox{\textwidth}{!}{%
+% 0.92\textwidth: the diagram plus its long caption must fit one float page
+% without the last caption lines colliding with the page-number footer.
+\resizebox{0.92\textwidth}{!}{%
 \begin{tikzpicture}[
   font=\sffamily\small,
   every node/.style={align=center},
@@ -63,15 +65,18 @@
 \node[newcomp] (spillstore)   at (\cB,\rOne)  {SpillableTime\-Based\\SliceStore};
 \node[newcomp] (spillslice)   at (\cB,\rTwo)  {SpillableAggregationSlice\\\footnotesize\itshape : HashMapSlice (subclass)};
 \node[smnew]   (buildpath)    at (\cBL,\rThr) {Build path\\\footnotesize\itshape getHashMapPtr\\\footnotesize\itshape state == FILLING};
-\node[smnew]   (probepath)    at (\cBR,\rThr) {Probe path\\\footnotesize\itshape force-unspill\\\footnotesize\itshape before JIT probe};
+\node[smnew]   (probepath)    at (\cBR,\rThr) {Probe path\\\footnotesize\itshape force-unspill before\\\footnotesize\itshape the compiled\\\footnotesize\itshape probe runs};
 \node[newcomp] (backendiface) at (\cB,\rFou)  {SpillBackend\\\footnotesize\itshape interface (RocksDB / file / mmap)};
 % ---- THIS THESIS'S EXTENSIONS, called out explicitly ----
-% Background spiller thread: sits in the empty midpoint space between the existing
-% path and the spill path; drives preemptive/forced spilling off the thresholds.
-\node[smnew] (spiller) at (\cMid,\rFiv) {Background\\spiller\\\footnotesize\itshape 100\,ms poll\\\footnotesize\itshape soft / hard\\\footnotesize\itshape thresholds};
+% Background spiller thread: bottom row of the spill column, under the build
+% path, so its two edges route at 90 degrees (up the left inside edge of the
+% blue group box to the store; a short vertical into SpillBackend).
+\def\cSp{3.9}
+\node[smnew] (spiller) at (\cSp,\rFiv) {Background\\spiller\\\footnotesize\itshape 100\,ms poll\\\footnotesize\itshape soft / hard\\\footnotesize\itshape thresholds};
 % rocks + local disk merged into one storage node to save a row -- a thin
 % double rule conveys "physical storage" without needing a second box.
-\node[storage, double, double distance=1pt] (rocks) at (\cB,\rFiv)
+% Sits under the probe path so the spiller fits beside it on the same row.
+\node[storage, double, double distance=1pt] (rocks) at (\cBR,\rFiv)
   {RocksDBSpillBackend\\\footnotesize\itshape local disk};
 
 % ============ COLUMN C : config / memory / watermark ============
@@ -95,7 +100,7 @@
 \draw[flow] (iface) -- node[lbl]{implements} (lower);
 \draw[flow] (lower.west)  -- (\cA,\rL)  -- node[lbl, pos=0.55]{creates (default)}  (defstore.north);
 \draw[flow] (lower.east)  -- (\cB,\rL)  -- node[lbl, pos=0.55]{creates (spill on)} (spillstore.north);
-\draw[flow] (handler) -- node[lbl, pos=0.55]{triggers,\\drives spill} (lower);
+\draw[flow] (handler.south) |- node[lbl, pos=0.72]{triggers,\\drives spill} (lower.east);
 
 % ============ EDGES : existing path (pure vertical, labels offset right) ============
 \draw[flow] (defstore) -- node[lbl]{contains} (aggslice);
@@ -104,15 +109,22 @@
 
 % ============ EDGES : spillable path ============
 \draw[flow] (spillstore) -- node[lbl]{contains} (spillslice);
-\draw[flow] (spillslice.south) -- node[lbl, pos=0.55]{write}   (buildpath.north);
-\draw[flow] (spillslice.south) -- node[lbl, pos=0.55]{read}    (probepath.north);
+% write/read: straight verticals from the slice's south edge into the two paths
+\draw[flow] ([xshift=-1.7cm]spillslice.south) -- node[lbl, pos=0.5]{write}
+  ([xshift=0.3cm]buildpath.north);
+\draw[flow] ([xshift=1.7cm]spillslice.south)  -- node[lbl, pos=0.5]{read}
+  ([xshift=-0.3cm]probepath.north);
 \draw[flow] (buildpath.south)  -- node[lbl, pos=0.55]{spill}   (backendiface.north);
 \draw[flow] (probepath.south)  -- node[lbl, pos=0.55]{unspill} (backendiface.north);
-\draw[flow] (backendiface) -- (rocks);
+\draw[flow] ([xshift=1cm]backendiface.south) -- ([xshift=-1cm]rocks.north);
 
 % ---- spiller thread edges: watches the store budget, drives eviction ----
-\draw[flow] (spiller.north) -- node[lbl, pos=0.55]{watches budget} (spillstore.west);
-\draw[flow] (spiller.east)  -- node[lbl, pos=0.55]{drives spill} (backendiface.west);
+% 90-degree routing: up the inside left edge of the blue group box, then right
+% into the store; and a short vertical into SpillBackend's south edge.
+\draw[flow] (spiller.west) -- ++(-0.35,0) |-
+  node[lbl, pos=0.25, align=center]{watches\\budget} (spillstore.west);
+\draw[flow] ([xshift=0.7cm]spiller.north) -- node[lbl, pos=0.5]{drives spill}
+  ([xshift=-1.4cm]backendiface.south);
 
 % Sibling relation -- both slice types share the HashMapSlice base.
 \draw[sibling] (aggslice.east) -- node[lbl]{shared base} (spillslice.west);
@@ -121,8 +133,10 @@
 \draw[flow] (cfg.west)     -- node[lbl]{tunes}     (spillstore.east);
 \draw[flow] (budget.west)  -- node[lbl]{advises}   (spillslice.east);
 \draw[flow] (bufmgr.north) -- node[lbl]{observes}  (budget.south);
-% Watermark to probe path: diagonal stays left of BufferManager (passes ~x=10.5)
-\draw[flow] (wm.west) -- node[lbl, pos=0.4]{end$<$wm $\wedge$ $\neq$FILLING} (probepath.east);
+% Watermark to probe path: 90-degree route through the free corridor between
+% SpillBackend (right edge x=8) and the column-C boxes (left edge x=11).
+\draw[flow] (wm.west) -| node[lbl, pos=0.30, align=center]{end$<$wm\\$\wedge$ $\neq$FILLING}
+  ([xshift=1.1cm]probepath.south);
 
 % ============ DASHED GROUP BOXES ============
 \begin{pgfonlayer}{background}
@@ -148,23 +162,18 @@
 \caption[NebulaStream out-of-core integration architecture]{%
 Integration of the spillable slice store into NebulaStream. Blue nodes are the
 components this thesis adds; grey nodes are existing NebulaStream code. The
-extensions are the spillable slice store and its slice subclass, the background
-spiller thread that drives preemptive and forced spilling off the soft and hard
-thresholds, the \texttt{SpillBackend} interface with its RocksDB implementation,
-the \texttt{SpillConfig} and \texttt{MemoryBudgetTracker}, and two additions to
-the existing \texttt{BufferManager}: an availability query and the pool-pressure
-hooks the levers of Section~\ref{sec:levers} use. The optimizer rewrite rule
-\texttt{LowerToPhysicalWindowedAggregation} picks the store implementation per
-aggregation operator. \texttt{SpillableAggregationSlice} is a \emph{subclass} of
-\texttt{HashMapSlice} (not a wrapper), so the Nautilus just-in-time (JIT) build path can keep
-using \texttt{getHashMapPtr(WorkerId)} unchanged; only the probe path is aware of
-unspill. The probe path must force-unspill \emph{before} the compiled probe
-pipeline runs: the query compiler emits machine code that reads the hash map
-through raw pointers, so the state must be resident in memory before that code
-executes, and the compiled code itself stays unchanged. A slice holds one hashmap per worker thread and becomes eligible for
-spilling once its end timestamp falls below the watermark and its state has left
-\texttt{WINDOW\_FILLING}. The \texttt{SpillBackend} interface keeps the RocksDB
-backend swappable for evaluation. \texttt{MemoryBudgetTracker} observes the
-existing \texttt{BufferManager} rather than maintaining a parallel memory pool.}
+additions are the spillable slice store and its slice subclass, the background
+spiller, the \texttt{SpillBackend} interface with its RocksDB implementation,
+\texttt{SpillConfig} and \texttt{MemoryBudgetTracker}, and two
+\texttt{BufferManager} extensions: an availability query and the pool-pressure
+hooks of Section~\ref{sec:levers}. \texttt{SpillableAggregationSlice} subclasses
+\texttt{HashMapSlice} rather than wrapping it, so the \ac{JIT} build path keeps
+using \texttt{getHashMapPtr(WorkerId)} unchanged; only the probe path must
+force-unspill first, since the compiled probe reads the hash map through raw
+pointers. Query compilation itself is untouched: the store restores state
+before compiled code runs, rather than teaching the compiler about spilling. A slice becomes spill-eligible once its end timestamp falls below the
+watermark and it has left \texttt{WINDOW\_FILLING}. \texttt{SpillBackend} keeps
+the backend swappable for evaluation; \texttt{MemoryBudgetTracker} observes the
+existing \texttt{BufferManager} rather than maintaining a parallel pool.}
 \label{fig:ooc-integration}
 \end{figure}

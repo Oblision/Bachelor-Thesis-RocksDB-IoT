@@ -49,29 +49,61 @@ def main() -> None:
         2, 1, figsize=(7.6, 5.8), height_ratios=[1.0, 1.45])
 
     # ---------------- panel (a): the baseline collapse ----------------
+    # One row per cap, one marker per baseline cell at its rho, each labeled
+    # completed/attempted. Fill encodes the outcome (filled green = all reps
+    # complete, orange = partial, open red = all fail): there is no fraction
+    # axis to decode, and the collapse at the boundary reads directly as
+    # "green left of the line, red right of it".
+    ROW = {512: 2, 1024: 1, 2048: 0}   # 512 on top, reading order of panel (b)
+    from matplotlib.lines import Line2D
+    ax_a.axvspan(1.0, 3.3, color=style.RED, alpha=0.05, zorder=0)
     for cap in CAPS:
         sub = inm_all[inm_all["cap_mb"] == cap]
-        xs, ys = [], []
-        for w in sorted(sub["workload"].dropna().unique()):
-            f, _ = _frac_lab(sub[sub["workload"] == w])
-            xs.append(rho_mb[int(w)] / cap)
-            ys.append(f)
-        ax_a.plot(xs, ys, ls="", marker=CAP_MARK[cap], ms=6.5,
-                  mfc=style.ORANGE, mec="black", mew=0.5, alpha=0.9,
-                  label=f"{cap} MB cap")
+        prev_x, prev_below = None, False
+        for w in sorted(sub["workload"].dropna().unique(),
+                        key=lambda w_: rho_mb[int(w_)]):
+            f, lab = _frac_lab(sub[sub["workload"] == w])
+            x_, y_ = rho_mb[int(w)] / cap, ROW[cap]
+            if f == 1.0:
+                kw = dict(mfc=style.GREEN, mec="black", mew=0.5)
+            elif f == 0.0:
+                kw = dict(mfc="none", mec=style.RED, mew=1.3)
+            else:
+                kw = dict(mfc=style.ORANGE, mec="black", mew=0.5)
+            # near-coincident rho values: drop the marker slightly below the
+            # row line (y is categorical, so the dodge misstates nothing)
+            below = prev_x is not None and (x_ - prev_x) < 0.14 and not prev_below
+            dodge = prev_x is not None and (x_ - prev_x) < 0.06
+            yy = y_ - (0.34 if dodge else 0.0)
+            ax_a.plot(x_, yy, marker="o", ms=6.2, ls="", **kw)
+            ax_a.annotate(lab, (x_, yy), textcoords="offset points",
+                          xytext=(0, -14.0 if (below or dodge) else 7.0),
+                          ha="center", fontsize=6.4, color="#333333")
+            prev_x, prev_below = x_, below or dodge
     ax_a.axvline(1.0, color="#666666", lw=1.0, ls="--")
-    ax_a.text(0.985, 0.5, "$\\rho = 1$", ha="right", va="center",
+    ax_a.text(0.985, -0.45, "$\\rho = 1$", ha="right", va="center",
               fontsize=8.5, color="#555555", rotation=90)
-    ax_a.text(1.06, 0.62, "no capped in-memory cell\ncompletes past $\\rho = 1$",
-              ha="left", va="center", fontsize=8.2, color="#8a1500",
+    ax_a.text(1.98, 0.38, "the baseline collapses at the boundary:\n"
+              "no completion past $\\rho \\approx 1$",
+              ha="center", va="center", fontsize=8.2, color="#8a1500",
               style="italic")
     ax_a.set_xlim(0.35, 3.3)
-    ax_a.set_ylim(-0.06, 1.30)
-    ax_a.set_yticks((0, 0.5, 1.0))
+    ax_a.set_ylim(-0.85, 2.75)
+    ax_a.set_yticks((2, 1, 0), ("512 MB", "1024 MB", "2048 MB"), fontsize=8)
     ax_a.set_xlabel("state pressure $\\rho$ at cap")
-    ax_a.set_ylabel("completion\nfraction", fontsize=9)
-    ax_a.legend(loc="center right", fontsize=7.8, framealpha=0.95)
-    ax_a.set_title("(a)  capped in-memory baseline: completion vs. state pressure",
+    ax_a.set_ylabel("cap", fontsize=9)
+    handles_a = [
+        Line2D([], [], marker="o", ls="", mfc=style.GREEN, mec="black",
+               label="all reps complete"),
+        Line2D([], [], marker="o", ls="", mfc=style.ORANGE, mec="black",
+               label="partial (label = fraction)"),
+        Line2D([], [], marker="o", ls="", mfc="none", mec=style.RED, mew=1.3,
+               label="all reps fail"),
+    ]
+    ax_a.legend(handles=handles_a, loc="center right", fontsize=7.0,
+                framealpha=0.95, borderpad=0.4, labelspacing=0.3)
+    ax_a.set_title("(a)  capped in-memory baseline: each workload cell at its "
+                   "state pressure, labeled completed/attempted",
                    fontsize=9.5, loc="left")
 
     # ------- panel (b): head-to-head at and beyond the boundary -------

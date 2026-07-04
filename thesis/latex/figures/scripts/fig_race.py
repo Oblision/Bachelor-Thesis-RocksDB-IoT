@@ -181,9 +181,10 @@ def main() -> None:
     handles = [
         Line2D([], [], marker="o", ls="", mfc=style.GREEN, mec="black", label="completes (heap)"),
         Line2D([], [], marker="s", ls="", mfc=style.GREEN, mec="black", label="completes (bounded)"),
-        Line2D([], [], marker="o", ls="", mfc="none", mec=style.RED, mew=1.15, label="fails, $\\rho>1$: the race"),
-        Line2D([], [], marker="v", ls="", mfc=style.ORANGE, mec="black", label="fails, $\\rho<1$: capacity (slow, heavy)"),
-        Line2D([], [], marker="P", ls="", mfc=style.PURPLE, mec="black", label="fails, $\\rho<1$: pool geometry (fast)"),
+        Line2D([], [], marker="o", ls="", mfc="none", mec=style.RED, mew=1.15, label="fails, $\\rho>1$ (heap)"),
+        Line2D([], [], marker="s", ls="", mfc="none", mec=style.RED, mew=1.15, label="fails, $\\rho>1$ (bounded)"),
+        Line2D([], [], marker="v", ls="", mfc=style.ORANGE, mec="black", label="fails, $\\rho<1$: capacity (slow; both arms)"),
+        Line2D([], [], marker="P", ls="", mfc=style.PURPLE, mec="black", label="fails, $\\rho<1$: pool geometry (fast; both arms)"),
     ]
     ax.legend(handles=handles, loc="lower left", bbox_to_anchor=(0.0, 1.015),
               fontsize=7.9, framealpha=1.0, ncol=3, borderpad=0.45,

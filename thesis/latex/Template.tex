@@ -72,24 +72,30 @@
 % Optional first arg overrides the scale factor (default 1.2 -> ~1.7cm margin).
 \newcommand{\widefig}[2][1.2]{\makebox[\textwidth][c]{\includegraphics[width=#1\textwidth]{#2}}}
 
-% Methods/provenance note appended under a data figure's caption. Kept in LaTeX
-% (not baked into the PDF) so it wraps to \textwidth automatically and never
-% stretches the figure canvas. \methodsnote: the synthetic grid. \nexmarknote:
-% the Nexmark transfer figures (different stream, schema, and arms).
-\newcommand{\methodsnote}{\par\smallskip{\footnotesize\color{black!55}%
+% Methods/provenance note for a data figure's caption. The full setup text lives
+% once, next to the relevant section (\methodsnotefull in Section~\ref{sec:setup},
+% \nexmarknotefull in Section~\ref{sec:nexmark}), and each figure caption prints
+% only \methodsnote or \nexmarknote, a short pointer back to it, so the full
+% paragraph is not repeated under every plot. A future campaign with its own
+% setup can add another \dots notefull / \dots note pair the same way.
+\newcommand{\methodsnotefull}{{\footnotesize\color{black!55}%
 Synthetic Zipfian sensor stream ($s\approx1.0$, 1.5\,M-key universe, top-10
 $\approx20\%$ of traffic); tumbling window 50{,}000\,ms of event time, emit lag
 4\,M\,ms ($N_w=80$ retained windows); 2 pinned cores, hard cgroup cap, lz4 spill to SD card.
 $n=8$ to 10 repetitions per cell unless labelled otherwise. Source:
 lag-validation campaign (3{,}133 runs, 457 cells), debug build, single host; full
 setup in Section~\ref{sec:setup}, device profile in Table~\ref{tab:edge-profile}.}}
-\newcommand{\nexmarknote}{\par\smallskip{\footnotesize\color{black!55}%
+\newcommand{\nexmarknotefull}{{\footnotesize\color{black!55}%
 Nexmark bid stream: canonical bid schema, hot-skewed auction popularity (Zipf
 head), in-order event time. Two tumbling-window aggregations, \texttt{q3} (sum
 per auction) and \texttt{q7}, the \emph{Highest Bid} (maximum per auction).
 Arms: capped in-memory engine, bounded pooled backend (B2), heap backend (U8);
 $n=8$ repetitions per cell. Source: Nexmark V2 campaign (210 cells), single host;
 setup in Section~\ref{sec:nexmark}, device profile in Table~\ref{tab:edge-profile}.}}
+\newcommand{\methodsnote}{\par\smallskip{\footnotesize\color{black!55}%
+Synthetic grid campaign; full setup in Section~\ref{sec:methods-grid}.}}
+\newcommand{\nexmarknote}{\par\smallskip{\footnotesize\color{black!55}%
+Nexmark campaign; full setup in Section~\ref{sec:methods-nexmark}.}}
 
 % Float placement: keep section-5 figures near their references instead of
 % drifting to the end. Relax the default fractions so a near-page-width plot may

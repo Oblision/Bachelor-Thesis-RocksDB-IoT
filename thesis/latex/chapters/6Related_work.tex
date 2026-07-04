@@ -22,7 +22,7 @@ Results from Flink therefore do not transfer directly to NebulaStream.
 A separate line of work studies RocksDB's parameters.
 Jin et al.\ show that large-scale parameter tuning improves performance but does not remove compaction overhead~\cite{jin2022}.
 Pamarthi reports that careful integration and tuning improve RocksDB's behavior in stream processing~\cite{pamarthi2024}.
-Ad\~ao et al.\ co-design the storage hierarchy below the key-value store and reduce, but do not eliminate, sensitivity to memory and I/O pressure~\cite{adao2025}.
+Ad\~ao et al.\ co-design the storage hierarchy below the \ac{KV} store and reduce, but do not eliminate, sensitivity to memory and I/O pressure~\cite{adao2025}.
 Wei et al.\ analyze how background compaction degrades foreground performance~\cite{wei2025}.
 Together these studies show that parameters mitigate but do not remove memory and I/O sensitivity.
 This thesis therefore fixes one research-informed configuration instead of searching over configurations (Section~\ref{sec:bg-rocksdb}).

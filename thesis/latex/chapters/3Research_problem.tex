@@ -1,6 +1,9 @@
 \chapter{Research Problem\label{cha:problem}}
 % Drafted per POINT-SEQUENCE.md Ch.3 (points 4.1–4.8, re-homed from WP Ch.4).
 
+This chapter states the research problem and the research questions it raises.
+It then fixes the scope of the thesis that answers them.
+
 \section{Problem Statement\label{sec:goal}}
 
 % [4.1]
@@ -21,7 +24,7 @@ The design and implementation in Chapter~\ref{cha:solution} answer this question
 
 % [4.3]
 \textbf{RQ1 (effectiveness).}
-Does the backend prevent out-of-memory failures for workloads whose state exceeds the memory budget?
+Does the backend prevent OOM failures for workloads whose state exceeds the memory budget?
 And for which workloads and budgets does it do so?
 
 % [4.4]
@@ -49,11 +52,11 @@ This covers write amplification and the composition of the memory footprint.
 The thesis is scoped deliberately.
 It covers tumbling windows only.
 It runs on a single node.
-It changes neither the query compiler nor the just-in-time compilation pipeline.
+It changes neither the query compiler nor the \ac{JIT} pipeline.
 It excludes fault tolerance, durability guarantees, sliding windows, state migration, and automatic parameter tuning.
 Cross-system comparisons are out of scope.
 
-The backend succeeds if it completes workloads whose state exceeds physical memory, without out-of-memory failures.
+The backend succeeds if it completes workloads whose state exceeds physical memory, without OOM failures.
 Its results must match those of the in-memory engine given sufficient memory.
 Efficiency is measured against the same in-memory engine under identical processor constraints without memory limits.
 

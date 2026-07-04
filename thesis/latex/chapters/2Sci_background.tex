@@ -17,7 +17,7 @@ A stream has no defined end.
 A \ac{DSPS} computes results in real-time from such streams while data arrives.
 It does not first store all the data and query it later for evaluation.
 
-NebulaStream is a data management system for the Internet of Things~\cite{zeuch2020,zeuch2022}.
+NebulaStream is a data management system for the \ac{IoT}~\cite{zeuch2020,zeuch2022}.
 Researchers at \ac{DIMA} develop it together with \ac{BIFOLD}.
 Its execution engine processes data streams, the capability this thesis builds on.
 The \ac{IoT} consists of many small networked devices, such as sensors spread across a city. 
@@ -178,9 +178,9 @@ The last section of this chapter defines them.
 
 % [2.17]
 Linux can place a group of processes under a hard memory limit.
-The mechanism is called a control group, or cgroup.
-A process group that exceeds its limit triggers the kernel's out-of-memory killer.
-The out-of-memory killer terminates the process.
+The mechanism is called a \ac{cgroup}.
+A process group that exceeds its limit triggers the kernel's OOM killer.
+The OOM killer terminates the process.
 This thesis writes OOM for out of memory.
 In the evaluation this cgroup is the one Docker creates for the container, so its hard limit is set by a Docker flag (Section~\ref{sec:reproducibility}); the bare term ``cgroup'' below always refers to that Docker-imposed control group.
 

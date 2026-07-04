@@ -1,8 +1,10 @@
 % Background view: the unmodified NebulaStream components that hold window state.
 % Deliberately contains NO thesis extensions (no spiller, no RocksDB, no thresholds):
 % those appear in fig:system-overview (Section 4.1), which extends this picture.
-% Same visual language as the Chapter-4 figures; everything here is existing engine
-% code, so everything is grey.
+% Boxes are shaded by ROLE (processing path grey, window state teal, memory
+% suppliers green, event time yellow). The tints deliberately avoid the
+% Chapter-4 legend colors (blue = this thesis, orange = storage engine), so
+% the two figure families cannot be confused.
 
 \begin{figure}[ht]
 \centering
@@ -12,7 +14,9 @@
   every node/.style={align=center},
   box/.style     ={rectangle, draw, thick, minimum height=1.5cm, inner sep=5pt, rounded corners=1pt, minimum width=3.1cm},
   existing/.style={box, fill=black!12},
-  slice/.style   ={rectangle, draw, thick, minimum width=2.9cm, minimum height=1.5cm, inner sep=4pt, rounded corners=1pt, fill=black!7},
+  memory/.style  ={box, fill=green!13},
+  time/.style    ={box, fill=yellow!25},
+  slice/.style   ={rectangle, draw, thick, minimum width=2.9cm, minimum height=1.5cm, inner sep=4pt, rounded corners=1pt, fill=teal!16},
   flow/.style    ={-{Latex[length=2.6mm]}, very thick},
   watch/.style   ={-{Latex[length=2.4mm]}, thick, dashed, black!60},
   lbl/.style     ={fill=white, draw=black!30, line width=0.2pt, rounded corners=1pt,
@@ -33,17 +37,17 @@
 
 % ---- slice store group box ----
 \begin{pgfonlayer}{background}
-  \node[draw, thick, rounded corners, fit=(sliceA)(sliceB), inner sep=4.5mm, fill=black!4] (store) {};
+  \node[draw, thick, rounded corners, fit=(sliceA)(sliceB), inner sep=4.5mm, fill=teal!6] (store) {};
 \end{pgfonlayer}
-\node[anchor=south, font=\sffamily\footnotesize\bfseries, text=black!65]
+\node[anchor=south, font=\sffamily\footnotesize\bfseries, text=teal!40!black]
   at (store.north) {Slice store \textnormal{\footnotesize\itshape (one slice per tumbling window)}};
 
 % ---- row B: memory suppliers + event time ----
-\node[existing, minimum width=4.6cm] (pool) at (4.6,-4.0)
+\node[memory, minimum width=4.6cm] (pool) at (4.6,-4.0)
   {Global buffer pool\\\footnotesize\itshape fixed number of buffers,\\\footnotesize\itshape allocated once at start};
-\node[existing, minimum width=3.0cm] (heap) at (0,-4.0)
+\node[memory, minimum width=3.0cm] (heap) at (0,-4.0)
   {Process heap\\\footnotesize\itshape grows on demand};
-\node[existing, minimum width=3.4cm] (wm) at (12.8,-4.0)
+\node[time, minimum width=3.4cm] (wm) at (12.8,-4.0)
   {Watermark\\\footnotesize\itshape event time up to which\\\footnotesize\itshape all tuples have arrived};
 
 % ---- edges ----
@@ -57,6 +61,14 @@
 \draw[flow] (heap.north) -- ++(0,0.7) -| node[lbl, pos=0.08]{pages + directories\\(unbounded allocation)} (sliceA.south);
 \draw[watch] (wm.north) -- node[lbl, pos=0.5]{marks windows\\complete} (sliceB.south);
 
+% ---- legend: the role shading ----
+\node[draw, thick, rounded corners, inner sep=5pt, font=\sffamily\footnotesize]
+  at (8.8,-6.3)
+  {\tikz\node[draw, thick, fill=black!12, minimum width=9mm, minimum height=4mm, inner sep=0pt]{};\,processing path\quad
+   \tikz\node[draw, thick, fill=teal!16, minimum width=9mm, minimum height=4mm, inner sep=0pt]{};\,window state\quad
+   \tikz\node[draw, thick, fill=green!13, minimum width=9mm, minimum height=4mm, inner sep=0pt]{};\,memory suppliers\quad
+   \tikz\node[draw, thick, fill=yellow!25, minimum width=9mm, minimum height=4mm, inner sep=0pt]{};\,event time};
+
 \end{tikzpicture}%
 }
 \caption[NebulaStream components that hold window state]{%
@@ -67,7 +79,9 @@ maps, and the hash maps live on fixed-size pages. Pages come from the global
 buffer pool when one page fits into one buffer (bounded allocation), and from
 the process heap otherwise (unbounded allocation). Once the watermark passes a
 window's end, the window is complete; its result is emitted downstream and its
-slices are freed afterwards. All state lives in main memory. Chapter~\ref{cha:solution}
+slices are freed afterwards. All state lives in main memory. Boxes are shaded
+by role: processing path in grey, window state in teal, memory suppliers in
+green, event time in yellow. Chapter~\ref{cha:solution}
 extends exactly this picture with a spillable slice store
 (Figure~\ref{fig:system-overview}).}
 \label{fig:nes-components}

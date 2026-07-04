@@ -34,7 +34,7 @@ When pressure crosses a hard threshold despite it, the backend forces a synchron
 The forced spill evicts state as quickly as the storage device permits, so an \ac{OOM} failure is averted rather than merely deferred.
 Third, it never changes query results.
 A window that was spilled and restored must produce the same output, byte for byte, as one that never left memory; Section~\ref{sec:reproducibility} describes how this is verified.
-Fourth, it leaves the just-in-time compilation pipeline untouched.
+Fourth, it leaves the \ac{JIT} pipeline untouched.
 
 \section{The Spillable Slice Store\label{sec:architecture}}
 
@@ -73,7 +73,7 @@ When the live slice bytes reach it, the store spills synchronously.
 This covers the case where the background spiller falls behind the arrival rate.
 
 % [5.6]
-Slices serialize page by page into RocksDB key-value pairs.
+Slices serialize page by page into RocksDB \ac{KV} pairs.
 The serializer preserves the exact memory layout of the hash map.
 A restore is therefore a plain byte copy back into pages.
 
