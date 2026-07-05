@@ -1059,6 +1059,39 @@ RQ1 and RQ3, and the chapter-wide OOC acronym consistency sweep.
 
 ---
 
+## Issue #28 — RQ1/RQ3 framing, figure cross-references, chapter-wide OOC sweep (wave 2b, 2026-07-05)
+
+Done directly (editorial, full context in hand), completing the user's wave-2
+requests.
+
+- **RQ1/RQ3 framing** for red-thread consistency with the restructured RQ2/4/5:
+  RQ1 opening now states the RQ question + closes with an "In answer to RQ1:"
+  paragraph after Nexmark (backend prevents OOM within a characterized window;
+  which arm holds it depends on the budget; transfers to Nexmark). RQ3 opening
+  ties to its question; new "In answer to RQ3:" paragraph before the summary
+  (two-sided feasibility law + ingest-drain race; three failure kinds ->
+  Table~\ref{tab:outcomes}; bounded arm makes the corridor navigable). The
+  Summary section already carried per-RQ narratives; these are the in-place
+  section conclusions that complement it.
+- **Figure cross-references (Task 6):** audit found several figures with ZERO
+  \ref citations. Added: fig:flagship (Fig 4) in 7.2.1; fig:race (Fig 14) at
+  "Completion is therefore a race"; fig:cost (Fig 17) panel refs (a)/(b)/(c) on
+  the three cost dimensions; fig:cpu-io (Fig 18) panel refs (a) idle / (b) disk
+  volume; fig:gridlock (Fig 21) at the deadlock; fig:regimes (Fig 22) at the
+  three-regime law. fig:geometry-law-1024 was already covered by the range ref
+  "Figures~\ref{...-512}--\ref{...-2048}" (= Figs 9--11), left as-is.
+- **Chapter-wide OOC sweep:** converted the remaining 14 spelled-out
+  "out-of-core" in Ch5 to \ac{OOC} (renders "OOC"; first use is Ch1). Protected
+  the one in fig:cost's \caption[...] LoF optional argument (moving arg) -- it
+  stays spelled out. Ch5 now uses OOC consistently everywhere except that LoF
+  entry.
+
+Compiles at 109 pages, zero errors, zero undefined references; RQ2 render
+verified (Figure 17(a)/(b) panel refs + OOC + answer paragraph all correct).
+Chapter-5 RQ-section restructuring (Issues #26--28) complete.
+
+---
+
 ## Full Glossary (by first-definition location, in reading order)
 
 ### Chapter 1 — Introduction (informal pre-definitions only, by design —

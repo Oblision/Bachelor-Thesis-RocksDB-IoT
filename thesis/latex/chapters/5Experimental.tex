@@ -20,7 +20,7 @@ Docker constrains the container to an edge-class resource envelope; it does not 
 The memory cap is the central constraint and the only one varied across experiments: a cgroup hard limit with swap disabled, set to 512, 1024, or 2048\,MB, so the backend is held to a fixed memory budget it may never exceed.
 Docker imposes this cap through the Linux kernel's \ac{cgroup} memory controller: the \texttt{--memory} flag of Table~\ref{tab:edge-profile} sets the cgroup's hard limit.
 The ``Docker memory limit'' and the ``cgroup cap'' named throughout this thesis are therefore the same mechanism seen at the container and kernel layers, not two independent limits, and the memory probes read their footprint from that same cgroup (Section~\ref{sec:bg-metrics}).
-The 512\,MB floor is chosen to sit at the low end of the memory budgets reported for constrained \ac{IoT} and edge-class devices~\cite{ojo2019,shi2016}, the regime where in-memory state no longer fits and out-of-core processing becomes necessary; the larger caps trace how the behavior changes as the budget grows.
+The 512\,MB floor is chosen to sit at the low end of the memory budgets reported for constrained \ac{IoT} and edge-class devices~\cite{ojo2019,shi2016}, the regime where in-memory state no longer fits and \ac{OOC} processing becomes necessary; the larger caps trace how the behavior changes as the budget grows.
 Two further levers complete the envelope: a two-core CPU budget pinned to a fixed pair of physical cores, and a consumer-grade SD card bind-mounted as the spill target.
 Together these constraints make the container \emph{resemble}, not replicate, a memory-constrained edge device: they reproduce its resource limits, not its hardware, and Section~\ref{sec:threats} states what this does and does not license.
 Table~\ref{tab:edge-profile} summarizes the resulting profile.
@@ -156,7 +156,7 @@ the physical axis.}
 Three variants run on identical workloads.
 The in-memory engine without a cap is the correctness reference.
 The in-memory engine under the cap is the failure the backend must prevent.
-The out-of-core backend runs under the same cap.
+The \ac{OOC} backend runs under the same cap.
 
 % [7.1.4]
 The measurement matrix spans memory caps of 512, 1024, and 2048\,MB, several pool sizes, and $\rho$ from 0.45 to about 3.
@@ -316,14 +316,15 @@ The engine-default configuration uses unbounded allocation: hash map pages live 
 The corrected configuration uses bounded allocation: hash map pages live in the global buffer pool.
 For brevity, this chapter also calls the first the heap architecture and the second the pooled architecture.
 Why two architectures exist is the subject of Section~\ref{sec:rq3}.
-This section reports the operating windows of both.
+RQ1 asks whether the backend prevents the out-of-memory failures that a fixed cap forces on the in-memory engine, and for which workloads and memory budgets it does so.
+This section answers that by mapping the operating windows of both architectures --- the region of workload and pool sizes over which each completes --- and closes with a transfer of the result to a realistic Nexmark workload.
 All figures and statistics in this section use the 16/8 RocksDB configuration fixed in Section~\ref{sec:rocksdb-config} (16\,MB write buffer, 8\,MB block cache), at 8 to 10 repetitions per cell.
 A separate experiment reran parts of the grid under the larger 32/32 configuration; that single-variable contrast has findings of its own and is analyzed in Section~\ref{sec:rb32}, not mixed into the counts here.
 
 \subsection{Headline Contrasts\label{sec:rq1-headline}}
 
 % [7.2.1]
-The flagship result stands at the smallest cap.
+The flagship result stands at the smallest cap (Figure~\ref{fig:flagship}).
 At 512\,MB under the heap architecture, the backend completes 14 of 24 runs.
 The capped in-memory engine completes 0 of 18.
 Fisher's exact test gives $p = 4.1 \times 10^{-5}$.
@@ -563,9 +564,9 @@ The one apparent exception is r200 at 1024\,MB, which completes 10 of 10 at $\rh
 This is a measurement-boundary effect, not completion beyond memory: $\rho$ is taken from an uncapped run, which runs about ten percent fatter with no reclaim pressure, so a workload measured just over $\rho = 1$ can still fit when actually capped --- r200's capped peak is 948\,MB, comfortably under 1024.
 The two cells that sit exactly at $\rho \approx 1.01$ split on this margin: r200 at 1024\,MB fits and completes, while r1000 at 2048\,MB genuinely exceeds its cap and fails 0 of 10; away from this one-percent band the collapse is sharp.
 Panel (b) compares the two arms at and beyond the boundary; the lighter workloads, which both arms complete in full, are omitted there because Figures~\ref{fig:heatmap-512}--\ref{fig:heatmap-2048} already show the full grids.
-At 512 and 1024\,MB the best out-of-core operating point, taken over pool sizes and both architectures, extends completion past the memory boundary.
-One cell in panel (b) breaks the left-to-right order of $\rho$: r500 at 1024\,MB ($\rho \approx 1.34$) fails on both arms, while r300 immediately to its right ($\rho \approx 1.54$, a \emph{larger} footprint) completes 8 of 8 out-of-core.
-This is not a mislabeling but the central lesson of the out-of-core window: completion is set by pool geometry, not by total footprint.
+At 512 and 1024\,MB the best \ac{OOC} operating point, taken over pool sizes and both architectures, extends completion past the memory boundary.
+One cell in panel (b) breaks the left-to-right order of $\rho$: r500 at 1024\,MB ($\rho \approx 1.34$) fails on both arms, while r300 immediately to its right ($\rho \approx 1.54$, a \emph{larger} footprint) completes 8 of 8 \ac{OOC}.
+This is not a mislabeling but the central lesson of the \ac{OOC} window: completion is set by pool geometry, not by total footprint.
 r500's concurrently live state needs a 96k-buffer pool ($\approx 786$\,MB) that cannot fit under a 1024\,MB cap, so every r500 run there dies --- the heap arm by OOM kill, the bounded arm by pool-exhaustion abort --- whereas r300, despite its larger total state, completes through a 48k pool that does fit (Section~\ref{sec:rq1-windows}).
 At 2048\,MB the single beyond-memory workload, r1000 at $\rho \approx 1$, defeats every configuration; this cell is the edge of the demonstrated result and is marked as such.
 
@@ -581,13 +582,13 @@ at and beyond the boundary ($\rho \geq 0.75$ only; lighter workloads, which
 both arms complete in full, are omitted since
 Figures~\ref{fig:heatmap-512}--\ref{fig:heatmap-2048} show the full grids):
 bars compare the capped in-memory baseline with the best
-out-of-core operating point (maximum completion over pool sizes and both
+\ac{OOC} operating point (maximum completion over pool sizes and both
 architectures), labeled completed/attempted; shaded spans mark the
 beyond-memory pairs ($\rho > 1$). The one green baseline cell past $\rho = 1$
 in panel (a), r200 at 1024\,MB ($\rho \approx 1.01$), is a measurement-boundary
 effect --- $\rho$ is measured uncapped and the capped peak still fits (text). In
 panel (b), r500 at 1024\,MB fails at a \emph{lower} $\rho$ than r300 beside it
-because out-of-core completion is governed by pool geometry, not total footprint
+because \ac{OOC} completion is governed by pool geometry, not total footprint
 (text). See the text for the per-cap reading.\methodsnote}
 \label{fig:effectiveness}
 \end{figure}
@@ -616,7 +617,7 @@ The mechanism is robust; the precise fractions are not.
 Knife-edge cells throughout this chapter carry $n = 8$ and correspondingly wide intervals, so their exact fractions should be read as estimates, not as fixed values.
 
 % [7.2.7]
-Completion is therefore a race.
+Completion is therefore a race, and Figure~\ref{fig:race} plots it: one point per spilling cell, ingest rate against state pressure.
 The ingest rate competes with the rate at which the spiller drains state to disk.
 This reframing drives the rest of the chapter.
 
@@ -793,6 +794,11 @@ scenarios for no benefit; the winning beyond-memory cell (C at 1024\,MB) pays
 \label{fig:nexmark-cost}
 \end{figure}
 
+% [7.2.11] --- answer to RQ1
+In answer to RQ1: the backend prevents the out-of-memory failure the capped in-memory engine suffers, but within a characterized window rather than unconditionally.
+Which architecture holds that window depends on the memory budget --- the heap architecture reaches the highest state pressures, where a small pool suffices, while the bounded architecture holds the fitting and moderately beyond-memory workloads and keeps the footprint guarantee --- and the two-sided pool geometry and the ingest-drain race (Sections~\ref{sec:rq1-geometry} and~\ref{sec:rq1-race}) bound that window, which Table~\ref{tab:windows} states per cap.
+The result transfers beyond the synthetic grid: on a realistic Nexmark bid stream at its one beyond-memory coordinate, the bounded backend completes where the in-memory engine cannot (Figure~\ref{fig:nexmark-sweep}).
+
 \section{Cost (RQ2)\label{sec:rq2}}
 
 RQ2 asks what the backend costs in throughput and tail latency, and what spilling and restoring state cost on their own.
@@ -800,12 +806,12 @@ This section answers it in three moves: the throughput penalty where both archit
 All headline comparisons use matched \ac{IO} granularity --- about 8{,}000-byte buffers in every variant, including the in-memory reference --- so that each contrast measures the architecture and not the buffer size; the granularity finding below justifies the choice.
 
 % [7.3.1] + [7.3.2] --- throughput cost
-Throughput is the first cost.
-At matched granularity, out-of-core processing costs 11--15\% throughput where both variants complete, under either allocation type; the penalty grows with state size and shrinks with memory headroom.
+Throughput is the first cost (Figure~\ref{fig:cost}(a)).
+At matched granularity, \ac{OOC} processing costs 11--15\% throughput where both variants complete, under either allocation type; the penalty grows with state size and shrinks with memory headroom.
 
 % [7.3.4] + [7.3.3] + [7.3.7] --- tail-latency cost, confound separated
-Tail latency is the second cost, and it must be read with care, because a naive comparison overstates it.
-At matched granularity the out-of-core 99th percentile is 1.1 to 1.6 times the in-memory engine, where earlier comparisons showed a 2--5$\times$ gap.
+Tail latency is the second cost (Figure~\ref{fig:cost}(b)), and it must be read with care, because a naive comparison overstates it.
+At matched granularity the \ac{OOC} 99th percentile is 1.1 to 1.6 times the in-memory engine, where earlier comparisons showed a 2--5$\times$ gap.
 That gap was the buffer granularity, not the architecture: per-task latency scales with buffer size in every variant, including the in-memory engine.
 What remains once granularity is matched is the spill-restore round trip itself, and it surfaces in the tail.
 Under unbounded allocation, tail latency grows into milliseconds at ten-million-entry working sets; matched granularity cuts it sharply, so that at the heaviest workload the 99th-percentile latency falls from 2509 to 899 microseconds while throughput rises 36\%.
@@ -813,20 +819,20 @@ Spill and restore latencies are distributions, not single numbers: their effect 
 
 % [7.3.5] --- granularity as an engine-wide finding
 Controlling for granularity surfaces a finding of its own.
-Buffer granularity is an engine-wide performance factor in its own right, not specific to out-of-core processing: the same per-task latency scaling with buffer size noted above shows up in throughput too.
+Buffer granularity is an engine-wide performance factor in its own right, not specific to \ac{OOC} processing: the same per-task latency scaling with buffer size noted above shows up in throughput too.
 Raising the default 4096-byte buffers to about 8{,}000 bytes speeds up even the in-memory engine by up to 13\%.
 The shipped default loses at every tested cell.
-This is an actionable finding for the engine itself, independent of out-of-core processing.
+This is an actionable finding for the engine itself, independent of \ac{OOC} processing.
 
 % [7.3.6]
-The bounded architecture's footprint advantage is confirmed at matched granularity.
+The bounded architecture's footprint advantage is confirmed at matched granularity (Figure~\ref{fig:cost}(c)).
 It uses 33\% less anonymous memory than the in-memory engine (924 versus 1387\,MB).
-It uses 27\% less than heap-allocated out-of-core at the same cell.
+It uses 27\% less than heap-allocated \ac{OOC} at the same cell.
 
 \begin{figure}[ht]
 \centering
 \widefig{img/fig_cost.pdf}
-\caption[The cost of out-of-core processing]{The cost of out-of-core processing
+\caption[The cost of out-of-core processing]{The cost of \ac{OOC} processing
 at matched I/O granularity ($\sim$8\,K buffers in every variant, same pool per
 coordinate; means over completing repetitions), in three panels: (a) throughput,
 (b) tail latency, (c) resident footprint, each relative to the in-memory
@@ -885,12 +891,12 @@ Below the memory boundary, spilling costs almost no read traffic: restores are s
 Beyond the boundary the spilled state outgrows the page cache, and every spilling cell reads from the device (57 to 511\,MB per run); the cells that complete there run at 62--87\% with write-dominated traffic.
 
 % [7.4.1c] --- two mechanisms pull the processor below full
-The lower figures are genuine idle, not the compilation cost, and two mechanisms produce them.
+The lower figures in Figure~\ref{fig:cpu-io}(a) are genuine idle, not the compilation cost, and two mechanisms produce them.
 One is disk wait: the bottom of that range is the throttled regime --- demand exceeds the pool, but the cap throttles ingest instead of the run deadlocking (regime two of the three-regime feasibility law, Section~\ref{sec:rq3}) --- at 62\% utilization with heavy traffic in both directions (278\,MB read, 525\,MB written), the workload disk-bound.
 The other is pool backpressure, in the bounded arm: the largest probed pool at each cap yields the coolest cells of its panel --- 31\% for r75 at 512\,MB (24k buffers), 64\% for r100 at 1024\,MB (48k), 54\% for r700 at 2048\,MB (96k) --- with near-zero device reads and runtimes stretched up to threefold over smaller pools on the same workload, the up-front reservation squeezing the ingest headroom (the mechanism of Section~\ref{sec:rq1-windows}).
 
 % [7.4.2]
-Disk read and write volumes scale with the spilled state volume.
+Disk read and write volumes scale with the spilled state volume (Figure~\ref{fig:cpu-io}(b)).
 The SD card's write bandwidth bounds the drain rate in the race from Section~\ref{sec:rq1}.
 
 % [7.4.3] --- answer to RQ4
@@ -973,9 +979,9 @@ heap/bounded agreement are interpreted in Section~\ref{sec:rq5}.\methodsnote}
 
 \section{Memory Behavior and Stability (RQ3)\label{sec:rq3}}
 
-This section is the investigation that produced the architecture finding (C4) and the failure taxonomy (C5).
-It is told in investigation order.
-Every step was pre-registered before its runs.
+RQ3 asks how memory behaves as state grows past the cap, and why the remaining failures happen.
+This section is the investigation that answered both: it produced the architecture finding (C4) and the failure taxonomy (C5).
+It is told in investigation order, and every step was pre-registered before its runs.
 
 % [7.6a]
 Failures map onto two independent constraints.
@@ -1053,7 +1059,7 @@ Its instrumentation supplied the diagnosis instead.
 In 118 of 138 stalls, no buffer returned anywhere in the pool for two full seconds.
 
 % [7.6k]
-The residual failure is an allocation deadlock: the emitted state pins the pool, and the workers that would drain it are all blocked allocating.
+The residual failure is an allocation deadlock (Figure~\ref{fig:gridlock}): the emitted state pins the pool, and the workers that would drain it are all blocked allocating.
 Emitted but unprocessed window state holds the pool's buffers.
 Draining that state back out requires worker threads.
 Every worker thread is itself blocked waiting to allocate.
@@ -1077,7 +1083,7 @@ stalls.\methodsnote}
 \end{figure}
 
 % [7.6l]
-The results compose into a three-regime feasibility law.
+The results compose into a three-regime feasibility law (Figure~\ref{fig:regimes}).
 Regime one: the demand fits the pool; the run completes at full speed.
 Regime two: the demand exceeds the pool, but the memory cap throttles ingest; the run completes at reduced speed.
 Regime three: the demand exceeds the pool and ingest is unconstrained; the run deadlocks.
@@ -1297,11 +1303,16 @@ Each 32/32 cell is matched to its 16/8 twin on cap, pool, state pressure, and ar
 Cells that die by pool exhaustion or OOM kill are counted as failures, not dropped, so the completion fractions carry no survivorship bias.
 The full per-arm tables are in \hyperref[app:rocksdb-tables]{Appendix~E}.
 
+% [7.6-answer] --- answer to RQ3
+In answer to RQ3: past the cap, memory behaves along a two-sided feasibility law --- the pool must hold the hot band or the run aborts, and the pool plus its overhead plus the base footprint must stay under the cap or the run is OOM-killed --- with completion additionally gated by the ingest-drain race once the pool is sized right.
+The remaining failures are therefore of three kinds: OOM kills where the footprint exceeds the cap, pool-exhaustion aborts where the pool is too small for the hot band, and a rare restore-path crash confined to cells already failing for a memory reason (Table~\ref{tab:outcomes}).
+The bounded architecture is the one that makes this corridor navigable, holding the footprint under the cap by recycling pages through the pool, and the backend-sizing contrast confirms the finding is robust to the RocksDB configuration (Section~\ref{sec:rb32}).
+
 \section{Summary of Results\label{sec:eval-summary}}
 
 % [7.7.1] Written-out summary, one short narrative per RQ, around the table.
 Every research question is answered.
-RQ0 asks whether an out-of-core backend can integrate into the push-based execution model, and it can: the spillable slice store sits behind the unchanged store interface and ran through about 3,100 measured runs without touching the \ac{JIT} pipeline.
+RQ0 asks whether an \ac{OOC} backend can integrate into the push-based execution model, and it can: the spillable slice store sits behind the unchanged store interface and ran through about 3,100 measured runs without touching the \ac{JIT} pipeline.
 RQ1 asks whether the backend prevents OOM failures beyond the budget, and it does inside a characterized window: at 512\,MB it completes 14 of 24 runs where the capped in-memory engine completes 0 of 18, and the output checksums match while spilling is active.
 RQ2 asks the cost, which is 11 to 15 percent throughput at matched granularity, with a 99th-percentile latency 1.1 to 1.6 times the in-memory engine.
 RQ3 asks how memory behaves as state grows and why failures happen, and its investigation is the deepest of the thesis: the attribution ladder carries the decisive cell from 0 of 10 to 7 of 8, pooled lever arms beat unpooled levers 12 of 16 against 0 of 16, and the residual failure is a diagnosed allocation deadlock, seen as no returned buffer in 118 of 138 stalls.
