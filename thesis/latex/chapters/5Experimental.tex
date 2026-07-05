@@ -795,27 +795,24 @@ scenarios for no benefit; the winning beyond-memory cell (C at 1024\,MB) pays
 
 \section{Cost (RQ2)\label{sec:rq2}}
 
-All headline cost comparisons in this section use matched \ac{IO} granularity: about 8{,}000-byte buffers in every variant, including the in-memory reference.
-The reason follows in the granularity finding below.
+RQ2 asks what the backend costs in throughput and tail latency, and what spilling and restoring state cost on their own.
+This section answers it in three moves: the throughput penalty where both architectures complete, the tail-latency penalty that the spill-restore round trip adds once state is evicted, and the resident footprint the bounded architecture trades for that cost.
+All headline comparisons use matched \ac{IO} granularity --- about 8{,}000-byte buffers in every variant, including the in-memory reference --- so that each contrast measures the architecture and not the buffer size; the granularity finding below justifies the choice.
 
-% [7.3.1]
-At matched granularity, out-of-core processing costs 11--15\% throughput where both variants complete.
-This holds under either allocation type.
+% [7.3.1] + [7.3.2] --- throughput cost
+Throughput is the first cost.
+At matched granularity, out-of-core processing costs 11--15\% throughput where both variants complete, under either allocation type; the penalty grows with state size and shrinks with memory headroom.
 
-% [7.3.2]
-The cost grows with state size and shrinks with memory headroom.
-
-% [7.3.3]
-Under unbounded allocation, tail latency grows into milliseconds at ten-million-entry working sets.
-This is the spill-restore round trip surfacing in the tail.
-Matched granularity cuts it sharply: at the heaviest workload, the 99th-percentile latency falls from 2509 to 899 microseconds while throughput rises 36\%.
-
-% [7.3.4]
-At matched granularity, the out-of-core 99th percentile is 1.1 to 1.6 times the in-memory engine.
-Earlier comparisons showed a 2--5$\times$ gap.
+% [7.3.4] + [7.3.3] + [7.3.7] --- tail-latency cost, confound separated
+Tail latency is the second cost, and it must be read with care, because a naive comparison overstates it.
+At matched granularity the out-of-core 99th percentile is 1.1 to 1.6 times the in-memory engine, where earlier comparisons showed a 2--5$\times$ gap.
 That gap was the buffer granularity, not the architecture: per-task latency scales with buffer size in every variant, including the in-memory engine.
+What remains once granularity is matched is the spill-restore round trip itself, and it surfaces in the tail.
+Under unbounded allocation, tail latency grows into milliseconds at ten-million-entry working sets; matched granularity cuts it sharply, so that at the heaviest workload the 99th-percentile latency falls from 2509 to 899 microseconds while throughput rises 36\%.
+Spill and restore latencies are distributions, not single numbers: their effect shows in the latency tail rather than in mean throughput, which is why the tables report both quantities.
 
-% [7.3.5]
+% [7.3.5] --- granularity as an engine-wide finding
+Controlling for granularity surfaces a finding of its own.
 Buffer granularity is an engine-wide performance factor in its own right, not specific to out-of-core processing: the same per-task latency scaling with buffer size noted above shows up in throughput too.
 Raising the default 4096-byte buffers to about 8{,}000 bytes speeds up even the in-memory engine by up to 13\%.
 The shipped default loses at every tested cell.
@@ -825,9 +822,6 @@ This is an actionable finding for the engine itself, independent of out-of-core 
 The bounded architecture's footprint advantage is confirmed at matched granularity.
 It uses 33\% less anonymous memory than the in-memory engine (924 versus 1387\,MB).
 It uses 27\% less than heap-allocated out-of-core at the same cell.
-
-% [7.3.7]
-Spill and restore latencies are distributions, not single numbers: their effect shows in the latency tail rather than in mean throughput, which is why the tables report both quantities.
 
 \begin{figure}[ht]
 \centering
@@ -870,23 +864,38 @@ no latency dimension, and the Nexmark transfer is a throughput contrast only.}
 \label{tab:cost}
 \end{table}
 
+% [7.3.9] --- answer to RQ2
+In answer to RQ2: at matched granularity the backend costs 11--15\% throughput where both architectures complete, at a 99th-percentile task latency 1.1 to 1.6 times the in-memory engine.
+Spilling and restoring state cost almost nothing in mean throughput --- their price is paid in the tail, where the round trip drives the unbounded default into milliseconds at ten-million-entry sets --- and the bounded architecture buys back a 33\% smaller resident footprint against that cost.
+
 \section{Processor and Disk Utilization (RQ4)\label{sec:rq4}}
 
-% [7.4.1]
+RQ4 asks how processor utilization and disk traffic evolve as the working set grows past the memory budget.
+This section follows that evolution along the state-pressure axis --- from workloads the pool absorbs, through the memory boundary where restores stop fitting in the page cache, to workloads that spill to the device --- and separates the two mechanisms that pull the processor below full utilization: disk wait and pool backpressure.
+
+% [7.4.1] --- measurement basis and the in-memory baseline
 All utilization figures here are the mean over the whole run.
 The whole run includes the one-off Nautilus query-compilation phase at startup, which is single-threaded and pays a fixed cost regardless of the workload.
 On short in-memory runs (two to fifteen seconds) that fixed cost holds mean utilization just below full, so the in-memory engine runs at 84--97\%, lowest on the shortest cells; on long runs it amortizes away and utilization reaches about 99.6\%.
 The in-memory engine has zero disk traffic.
+
+% [7.4.1b] --- disk reads divide at the memory boundary
+Disk read traffic divides at the memory boundary.
 Below the memory boundary, spilling costs almost no read traffic: restores are served from the operating system's page cache, and device reads are at or near zero in 19 of the 21 spilling cells.
 Beyond the boundary the spilled state outgrows the page cache, and every spilling cell reads from the device (57 to 511\,MB per run); the cells that complete there run at 62--87\% with write-dominated traffic.
-The lower figures are genuine idle, not the compilation cost.
-The bottom of that range is the throttled regime — demand exceeds the pool, but the cap throttles ingest instead of the run deadlocking (regime two of the three-regime feasibility law, Section~\ref{sec:rq3}) — at 62\% utilization with heavy traffic in both directions (278\,MB read, 525\,MB written); the idle share is disk wait and the workload is disk-bound.
-A second idle pattern sits in the bounded arm: the largest probed pool at each cap yields the coolest cells of its panel — 31\% for r75 at 512\,MB (24k buffers), 64\% for r100 at 1024\,MB (48k), 54\% for r700 at 2048\,MB (96k) — with near-zero device reads and runtimes stretched up to threefold over smaller pools on the same workload.
-That idle is pool backpressure: the up-front reservation squeezes the ingest headroom (the mechanism of Section~\ref{sec:rq1-windows}).
+
+% [7.4.1c] --- two mechanisms pull the processor below full
+The lower figures are genuine idle, not the compilation cost, and two mechanisms produce them.
+One is disk wait: the bottom of that range is the throttled regime --- demand exceeds the pool, but the cap throttles ingest instead of the run deadlocking (regime two of the three-regime feasibility law, Section~\ref{sec:rq3}) --- at 62\% utilization with heavy traffic in both directions (278\,MB read, 525\,MB written), the workload disk-bound.
+The other is pool backpressure, in the bounded arm: the largest probed pool at each cap yields the coolest cells of its panel --- 31\% for r75 at 512\,MB (24k buffers), 64\% for r100 at 1024\,MB (48k), 54\% for r700 at 2048\,MB (96k) --- with near-zero device reads and runtimes stretched up to threefold over smaller pools on the same workload, the up-front reservation squeezing the ingest headroom (the mechanism of Section~\ref{sec:rq1-windows}).
 
 % [7.4.2]
 Disk read and write volumes scale with the spilled state volume.
 The SD card's write bandwidth bounds the drain rate in the race from Section~\ref{sec:rq1}.
+
+% [7.4.3] --- answer to RQ4
+In answer to RQ4: as the working set grows past the memory budget, processor utilization falls from near-full --- while the state fits and restores come from the page cache --- to disk-bound idle once spilling reaches the device, bottoming at 62\% in the throttled regime; disk traffic tracks the spilled state and is bounded by the SD card's write bandwidth.
+A second idle is independent of state pressure: at the largest pools the up-front pool reservation, not disk wait, holds utilization as low as 31\%.
 
 \begin{figure}[ht]
 \centering
@@ -905,56 +914,60 @@ for spilling cells.\methodsnote}
 
 \section{Storage Efficiency (RQ5)\label{sec:rq5}}
 
-% [7.5.1]
-The map gauge decomposes the state at 26 million entries.
-Entry headers take 51\%.
-Payload takes 34\%.
-The bucket directory takes 14\%.
-Slack is below 1\%.
+% [7.5.0] Opening frame: how this section answers RQ5.
+This section answers RQ5 --- how efficiently storage is used --- along the two dimensions the question names: the composition of the memory footprint and the write amplification of spilling.
+It proceeds in four parts: the footprint composition (Figure~\ref{fig:composition}(a)), the reducible overhead within it, the write amplification of spilling against the on-disk spill volume (Figure~\ref{fig:composition}(b)), and a pool-sizing rule that folds the footprint into a provisioning heuristic built on the geometry law of Section~\ref{sec:rq1}.
 
-% [7.5.2]
-Eight bytes of every 24-byte header is a pointer for virtual dispatch that is never used.
-Removing it would cut about 20\% from each entry's header-plus-payload record, roughly 17\% of total state once the bucket directory is included.
+% [7.5.1] Footprint composition.
+The per-map gauge decomposes the state at 26 million entries (Figure~\ref{fig:composition}(a)).
+Entry headers take 51\%, payload 34\%, the bucket directory 14\%, and page slack below 1\%.
+The bucket directory is the map's control block that indexes its entries; it spills with the entries and is reconstructed byte for byte on restore, because the serializer writes the exact map layout, directory included, so a restore is a plain byte copy.
+
+% [7.5.2] Reducible overhead: the unused header pointer.
+Two parts of that footprint are structural overhead a refactor could remove, and both are quantified but left unimplemented.
+The first is in the header: eight bytes of every 24-byte header is a pointer for virtual dispatch that is never used, one third of each header.
+Removing it would recover about 20\% of an entry's 40-byte header-plus-payload record, roughly 17\% of total state once the bucket directory is included (the $\approx$20\% marked on the bar of Figure~\ref{fig:composition}(a)).
 The removal requires an entry-inheritance refactor; it is documented and not implemented.
 
-% [7.5.3]
-A one-line shrink of the bucket directory did not work.
-The fix changed the bucket count only at slice-creation time, but hash maps also get their bucket count assigned at two other sites, the per-worker build and the unspill/merge path, which the fix left untouched.
+% [7.5.3] Reducible overhead: the oversized bucket directory.
+The second is the bucket directory, which is larger than the workload needs, but a one-line shrink of it did not work.
+The fix changed the bucket count only at slice-creation time, while hash maps also get their bucket count assigned at two other sites, the per-worker build and the unspill/merge path, which the fix left untouched.
 Two-thirds of the maps, the ones built through those other two sites, therefore kept their original directory size.
 Completion was unaffected.
 
-% [7.5.4]
-Write amplification is measured at device level: disk bytes written divided by spill directory volume gives 1.0 to 1.8 with lz4 compression, including compaction.
+% [7.5.4] Write amplification.
+Write amplification is measured at device level: disk bytes written divided by spill-directory volume gives 1.0 to 1.8 with lz4 compression, including compaction.
 This is a device-level proxy, not RocksDB's internal counter; the internal counter was not captured uniformly.
+
+% [7.5.4b] On-disk spill volume (panel b).
+The on-disk spill volume itself is a property of the workload and its compression, not of the architecture: where both architectures complete the same cell their spill directories are the same size, so the heap and bounded markers coincide in Figure~\ref{fig:composition}(b).
+Heap contributes fewer points there because the bounded campaign probed more pool and cap coordinates, and heap loses the high-pressure cells to the completion race of Section~\ref{sec:rq1-race}.
 
 % [7.5.5]
 A pool-sizing rule combines the geometry law above with a designed safety margin.
 The pool must hold the hot band, the two-sided geometry law's lower bound (Section~\ref{sec:rq1}).
 What the data does not itemize on its own, the soft budget, the emission pipeline, and the I/O path, is covered instead by headroom: the pool plus its unpooled overhead plus the base footprint (the resident memory outside the pool and the unpooled directories --- the engine and runtime baseline together with the working set the gauges do not attribute, the RocksDB set included; decomposed in Figure~\ref{fig:rb32-compartments}) should stay below 90\% of the cap, a margin chosen to leave that headroom rather than measured from it.
 
+% [7.5.6] Answer to RQ5.
+Storage is used efficiently.
+Spilling writes between 1.0 and 1.8 device bytes per byte of spilled state under lz4, a device-level proxy for write amplification.
+The footprint is dominated by payload-bearing structure --- 51\% headers, 34\% payload, 14\% bucket directory, under 1\% page slack --- with no measured waste beyond that slack.
+The one clear inefficiency is structural: about 17\% of total state (20\% of each header-plus-payload record) is recoverable in principle by dropping the unused header pointer, and the bucket directory is further reducible, but both reductions are documented rather than implemented.
+The efficiency reported here is therefore what the shipped layout already achieves, with a stated, unrealized headroom of roughly 17 to 20 percent.
+
 \begin{figure}[ht]
 \centering
 \widefig{img/fig_composition.pdf}
 \caption[Composition of the state footprint]{Composition of the state
-footprint. (a) Hash-map state decomposition from the per-map gauge census of
-the r150 workload, aggregated over 996 destructed maps and 25.9 million entries:
-headers 51\%, payload 34\%, bucket directory 14\%, slack below 1\%. The bucket
-directory (the map's control block that indexes its entries) spills with the
-entries and is part of the byte-for-byte reconstruction on restore: the serializer
-writes the exact map layout, directory included, so a restore is a plain byte copy.
-The 51\% is the headers' \emph{share} of state; the $\approx$20\% noted on the bar
-is a separate quantity, the state that dropping the unused 8-byte vtable pointer
-from each 24-byte header would \emph{recover}: those 8 bytes are one third of each
-header, about 20\% of an entry's 40-byte header-plus-payload record (about 17\% of
-the full state once the bucket directory is included), see Section~\ref{sec:rq5}.
-(b) On-disk spill directory size (lz4)
-of completing spilling cells against state pressure. Heap contributes fewer
-points than the bounded backend: the bounded campaign probed more pool and cap
-coordinates, and heap loses the high-$\rho$, high-ingest cells to the race
-(Section~\ref{sec:rq3}), so those never complete to appear here. Where heap does
-complete its on-disk volume matches the bounded backend's (the spilled volume is
-a workload and compression property, not an architecture one), so the markers
-coincide; heap is drawn on top with a white edge to keep it visible.\methodsnote}
+footprint. (a) Stacked decomposition of hash-map state bytes from the per-map
+gauge census (r150 workload, $\approx$996 destructed maps, $\approx$25.9 million
+entries) into entry headers, payload, bucket directory, and page slack; the
+annotation on the bar marks the share recoverable by dropping the unused 8-byte
+vtable pointer from each header. (b) On-disk spill-directory size (lz4) of
+completing spilling cells against state pressure $\rho$, one marker per cell:
+squares for the bounded architecture, circles for heap (drawn on top with a white
+edge for legibility). The composition shares, the recoverable overhead, and the
+heap/bounded agreement are interpreted in Section~\ref{sec:rq5}.\methodsnote}
 \label{fig:composition}
 \end{figure}
 

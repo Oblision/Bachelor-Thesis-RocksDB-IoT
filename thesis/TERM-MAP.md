@@ -1019,6 +1019,46 @@ fig_race.pdf and fig_rb32_compartments.pdf regenerated; full doc compiles at
 
 ---
 
+## Issue #27 — RQ2/RQ4/RQ5 restructured into scientific analysis; Fig 19 caption trimmed (wave 2a, 2026-07-05)
+
+User: the non-RQ1 sections "seem a bit minimal", read as disconnected one-liners;
+each RQ must be "addressed in a proper manner ... scientific analysis and the
+individual aspects that compose the data and the answer". Two parallel read-only
+agents drafted restructures (RQ2+RQ4, and RQ5+Fig19); I verified numbers and
+applied. Each section now has: an OPENING framing how it answers the RQ + naming
+its aspects, a threaded BODY over the component aspects, and a CONCLUDING "In
+answer to RQ_n:" paragraph.
+
+- **RQ2 (Cost):** opening (three moves: throughput / tail latency / footprint);
+  merged throughput 7.3.1+7.3.2; tail-latency thread reordered confound-first
+  (7.3.4 then 7.3.3) with the distributions sentence (old 7.3.7) folded in and
+  its stranded copy deleted; granularity-finding bridge; closing answer. Numbers
+  re-verified via fig_cost's exact mean-based logic: throughput 11--15% (heap
+  -28% at 512/r75 is the flagged short-cell outlier, excluded), p99 1.1--1.6x,
+  footprint -33% (918 vs 1385 MB), r700 tail 2491->902 us / +37% (prose 2509/899
+  /36%). All hold.
+- **RQ4 (Utilization):** opening frame; re-paragraphed the 10-sentence blob into
+  measurement-basis / boundary-read-divide / two-idle-mechanisms (parallel "One
+  is disk wait... The other is pool backpressure..."); closing answer. Numbers
+  carried verbatim from the wave-1-corrected section.
+- **RQ5 (Storage):** opening (four aspects); threaded composition / reducible-
+  overhead(vtable + bucket dir) / write-amp / pool-sizing; closing answer
+  (efficient; write-amp 1.0-1.8; ~17-20% reducible-but-unimplemented). Added
+  panel refs Figure~\ref{fig:composition}(a)/(b) (fig went 0 -> 4 citations).
+  Race cross-ref sharpened sec:rq3 -> sec:rq1-race.
+- **Fig 19 caption trimmed** ~20 -> ~9 lines: now describes only what each panel
+  shows + defers interpretation to sec:rq5; the moved sentences (directory
+  spill/restore byte-copy; panel-(b) heap/bounded coincidence) relocated into the
+  RQ5 body. "Median resident" kept; note the metric is per-cell values.
+
+Compiles at 109 pages, zero errors, zero undefined references; RQ4 render
+verified. DEFERRED to wave 2b: cross-reference pass for the still-uncited figures
+(fig:flagship=Fig4, fig:race=Fig14, fig:geometry-law-1024, fig:gridlock,
+fig:regimes; plus panel refs for fig:cost/fig:cpu-io), intro/answer framing for
+RQ1 and RQ3, and the chapter-wide OOC acronym consistency sweep.
+
+---
+
 ## Full Glossary (by first-definition location, in reading order)
 
 ### Chapter 1 — Introduction (informal pre-definitions only, by design —
