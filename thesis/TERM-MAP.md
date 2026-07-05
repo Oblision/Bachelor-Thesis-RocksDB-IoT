@@ -1090,6 +1090,18 @@ Compiles at 109 pages, zero errors, zero undefined references; RQ2 render
 verified (Figure 17(a)/(b) panel refs + OOC + answer paragraph all correct).
 Chapter-5 RQ-section restructuring (Issues #26--28) complete.
 
+**Follow-up (same day) — OOM acronym + stray OOC.** The OOC sweep above missed
+that "out-of-memory" was still spelled out in Ch5, and one "Out-of-core" too.
+Ch2 already establishes the convention ("This thesis writes OOM for out of
+memory") and Ch5 uses bare "OOM" in ~30 places, so the spelled-out forms were
+inconsistent. Converted to bare "OOM" (matching the chapter's existing style):
+L168 "an OOM kill means...", L181 outcomes-table cell "the cgroup OOM killer",
+L319 RQ1 opening "prevents the OOM failures", L798 RQ1 answer "prevents the OOM
+failure". Fixed one stray L340 "Out-of-core" -> \ac{OOC} in the flagship
+\caption's *mandatory* argument (\ac safe there; renders "OOC"). The only
+remaining spelled-out "out-of-core" is L835 fig:cost \caption[...] LoF optional
+arg, which must stay spelled out. Recompiles clean (109 pp, 0 err, 0 undef).
+
 ---
 
 ## Full Glossary (by first-definition location, in reading order)

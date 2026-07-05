@@ -165,7 +165,7 @@ The core evaluation comprises about 460 cells and roughly 3{,}100 measured runs;
 
 % [7.1.5] Outcome taxonomy: how each run's exit is classified (used chapter-wide).
 Every run ends in one of a small set of outcomes, read from the process exit status and used unchanged throughout the chapter; the completion counts reported everywhere (an $n/m$ label) count the \emph{Complete} outcome over a cell's repetitions.
-A run either completes or it fails in one of three ways, and the failure reason is what the analysis turns on: an out-of-memory kill means the total footprint did not fit the cap, while a pool-exhaustion abort means the buffer pool was too small for the concurrently live state even though the total might have fit.
+A run either completes or it fails in one of three ways, and the failure reason is what the analysis turns on: an OOM kill means the total footprint did not fit the cap, while a pool-exhaustion abort means the buffer pool was too small for the concurrently live state even though the total might have fit.
 These two are the two sides of the geometry law of Section~\ref{sec:rq1-geometry}; the third, a crash, is a rare corruption on the restore path confined to cells that already fail for a memory reason (Section~\ref{sec:rq3}).
 Table~\ref{tab:outcomes} lists the categories and the exit codes that map to them.
 
@@ -178,7 +178,7 @@ Table~\ref{tab:outcomes} lists the categories and the exit codes that map to the
 \hline
 Complete & 0 & The run finished and its output checksum matched the uncapped in-memory reference. \\
 \hline
-OOM kill & 137, 137c, 134 & The working set exceeded the cap: the cgroup out-of-memory killer terminated the process (137; 137c is the same kill under checksum verification), or the allocator aborted under the cap (134). Total footprint too large. \\
+OOM kill & 137, 137c, 134 & The working set exceeded the cap: the cgroup OOM killer terminated the process (137; 137c is the same kill under checksum verification), or the allocator aborted under the cap (134). Total footprint too large. \\
 \hline
 Pool abort & 141 & The buffer pool could not satisfy an allocation: a worker found no free buffer for the concurrently live window state and the run aborted. Pool too small for the demand. \\
 \hline
@@ -316,7 +316,7 @@ The engine-default configuration uses unbounded allocation: hash map pages live 
 The corrected configuration uses bounded allocation: hash map pages live in the global buffer pool.
 For brevity, this chapter also calls the first the heap architecture and the second the pooled architecture.
 Why two architectures exist is the subject of Section~\ref{sec:rq3}.
-RQ1 asks whether the backend prevents the out-of-memory failures that a fixed cap forces on the in-memory engine, and for which workloads and memory budgets it does so.
+RQ1 asks whether the backend prevents the OOM failures that a fixed cap forces on the in-memory engine, and for which workloads and memory budgets it does so.
 This section answers that by mapping the operating windows of both architectures --- the region of workload and pool sizes over which each completes --- and closes with a transfer of the result to a realistic Nexmark workload.
 All figures and statistics in this section use the 16/8 RocksDB configuration fixed in Section~\ref{sec:rocksdb-config} (16\,MB write buffer, 8\,MB block cache), at 8 to 10 repetitions per cell.
 A separate experiment reran parts of the grid under the larger 32/32 configuration; that single-variable contrast has findings of its own and is analyzed in Section~\ref{sec:rb32}, not mixed into the counts here.
@@ -337,7 +337,7 @@ Output checksums match the uncapped in-memory reference under both architectures
 \centering
 \widefig{img/fig_flagship.pdf}
 \caption[Completion at the flagship cell (512\,MB)]{Completion at the flagship
-cell. Out-of-core (8 repetitions per workload) versus the capped in-memory
+cell. \ac{OOC} (8 repetitions per workload) versus the capped in-memory
 engine (6 repetitions) at the three beyond-memory state pressures of the
 512\,MB cap. Totals: 14/24 versus 0/18, Fisher's exact test
 $p = 4.1 \times 10^{-5}$ (two-sided).\methodsnote}
@@ -795,7 +795,7 @@ scenarios for no benefit; the winning beyond-memory cell (C at 1024\,MB) pays
 \end{figure}
 
 % [7.2.11] --- answer to RQ1
-In answer to RQ1: the backend prevents the out-of-memory failure the capped in-memory engine suffers, but within a characterized window rather than unconditionally.
+In answer to RQ1: the backend prevents the OOM failure the capped in-memory engine suffers, but within a characterized window rather than unconditionally.
 Which architecture holds that window depends on the memory budget --- the heap architecture reaches the highest state pressures, where a small pool suffices, while the bounded architecture holds the fitting and moderately beyond-memory workloads and keeps the footprint guarantee --- and the two-sided pool geometry and the ingest-drain race (Sections~\ref{sec:rq1-geometry} and~\ref{sec:rq1-race}) bound that window, which Table~\ref{tab:windows} states per cap.
 The result transfers beyond the synthetic grid: on a realistic Nexmark bid stream at its one beyond-memory coordinate, the bounded backend completes where the in-memory engine cannot (Figure~\ref{fig:nexmark-sweep}).
 
