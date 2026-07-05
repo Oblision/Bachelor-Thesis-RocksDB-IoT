@@ -32,6 +32,9 @@ def _cell_means(df, cell: str) -> dict[str, float]:
 def main() -> None:
     style.use_style()
     df = data.load_runs()
+    # 16/8 baseline only: the exact-name cell matches below can never hit a
+    # *_b32_* cell, but rho_table would otherwise mix b32 calibration reps.
+    df = df[~df["cell"].str.contains("b32")]
     stats = [[_cell_means(df, c) for c in coord[1:]] for coord in COORDS]
 
     fig, axes = plt.subplots(3, 1, figsize=(7.2, 6.7))

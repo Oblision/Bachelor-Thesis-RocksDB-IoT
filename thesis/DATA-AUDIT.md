@@ -47,6 +47,11 @@ directions. Every alternative explanation pre-registered and refuted.
 I/O. Spilling winners: 89–92% CPU, write-mostly I/O, restores served from page cache (io_r=0).
 Throttled regime: CPU 63%, io 277 R + 529 W MB — I/O-bound, the regime-2 signature. Heavy bounded
 r700: CPU 54% (backpressure idle time visible).
+*[Addendum 2026-07-05: these bands were computed on data that pooled the 32/32 (`*_b32_*`) twin runs.
+Recomputed 16/8-only (see TERM-MAP Issue #24): in-mem 84–97%; completing spilling cells beyond ρ=1
+run 62–87% (the 89–92% band came from the 32/32 twins); page-cache restores hold below ρ=1 (io_r≈0 in
+19/21 cells) but above ρ=1 every spilling cell reads 57–511 MB from the device; throttled 62% (cell
+median), heavy bounded r700 54% unchanged. The thesis prose now quotes the 16/8-only numbers.]*
 
 **RQ5 (additional) — storage efficiency? MET with a stated proxy.** Composition (HMGAUGE, 26M
 entries): header 51% / payload 34% / directory 14% / slack <1%; measured reduction options: vtable

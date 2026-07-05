@@ -1,7 +1,9 @@
 """fig:race — completion as a race between ingest rate and spill-drain rate.
 
 One point per spilling cell (L_ heap + W_ bounded grids, pooled together: the
-race holds for both architectures). x = the cell's ingest rate: realized median
+race holds for both architectures). 16/8 RocksDB configuration only: the
+32/32 backend-size twin runs (*_b32_*) are excluded, matching the rest of the
+RQ1 figure family; that contrast is analysed separately in Section~sec:rb32. x = the cell's ingest rate: realized median
 tps of completing reps, or, for all-fail cells, the workload's free-running rate
 (median tps of its completing in-memory / uncapped reference runs — a dead run
 has no realized rate of its own). y = state pressure rho.
@@ -20,6 +22,7 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import Rectangle
 
 import data
+import gridcells as gc
 import style
 
 CEILING = 2.7   # right edge of the SD drain band; death zone starts here
@@ -58,13 +61,17 @@ def _drain_ceiling(df, rho_mb, grid) -> float:
 def main() -> None:
     style.use_style()
     df = data.load_runs()
+    df = df[~df["cell"].str.contains("b32")]  # 16/8 baseline only; see docstring
     rho_mb = data.rho_table(df)
     free = _free_running(df)
 
     fig, ax = plt.subplots(figsize=(8.2, 4.7))
-    grid = df[df["campaign"].isin(["L", "W"]) & df["arm"].isin(["heap", "bounded"])
-              & df["workload"].notna() & df["pool_buffers"].notna()
-              & df["cap_mb"].notna()]
+    # grid_df drops the chk/ref verification reruns, whose rc141 teardown
+    # status would otherwise appear as a spurious all-fail pool-abort cell.
+    grid = gc.grid_df(df)
+    grid = grid[grid["campaign"].isin(["L", "W"]) & grid["arm"].isin(["heap", "bounded"])
+                & grid["workload"].notna() & grid["pool_buffers"].notna()
+                & grid["cap_mb"].notna()]
     # Deterministic dodge: all-fail cells of one workload share the free-running
     # rate, so stagger them slightly by pool rank to keep every cell visible.
     pool_rank = grid.groupby(["arm", "cap_mb", "workload"])["pool_buffers"].rank(method="dense")

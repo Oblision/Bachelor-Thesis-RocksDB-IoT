@@ -3,7 +3,8 @@
 One row per decisive completion-proportion contrast in the evaluation. Each row
 shows the point estimate of the completion-proportion DIFFERENCE (arm A minus arm
 B), its 95% confidence interval (Newcombe's method, built from Wilson score
-intervals via scipy), and the reported one-sided Fisher's-exact p-value. A dashed
+intervals via scipy), and the reported Fisher's-exact p-value (one-sided for
+every contrast except the flagship, which the prose reports two-sided). A dashed
 reference marks p = 0.05 in the p-value column; every contrast clears it by orders
 of magnitude.
 
@@ -23,7 +24,7 @@ CONTRASTS = [
     ("flagship\n(OOC backend vs capped in-memory)", 14, 24, 0, 18, 4.1e-5),
     ("attribution ladder\n(levers on vs off)", 7, 8, 0, 8, 7.0e-4),
     ("pooled lever arms\n(pooled vs unpooled)", 12, 16, 0, 16, 8.1e-6),
-    ("allocation-type win @512\n(pooled vs heap)", 8, 8, 0, 8, 2.3e-5),
+    ("allocation-type win @512\n(pooled vs heap)", 8, 8, 0, 8, 7.8e-5),
     ("intrinsic backpressure\n(bounded vs heap)", 23, 24, 3, 10, 1.6e-4),
 ]
 
@@ -93,14 +94,14 @@ def main() -> None:
              ha="right", va="top", color="#555555")
     axp.set_xscale("log")
     axp.set_xlim(1e-6, 2e-1)
-    axp.set_xlabel("Fisher's exact test $p$ (two-sided)")
+    axp.set_xlabel("Fisher's exact test $p$")
     axp.set_title("(b) significance", fontsize=9.5)
     axp.grid(True, axis="x", alpha=0.25)
 
     fig.suptitle("Headline completion contrasts: effect size and significance",
                  fontsize=11, fontweight="bold")
     style.caption(fig, extra="(a) Newcombe 95% CI for the completion-proportion difference; "
-                             "(b) reported two-sided Fisher's-exact p, dashed line at p = 0.05")
+                             "(b) reported Fisher's-exact p (one-sided; flagship two-sided), dashed line at p = 0.05")
     style.save(fig, "fig_pvalues")
 
 

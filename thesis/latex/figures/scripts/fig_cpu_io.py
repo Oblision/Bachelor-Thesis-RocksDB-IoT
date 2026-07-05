@@ -3,6 +3,10 @@
 Per completing cell of the L_/W_/I8_ grids plus failing throttled/bounded cells'
 ok reps. CPU utilization = cgroup cpu usage / (elapsed x 2 cores, the pinned
 budget). Disk = cgroup io.stat bytes read/written. One point per cell (medians).
+
+16/8 RocksDB configuration only: the 32/32 backend-size twin runs (*_b32_*)
+are excluded, matching the rest of the figure family; that contrast is
+analysed separately in Section~sec:rb32.
 """
 from __future__ import annotations
 
@@ -18,6 +22,7 @@ CORES = 2.0
 def main() -> None:
     style.use_style()
     df = data.load_runs()
+    df = df[~df["cell"].str.contains("b32")]  # 16/8 baseline only; see docstring
     rho_mb = data.rho_table(df)
 
     ok = df[df["ok"] & df["workload"].notna() & df["cap_mb"].notna()
@@ -49,12 +54,13 @@ def main() -> None:
     ax.legend(fontsize=8, loc="lower left")
     # The plotted value is the whole-run MEAN utilisation. It folds in the one-off
     # single-threaded Nautilus JIT compile phase at start-up, which pulls the mean
-    # down: short in-memory runs sit at 91-97%, long no-spill runs at ~99.6%; the
-    # 63%/54% points are genuine idle (backpressure-throttled), not the JIT.
+    # down: short in-memory runs sit at 84-97%, long no-spill runs at ~99.6%; the
+    # points at and below 64% (throttled regime, largest-pool bounded cells) are
+    # genuine idle (disk wait / pool backpressure), not the JIT.
     ax.annotate("whole-run mean folds in the one-off\n"
                 "single-threaded Nautilus JIT compile\n"
-                "(short in-mem 91–97%, long no-spill $\\approx$99.6%;\n"
-                "63%/54% are genuine idle)",
+                "(short in-mem 84–97%, long no-spill $\\approx$99.6%;\n"
+                "points $\\leq$64% are genuine idle)",
                 xy=(0.98, 0.03), xycoords="axes fraction", ha="right", va="bottom",
                 fontsize=6.6, color="#444444", style="italic",
                 bbox=dict(boxstyle="round,pad=0.3", fc="white", ec=style.GREY,

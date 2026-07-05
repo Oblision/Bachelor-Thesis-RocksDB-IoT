@@ -5,6 +5,9 @@ HMGAUGE per-map census (headers 51%, payload 34%, bucket directory 14%,
 page slack <1% — DATA-AUDIT.md RQ5; the raw gauge lines live in the run logs
 on the measurement host, the audited shares are reproduced here).
 Panel (b): on-disk spill footprint vs state pressure, from the result TSVs.
+16/8 RocksDB configuration only: the 32/32 backend-size twin runs (*_b32_*)
+are excluded, matching the rest of the figure family; that contrast is
+analysed separately in Section~sec:rb32.
 """
 from __future__ import annotations
 
@@ -25,6 +28,7 @@ COMPOSITION = [  # audited HMGAUGE shares at 26 M entries
 def main() -> None:
     style.use_style()
     df = data.load_runs()
+    df = df[~df["cell"].str.contains("b32")]  # 16/8 baseline only; see docstring
     rho_mb = data.rho_table(df)
 
     fig, axes = plt.subplots(1, 2, figsize=(8.8, 4.6), width_ratios=[1, 1.5])

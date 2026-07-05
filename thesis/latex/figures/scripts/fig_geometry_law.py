@@ -1,14 +1,26 @@
-"""fig:geometry-law — the two-sided geometry law of the bounded architecture.
+"""fig:geometry-law-{512,1024,2048} — the two-sided geometry law of the
+bounded architecture, one standalone figure per cap.
 
-One panel per cap, bounded (W_) grid only. Every failing cell is coloured by
-its dominant failure reason and annotated "N ok / failure split": the
-pool-exhaustion aborts (rc 141) gather at the small-pool edge, the memory-
-pressure failures (rc 137 OOM kill / rc 134 allocator abort, counted
-together per the thesis accounting policy) at the large-pool edge. Cells
-mixing categories are hatched and write the split out; the corruption
+Bounded (W_) grid only, 16/8 RocksDB configuration only (the paired 32/32
+backend-size contrast is analysed separately in Section~sec:rb32 / Appendix
+E.6 and is excluded here rather than summed in, matching fig_heatmap). Every
+failing cell is coloured by its dominant failure reason and annotated "N ok /
+failure split": the pool-exhaustion aborts (rc 141) gather at the small-pool
+edge, the memory-pressure failures (rc 137 OOM kill / rc 134 allocator abort,
+counted together per the thesis accounting policy) at the large-pool edge.
+Cells mixing categories are hatched and write the split out; the corruption
 segfaults (rc 139/11) appear as "crash" and only inside cells that fail
 regardless. The heap arm and the in-memory baseline are NOT in this figure:
 the law is a bounded-architecture statement (fig_heatmap has the windows).
+
+Split into one figure per cap (was a single 3-panel figure) because the
+pattern differs enough cap to cap that one caption could not honestly
+describe all three at once: 512 MB shows the textbook two-sided law (abort
+on the left, OOM on the right, a working band in between); 1024 MB is a
+mixed picture with a corruption-crash cell; 2048 MB is abort-dominated
+across almost the whole probed grid, since the heavier workloads tested at
+this cap (r200-r1000) demand more pool than any tested size supplies except
+at the largest pool or lowest pressure.
 """
 from __future__ import annotations
 
@@ -88,21 +100,8 @@ def _panel(ax, sub, rho_mb, cap: int) -> list[tuple]:
     return mixed_here
 
 
-def main() -> None:
-    style.use_style()
-    df = data.load_runs()
-    rho_mb = data.rho_table(df)
-    g = gc.grid_df(df)
-
-    fig, axes = plt.subplots(1, 3, figsize=(11.8, 4.2))
-    all_mixed: list[tuple] = []
-    for col, cap in enumerate(gc.CAPS):
-        _heap, _inm, bounded = gc.arm_frames(g, cap)
-        all_mixed += _panel(axes[col], bounded, rho_mb, cap)
-    axes[0].set_ylabel("bounded (pooled)\n$\\rho$ at cap  (workload id)",
-                       fontsize=8.0)
-
-    legend_handles = [
+def _legend_handles() -> list[Patch]:
+    return [
         Patch(facecolor=gc.blend(style.GREEN, 1.0), edgecolor="white",
               label="all reps complete"),
         Patch(facecolor=gc.blend(style.RED, 0.85), edgecolor="white",
@@ -113,17 +112,33 @@ def main() -> None:
               label="mixes failure modes; split written out\n"
                     "(crash = corruption segfault, rc 139/11)"),
     ]
-    fig.legend(handles=legend_handles, loc="outside lower center", ncol=2,
-               fontsize=7.4, frameon=False)
-    fig.suptitle("The two-sided geometry law: failure reason across pool size "
-                 "(bounded architecture)",
-                 fontsize=11, fontweight="bold")
-    print(f"geometry-law: mixed-mode cells = {len(all_mixed)}")
-    for m in all_mixed:
-        print("   mixed:", m)
-    style.caption(fig, extra="cell = N ok / failure split; colour = modal "
-                             "failure reason; hatch = mixed modes; dot = not run")
-    style.save(fig, "fig_geometry_law")
+
+
+def main() -> None:
+    style.use_style()
+    df = data.load_runs()
+    df16 = df[~df["cell"].str.contains("b32")]  # 16/8 baseline only; see docstring
+    rho_mb = data.rho_table(df16)
+    g = gc.grid_df(df16)
+
+    for cap in gc.CAPS:
+        _heap, _inm, bounded = gc.arm_frames(g, cap)
+        fig, ax = plt.subplots(1, 1, figsize=(4.6, 4.6))
+        mixed = _panel(ax, bounded, rho_mb, cap)
+        ax.set_title("")  # the cap is in the figure's own suptitle instead
+        ax.set_ylabel("bounded (pooled)\n$\\rho$ at cap  (workload id)",
+                      fontsize=8.0)
+        fig.legend(handles=_legend_handles(), loc="outside lower center",
+                   ncol=1, fontsize=7.0, frameon=False)
+        fig.suptitle(f"Two-sided geometry law at {cap} MB "
+                     "(bounded architecture)",
+                     fontsize=10.5, fontweight="bold")
+        print(f"geometry-law {cap}MB: mixed-mode cells = {len(mixed)}")
+        for m in mixed:
+            print("   mixed:", m)
+        style.caption(fig, extra="cell = N ok / failure split; colour = modal "
+                                 "failure reason; hatch = mixed modes; dot = not run")
+        style.save(fig, f"fig_geometry_law_{cap}")
 
 
 if __name__ == "__main__":

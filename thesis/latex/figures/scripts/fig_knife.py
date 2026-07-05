@@ -1,11 +1,11 @@
 """fig:knife — pool-size sensitivity of the heap architecture at 512 MB, r75.
 
 One workload, one cap, one knob: completion against pool size for the
-L_ heap grid at 512 MB, r75. The pool is the only variable across the three
-bars; enlarging it alone moves the cell from full completion (20/20 at 16k)
-to total OOM (0/20 at 64k). Counts pool the 16/8 baseline with its 32/32
-backend-size twin, as in the grid figures; the caption reports the 16/8-only
-counts alongside.
+L_ heap grid at 512 MB, r75, 16/8 RocksDB configuration only (matching
+fig_heatmap and fig_geometry_law; the paired 32/32 backend-size contrast is
+analysed separately in Section~sec:rb32 / Appendix E.6). The pool is the
+only variable across the three bars; enlarging it alone moves the cell from
+full completion (10/10 at 16k) to total OOM (0/10 at 64k).
 """
 from __future__ import annotations
 
@@ -19,8 +19,9 @@ import style
 def main() -> None:
     style.use_style()
     df = data.load_runs()
-    rho_mb = data.rho_table(df)
-    g = gc.grid_df(df)
+    df16 = df[~df["cell"].str.contains("b32")]  # 16/8 baseline only; see docstring
+    rho_mb = data.rho_table(df16)
+    g = gc.grid_df(df16)
 
     heap512, _inm, _bnd = gc.arm_frames(g, 512)
     sub = heap512[heap512["workload"] == 75]

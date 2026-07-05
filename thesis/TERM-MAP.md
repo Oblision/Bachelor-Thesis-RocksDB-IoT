@@ -484,7 +484,7 @@ pointer to the full per-campaign, per-cap table.
 > default-granularity heap arm), do not... Full per-campaign, per-cap
 > numbers are in Appendix~E.6.
 
-### 17. ~~"16/8" and "32/32" used in §Experimental Setup, ~100 lines before either is explained~~ — FIXED
+### 17. ~~"16/8" and "32/32" used in §Experimental Setup, ~100 lines before either is explained~~ — FIXED (relocation stands; its "safe to pool" claim was WRONG — see #20)
 
 `5Experimental.tex:127` (old location, §7.1.4, Setup section) forward-referenced
 "the 16/8 grid" and "the paired 32/32 RocksDB configuration" while explaining
@@ -585,6 +585,329 @@ matching the chapter's own naming convention. `5Experimental.tex:317`
 ("heap architecture (engine-default, ...)") was already correct — it leads
 with the shorthand and glosses the technical name parenthetically — and
 was left unchanged as the model to follow.
+
+### 20. ~~fig:heatmap silently summed 16/8 and 32/32 into one count — the pooling was NOT statistically safe~~ — FIXED (retracts part of #17)
+
+Issue #17 (above) claimed the fig:heatmap pooling was "justified by Figure
+`fig:rb32-arch`, which shows the two configurations complete at the same
+rate once between-session drift is controlled for." You pushed back:
+looking at Figure 19 and Appendix E.6 directly, the McNemar $p$-values
+*don't* support that — several cap/campaign rows are significant (W\_ pooled
+at 512\,MB: $+15$pp, $p=0.002$; L\_ heap at 2048\,MB: $-6$pp, $p=0.004$),
+meaning the two configurations' completion demonstrably differs in exactly
+the cells that matter. My error: I had conflated the reassuring
+*same-session drift control* (a separate, smaller $n=80$ re-run, Appendix
+E.7) with the actual cross-session data that gets pooled into the heatmap's
+cells — the control's $p=0.21$ never applied to the real pooled counts.
+
+**Checked the underlying data directly** (`figures/scripts/data.py`: the
+16/8 and 32/32 runs share a `campaign` prefix and get merged by
+`gc.iter_cells`/`arm_frames` purely because they match on
+cap/pool/workload, with no check that their completion behavior agrees).
+Cross-tabulating `is_b32` per cell (pooled W\_ and heap L\_ campaigns, all
+three caps) surfaces divergences far starker than the McNemar table alone
+suggested, e.g.:
+- cap 512, W\_, pool 16k, r150: 16/8 = 1/8, 32/32 = 8/8
+- cap 512, L\_, pool 32k, r100: 16/8 = 9/10, 32/32 = 0/10 (a full reversal)
+- cap 1024, W\_, pool 32k, r300: 16/8 = 0/8, 32/32 = 7/8
+
+A merged count (e.g. "9/16") would hide exactly this — the disagreement is
+the informative part, not noise to average away.
+
+**Applied 2026-07-05.** Per your instruction ("keep one figure ... separate
+the runs ... so we can see ... where both work and where only some work and
+which one"): `figures/scripts/fig_heatmap.py` now splits any cell that has
+a 32/32 twin into two half-cells (left = 16/8, right = 32/32), each
+independently colored and labeled with its own completion count; cells with
+no twin stay a single block (`_draw_cell` vs. `_draw_split_cell`). No
+figure or data is summed anymore. Regenerated `img/fig_heatmap.pdf`
+(isolated venv) and confirmed visually. Rewrote the §7.2.3 paragraph and the
+`fig:heatmap` caption (`5Experimental.tex`) to describe the split instead of
+asserting the retracted "safe to pool" claim.
+
+**Left as an open item, not fixed:** `fig_geometry_law.py` and
+`fig_knife.py` (Figures~\ref{fig:geometry-law},~\ref{fig:knife}) pool the
+same two configurations via the same shared `gridcells.py` helpers and were
+NOT redesigned — `fig:geometry-law`'s per-cell failure-reason/hatching
+encoding has no obvious two-configuration layout, and `fig:knife` is a bar
+chart, not a grid. Their captions no longer claim consistency with
+`fig:heatmap` (which was the only thing fixed there): `fig:geometry-law`'s
+caption now says plainly that its cells still sum the two configurations;
+`fig:knife`'s caption now gives the 16/8-alone and 32/32-alone numbers
+side by side (verified against the data: 16k = 10/10 both, 32k = 6/10 vs.
+5/10, 64k = 0/10 both — here the two configurations agree closely, unlike
+the heatmap's worst cells).
+
+### 21. ~~"an allocation finds it empty and the run aborts" reworded; Figure 7 split into three; fig:heatmap split-cell readability and an in-mem labeling bug~~ — FIXED
+
+Three separate requests handled together:
+
+**a) `5Experimental.tex:330` reworded.** Checked against the mechanism
+Ch.4 already establishes (`4Solution.tex:112`, §Allocation Backpressure:
+"When it does and all buffers are in flight, NebulaStream aborts the next
+allocation"; `4Solution.tex:103`, Lever 1b: "an allocation that finds the
+pool empty") — the Ch.5 sentence was factually consistent with this but
+vague about whose allocation, and didn't cite where the mechanism was
+established. Reworded: "When the pool cannot supply the concurrently open
+hot band, a worker's buffer request finds the pool empty and NebulaStream
+aborts that allocation (Section~\ref{sec:backpressure}), which kills the
+run."
+
+**b) Figure 7 (`fig:geometry-law`) split into three.** You asked for this
+because the three cap panels (512/1024/2048\,MB) tell different stories
+and one caption could not honestly cover all three. Checked what each
+panel actually shows before writing captions: 512\,MB is the clean
+textbook two-sided law (abort / sweet spot / OOM, cleanly separated by
+column); 1024\,MB is transitional — even the largest pool tested (48k)
+still fully aborts the heaviest workload (r500, 0/16), so the OOM edge is
+never reached for it; 2048\,MB is abort-dominated almost everywhere, because
+the workloads tested there are heavier (r200-r1000 vs. 512\,MB's r75-r300)
+and only the largest pool or lightest workload complete.
+**Applied 2026-07-05.** `figures/scripts/fig_geometry_law.py` now saves
+three standalone figures (`fig_geometry_law_512/1024/2048.pdf`) instead of
+one 3-panel figure; `5Experimental.tex` now has three `\begin{figure}`
+blocks with labels `fig:geometry-law-512/1024/2048` and per-cap captions,
+with the shared color/hatch encoding explained once in the prose
+beforehand. Updated all four `\ref{fig:geometry-law}` call sites elsewhere
+in the chapter to a `Figures~\ref{...-512}--\ref{...-2048}` range.
+
+**c) fig:heatmap (Figure 6) split-cell readability, raised after #20's fix.**
+Three things, addressed together:
+- The "split cells: left = 16/8..." annotation was a `fig.text()` at a
+  fixed figure coordinate, which `constrained_layout` (this project's
+  standard, `style.py`) does not account for, so it could collide with the
+  suptitle/panel titles. Merged it into `fig.suptitle()`'s second line
+  instead, which constrained_layout does lay out correctly.
+- The only thing distinguishing a split cell's two halves was a black
+  divider line at nearly the same weight as the ordinary white
+  cell-to-cell grid lines — easy to miss. Per your instruction not to use
+  color (already spoken for by the completion fraction), the right
+  (32/32) half now carries a dot hatch, and the divider line is heavier
+  (0.7 → 1.4pt); the legend gained an entry showing this.
+- **Checked the data behind this again and found a real bug**: the in-mem
+  reference column also carries a `b32`-tagged duplicate for exactly half
+  its rows, at every cap (confirmed: 50 of 100 rows, all three caps). But
+  the in-memory reference engine never touches RocksDB, so this "twin" is
+  not a real 16/8-vs-32/32 configuration difference — it is the same
+  configuration, re-measured in a different session (the same kind of
+  session-labeling artifact, just on an arm where the distinction is
+  meaningless). Splitting that column would have implied a contrast that
+  does not exist. **Applied**: `_panel` in `fig_heatmap.py` now merges the
+  in-mem column's two sessions as ordinary extra repetitions instead of
+  splitting it (`j == 0 and with_inmem is not None` skips the split path).
+  Regenerated and visually confirmed the in-mem column is now a single
+  block again (e.g. cap 1024, r100: "20/20") while the pool-size columns
+  still split correctly.
+
+Also removed the "Untested cells are marked by a grey dot" sentence from
+both the `fig:heatmap` and `fig:geometry-law` captions, and the
+corresponding unused `Line2D` legend entry from `fig_heatmap.py`: checked
+both figures' actual grids for empty cells (`runs.empty` in
+`gc.iter_cells`) and found zero in each, across all caps and both arms —
+the grey-dot legend key never had a matching mark anywhere in the
+rendered grid, which is its own kind of confusing. `fig_geometry_law.py`
+and `fig_knife.py` never added a grey-dot entry to their own legends, so
+no fix was needed there.
+
+### 22. ~~"23 of 24" (fig:pvalues row 5, and the regime-law figure) silently combines three different lever-configuration arms against a single-arm baseline~~ — FIXED
+
+You asked whether Figure 5 (fig:pvalues) combines several runs together,
+since the rep counts across its five rows look inconsistent (24, 8, 16, 8,
+24 vs. 18, 8, 16, 8, 10). Checked each row's provenance:
+
+- **flagship** (14/24 vs. 0/18): combines 3 workloads x 8/6 reps —
+  already disclosed in `fig:flagship`'s own caption ("8 repetitions per
+  workload... 6 repetitions"). Fine as is.
+- **pooled lever arms** (12/16 vs. 0/16): combines 2 arms per side (B1+B2
+  vs. unpooled S\_A1+A2) — already disclosed at `5Experimental.tex:845`,
+  "Taken together, the pooled lever arms complete 12 of 16...". Fine as is.
+- **intrinsic backpressure** (23/24 vs. 3/10): **not** disclosed, and the
+  surrounding sentence actively pointed the wrong way. Traced this to
+  `figures/scripts/fig_regimes.py`'s own docstring, which already had the
+  verified breakdown: `N_B0/B1/B2 = 7+8+8 of 24` (three pooled-lever arms:
+  no levers, and the two lever configurations from the attribution ladder
+  above) against `W_c1024_p32k_r200 = 0/8`, a single run of a *different*
+  campaign at the other cap. `5Experimental.tex:864` read "Pooling helps
+  elsewhere **with no levers at all**" immediately before citing the
+  23/24 number — but 2 of the 3 combined arms *do* have levers on; the
+  phrase pointed at the opposite of what the combined figure contains.
+  Same non-disclosure recurred at `5Experimental.tex:915` (prose) and the
+  `fig:regimes` caption (`5Experimental.tex:921-924`) — three separate
+  places citing "23 of 24" with no mention that it is a 3-arm sum.
+
+**Applied 2026-07-05** at all three locations. The mechanism claim survives
+and is in fact stronger once stated correctly (the effect holds regardless
+of lever configuration, not only without levers):
+> Pooling helps elsewhere independently of the levers. A blocked
+> allocation throttles ingest to the drain rate at one cell, and every
+> pooled arm tested there recovers it, lever-off and lever-on alike.
+> Combining all three pooled arms (no levers, and the two lever
+> configurations above) against the single heap-architecture baseline,
+> the cell rises from 3 of 10 to 23 of 24 ($p = 1.6 \times 10^{-4}$).
+
+And at the regime-law passage and its figure caption (careful not to imply
+the 1024\,MB side is also a 3-arm combination — it is one run of a
+different campaign):
+> One workload shows the law directly: its three pooled-lever arms
+> (above) combine to complete 23 of 24 at cap 512\,MB, while a single run
+> of the baseline pooled campaign dies 0 of 8 at cap 1024\,MB with twice
+> the pool.
+
+`fig_pvalues.py`'s own row label, `"intrinsic backpressure\n(bounded vs
+heap)"`, was left unchanged — at the architecture level (any pooled
+config vs. heap) it was already accurate; the missing disclosure was in
+the surrounding prose, not the label.
+
+### 23. ~~RQ1 rebuilt on the 16/8 baseline alone: split-cell heatmap retired, per-cap figures, subsections, and two more scripts that silently pooled 32/32 (and one phantom chk-cell)~~ — FIXED
+
+You asked to (a) simplify RQ1 down to the 16/8 runs only ("that's what we
+said we're going to stick with"), (b) split the operating-window figure per
+cap as was done for the geometry law, (c) restructure RQ1 into subsections
+with the supporting prose next to each figure, and (d) "make sure the data
+points for the 16/8 data is used in this section and not the 32/32 data
+points". Applied 2026-07-05:
+
+**Figure scripts — 16/8 filter (`~df["cell"].str.contains("b32")`) added:**
+- `fig_heatmap.py`: split-cell design retired entirely; now emits three
+  standalone figures `fig_heatmap_{512,1024,2048}.pdf` (heap+in-mem panel
+  over bounded panel, per cap). Old combined `fig_heatmap.pdf` orphaned.
+- `fig_geometry_law.py`, `fig_knife.py`: same filter. Knife counts change
+  from the pooled 20/20, 11/20, 0/20 to 10/10, 6/10, 0/10 (all OOM,
+  verified from rc codes).
+- `fig_effectiveness.py`, `fig_race.py`: **were still silently pooling the
+  32/32 twins** (your (d) — confirmed correct). Filter added. Race-figure
+  headline numbers moved: death zone 40/40 → **23/23 fail**; ρ<1 failure
+  groups 16 capacity / 46 pool-geometry → **10 / 23**.
+- `fig_race.py` + `fig_effectiveness.py` additionally never applied
+  `gridcells.grid_df` (drops chk/ref verification reruns whose rc141
+  teardown reads as a pool abort). One phantom all-fail cell,
+  `W_chk_c1024_p32k_r100` (0/2, rc141), was inflating the pool-geometry
+  group to 24. Both scripts now route through `grid_df`.
+
+**Prose (`5Experimental.tex`, sec:rq1) restructured into five subsections**
+(Headline Contrasts / Operating Windows of the Two Architectures / The
+Two-Sided Geometry of the Bounded Window / Where Each Architecture Wins /
+Completion as a Race), with a per-cap paragraph next to each new heatmap
+figure. Blocks 7.2.6/7.2.6b moved from before tab:windows into the Race
+subsection. A scope note at the top of RQ1 states the section is 16/8-only
+and points the 32/32 contrast at Section 5.7.4 (sec:rb32); the split-cell
+justification paragraph and the two "unlike Figure X, these still sum both
+configs" caveats (geometry-law prose, fig:knife caption) are deleted.
+
+**Data findings folded into the new per-cap prose (all verified against
+the TSVs and `ANALYSIS-RQ.md`):**
+- 1024/r500 completes 0 at every pool under BOTH architectures despite
+  ρ 1.34 < r300's 1.54 (which completes 8/8 at 48k). Not a data error:
+  ρ orders total measured footprint (uncapped calibration runs), the label
+  number orders the input streams (r300 = old generator, r500/r700/r1000 =
+  regenerated; `ANALYSIS-RQ.md:37-40`), and r500's failures are 100%
+  rc141 pool aborts — its hot band exceeds any pool that fits under 1024
+  (it needs 96k, first available at 2048).
+- 2048 heap: per-workload completion bands move toward smaller pools as
+  heap-resident state grows (r700@16k-32k, r500@32k-64k, r200@64k-128k);
+  no heap pool column completes >2 of 5 workloads where bounded 96k
+  completes 4. r300 is the band exception (fails everywhere, free-runs
+  >2x r700's ingest) — race, not footprint.
+- The "user's 32/32-better-at-low-cap" reading stays OUT of RQ1 prose;
+  it belongs to sec:rb32, which already reports exactly that
+  (W_ +15pp / N_ +33pp at 512, wash at 1024/2048).
+
+**Fixed while re-verifying captions against the regenerated figures:**
+- geometry-law 512 caption: "small pool aborts every workload but r75
+  (7/9)" was pooled-data; 16/8 truth is r75 3/8, and r200/r300 die by OOM
+  even at 8k. Caption rewritten to the actual per-column pattern.
+- geometry-law 1024 caption: "the same two edges appear" — false on 16/8
+  data (no plain OOM cell at this cap; single OOM rep inside r300's mixed
+  16k cell). Rewritten: only the abort edge is reached. "r500 0 of 16" →
+  0 of 8; "heaviest workload" → "most pool-demanding workload" (r500's ρ
+  is NOT the largest in the panel).
+- geometry-law 2048 caption: "OOM edge barely appears" → never reached.
+- 7.2.6b's "a parallel measurement session completes the ρ≈0.89 point 6
+  of 8" was actually the **32/32 twin** (`W_b32_c512_p16k_r100`) presented
+  as a same-config repeat — now disclosed as "the same cell rerun under
+  the 32/32 backend configuration of Section sec:rb32".
+- "90 to 100 percent recover at the geometry-correct pool" no longer holds
+  for the 16/8-only pool-geometry group: r300@2048 recovers only 5/8
+  (bounded 96k), heap none. Reworded to "five of the group's six
+  cap-and-workload coordinates ... the exception is r300 at 2048 MB".
+- 7.2.6's ρ values aligned to the figure-printed 16/8 rho table
+  (0.74→0.77, 0.80→0.82); r1000's ρ 1.03 → 1.01 (prose + tab:windows).
+
+Full document compiled twice+ with pdflatex: zero errors, zero undefined
+references. All five regenerated figures visually verified via pdftoppm.
+
+**Open (flagged, not yet acted on):** the RQ2/4/5 figure scripts
+(`fig_cost.py`, `fig_cpu_io.py`, `fig_composition.py`) also load runs
+without the b32 filter; user's instruction covered RQ1 ("this section").
+Same question applies there — awaiting a decision before extending.
+*(Resolved in Issue #24: user directed "complete the open items".)*
+
+---
+
+## Issue #24 — b32 filter extended to the remaining figure scripts; RQ4 prose recomputed; two Fisher-value errors (2026-07-05)
+
+User directive: "complete the open items accordingly" (closing Issue #23's
+open question). Audited all 11 remaining `fig_*.py` scripts that had no b32
+handling.
+
+**Audit result per script:**
+- `fig_cpu_io.py` — EXPOSED: campaign-based selection (`L/W/I8`) admitted
+  b32 rows because b32 cells keep their parent campaign letter. 317 of 684
+  selected ok-rows (88 → 48 plotted cells) were 32/32 twins. Filter added.
+- `fig_composition.py` — EXPOSED: panel (b)'s campaign `L/W` selection
+  admitted 181 of 374 spill rows. Filter added. Panel (b) story (heap/bounded
+  on-disk volumes coincide) unchanged on 16/8-only data.
+- `fig_cost.py`, `fig_flagship.py` — exact-cell / campaign-'b' selections can
+  never hit a `*_b32_*` cell, but both fed the unfiltered df into
+  `rho_table()`, which mixes b32 calibration reps into the r500/r700/r1000
+  footprint medians (1361→1373.5, 1651→1675.5, 2077→2077.5 MB — none used by
+  these figures' coordinates, so zero visual change). Filter added as a guard.
+- `fig_gridlock.py`, `fig_ladder.py`, `fig_nexmark.py`, `fig_nexmark_cost.py`,
+  `fig_nexmark_sweep.py` — safe: exact full-cell-name matches; b32 cells carry
+  the `b32` infix (`NX_b32_q3_...`) and cannot collide. No change.
+- `fig_pvalues.py`, `fig_regimes.py` — load no run data. No filter needed.
+
+**RQ4 prose/caption/figure recomputed on 16/8-only data** (old numbers were
+DATA-AUDIT's 2026-06-12 mixed-data pass):
+- in-memory band 91–97% → **84–97%** (the 2–3 s r075 cells sit at 84.4/84.5%);
+- "spilling winners run at 89–92%" → completing spilling cells beyond ρ=1 run
+  at **62–87%** (the hotter 89–92% band came from the pooled 32/32 twins);
+- "restores served from the page cache" re-scoped with the boundary it
+  actually has: device reads ≈0 in 19 of 21 spilling cells **below** ρ=1;
+  **above** ρ=1 every spilling cell reads 57–511 MB from the device;
+- throttled regime 63% → **62%** (cell median of W_c512_p16k_r200, 8/8 ok;
+  278 MB read + 525 MB written; summary-table row updated too);
+- NEW pattern surfaced by the un-mixed data, added to prose: at every cap the
+  bounded arm's largest probed pool yields the coolest cells (31% r75@512/24k,
+  64% r100@1024/48k, 54% r700@2048/96k) with near-zero device reads and up to
+  3× stretched runtimes — pool backpressure (mechanism of sec:rq1-windows);
+- in-figure annotation "63%/54% are genuine idle" → "points ≤64% are genuine
+  idle" (16/8 low points: 31.3/52.9/53.8/61.8/64.2%).
+- DATA-AUDIT.md RQ4 paragraph got a dated addendum pointing here.
+
+**Two Fisher-value errors found while verifying (pre-existing, exposed by the
+filter work):**
+1. `fig_flagship.py` mislabeled sidedness: 4.1e-5 is the TWO-sided p for
+   14/24 vs 0/18 (one-sided is 3.71e-5). Prose and tex caption already said
+   two-sided (correct); the script's docstring and caption-footer said
+   one-sided. Fixed in the script; figure annotation value unchanged.
+2. The "allocation-type win @512" contrast: prose 7.2.2b and fig_pvalues
+   quoted p = 2.3e-5 for "8/8 versus 0/8" — that p matches NEITHER sidedness
+   of that table. 2.3e-5 is the one-sided p for 8/8 vs **0/10**, i.e. bounded
+   (W_c512_p16k_r200, 8/8) vs capped in-memory (L_c512_inm_r200, 0/10) — a
+   different contrast. The pooled-vs-heap contrast (vs U_c512_p16k_r200, 0/8)
+   is p = 7.8e-5, which 7.6p and 7.2.10 already quoted correctly. Fixes:
+   7.2.2b and the fig_pvalues row → 7.8e-5; tab:windows bounded-512 row
+   counts corrected "8/8 vs 0/8" → "8/8 vs 0/10" (its p = 2.3e-5 was right).
+   fig_pvalues axis/docstring sidedness labels made honest (one-sided;
+   flagship two-sided). All five rows now reproduce exactly from their counts
+   via scipy `fisher_exact`.
+
+Orphaned combined PDFs deleted (`img/fig_heatmap.pdf`,
+`img/fig_geometry_law.pdf` — zero references in the tex tree).
+Regenerated: fig_cpu_io, fig_composition, fig_cost, fig_flagship,
+fig_pvalues; all visually verified via pdftoppm. Full document recompiled:
+zero errors, zero undefined references.
 
 ---
 

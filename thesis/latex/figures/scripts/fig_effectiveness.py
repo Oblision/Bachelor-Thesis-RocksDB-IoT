@@ -10,7 +10,10 @@ architectures), restricted to the coordinates at and beyond the boundary
 (rho >= RHO_MIN). The lighter fits-workloads, where both arms complete
 everything, are omitted; the full grid is in fig:heatmap.
 
-Source: L_/W_ matrices + the L_ in-memory baselines.
+Source: L_/W_ matrices + the L_ in-memory baselines. 16/8 RocksDB
+configuration only: the 32/32 backend-size twin runs (*_b32_*) are excluded,
+matching fig_heatmap / fig_geometry_law / fig_knife; that contrast is
+analysed separately in Section~sec:rb32.
 """
 from __future__ import annotations
 
@@ -19,6 +22,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 
 import data
+import gridcells as gc
 import style
 
 CAPS = (512, 1024, 2048)
@@ -37,8 +41,11 @@ def _frac_lab(frame) -> tuple[float, str]:
 def main() -> None:
     style.use_style()
     df = data.load_runs()
+    df = df[~df["cell"].str.contains("b32")]  # 16/8 baseline only; see docstring
     rho_mb = data.rho_table(df)
-    cells = data.per_cell(df)
+    # grid_df drops the chk/ref verification reruns (rc141 teardown status),
+    # which would otherwise count as spurious failing cells.
+    cells = data.per_cell(gc.grid_df(df))
 
     inm_all = cells[(cells["campaign"] == "L") & (cells["arm"] == "inmem")
                     & cells["workload"].notna() & cells["cap_mb"].isin(CAPS)]

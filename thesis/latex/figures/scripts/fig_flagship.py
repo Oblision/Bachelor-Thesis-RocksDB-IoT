@@ -2,7 +2,7 @@
 
 Out-of-core (b_ooc, 8 reps per rho point) vs capped in-memory (b_inm, 6 reps)
 at the three beyond-memory rho points r150/r200/r300. Totals 14/24 vs 0/18,
-Fisher one-sided p = 4.1e-5 (matches DATA-AUDIT.md).
+Fisher two-sided p = 4.1e-5 (matches DATA-AUDIT.md; one-sided is 3.7e-5).
 """
 from __future__ import annotations
 
@@ -16,6 +16,9 @@ import style
 def main() -> None:
     style.use_style()
     df = data.load_runs()
+    # 16/8 baseline only: campaign 'b' has no *_b32_* cells, but rho_table
+    # would otherwise mix b32 calibration reps.
+    df = df[~df["cell"].str.contains("b32")]
     rho_mb = data.rho_table(df)
     cap = 512.0
     workloads = [150, 200, 300]
@@ -61,7 +64,7 @@ def main() -> None:
             f"total: {ok_a}/{n_a} vs {ok_b}/{n_b}\nFisher $p = 4.1\\times10^{{-5}}$",
             transform=ax.transAxes, va="top", ha="left", fontsize=9,
             bbox=dict(boxstyle="round,pad=0.35", fc="white", ec=style.GREY, lw=0.8))
-    style.caption(fig, extra="bar labels = completed/attempted · Fisher's exact test, one-sided")
+    style.caption(fig, extra="bar labels = completed/attempted · Fisher's exact test, two-sided")
     style.save(fig, "fig_flagship")
 
 
