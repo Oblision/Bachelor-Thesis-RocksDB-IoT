@@ -1104,6 +1104,55 @@ arg, which must stay spelled out. Recompiles clean (109 pp, 0 err, 0 undef).
 
 ---
 
+## Issue #29 — Fig 4 heap label, 5.3.1 as preview, Fig 5 heap win-vs-loss explained (2026-07-05)
+
+Reader-facing clarity fixes on the RQ1 headline area, each verified against data.
+
+- **Fig 4 (fig:flagship) heap-only.** The out-of-core arm is the heap
+  architecture only (data: `b_ooc_*` cells classify as `heap` in
+  `data._classify_arm`; text L328 already said so), but the figure never showed
+  it. Changed the legend to "out-of-core, heap arm" and the caption to "\ac{OOC}
+  under the heap architecture ... Only the heap architecture is shown here; the
+  bounded architecture at this cap is mapped in Section~\ref{sec:rq1-windows}."
+- **5.3.1 (Headline Contrasts) reframed from conclusion to preview.** User: it
+  "sounds more like a conclusion" and "jumps ahead"; a lead subsection should
+  hint + outline. Rewrote [7.2.1]/[7.2.2] so it previews the anchor contrast
+  ("That number is the headline, not yet the argument") and outlines 5.3.2--5.3.6
+  with forward refs. Trimmed the duplicate roadmap out of the 5.3 section intro.
+- **Fig 5 (fig:pvalues) heap win-vs-loss.** User confused how heap wins 14/24
+  (row 1) yet loses 0/8 (row 4, allocation type). VERIFIED at r200/512: flagship
+  heap = engine-default `b_ooc` (4K buffers) 8/8 at peak_anon 411 MB; row-4 heap
+  = **matched-granularity control** `U_c512_p16k` (arm `heap8128`, 8128-byte
+  buffers) OOM-killed (rc137) 0/8 at 496/512 MB; pooled `W_c512_p16k` 8/8 at
+  390 MB; row-5 heap = `L_c512_p16000` 3/10, bounded = N_B0/B1/B2 = 23/24. Fixed
+  the Fig 5 row descriptors to name the isolated axis and WHICH heap ("flagship:
+  spill vs no spill"; "allocation type (r200, 512 MB) / pooled vs matched-gran.
+  heap"; "intrinsic backpressure (r200)"). Added a paragraph [7.2.2c] resolving
+  the tension: different baselines (spill-vs-no-spill vs bounded-vs-unbounded
+  allocation) and different heap configs -> not a contradiction. All MB figures
+  reproduced from the data before writing.
+
+## Issue #30 — Ch5 figures kept in their subsection via \FloatBarrier (2026-07-05)
+
+User: "figures show up in a completely different section" -- text discusses a
+figure, then the float appears amid the next subsection. Confirmed by render:
+Fig 5 (discussed in 5.3.1) rendered at the top of p28, which is all 5.3.2 text.
+Cause: `placeins` was loaded as `[section]` only, so subsections had no float
+barrier (the package has NO `[subsection]` option -- tried it, fatal error).
+The preamble comment itself states the intent as barriers at "(sub)section
+boundaries." All 21 figures + 9 tables live in Ch5, so a scoped fix is safe:
+added `\FloatBarrier` before each figure-bearing subsection boundary -- RQ1
+(before 5.3.2/5.3.3/5.3.4/5.3.5/5.3.6) and RQ3 (before 5.7.1/5.7.2/5.7.3/5.7.4).
+Each subsection's figures now flush before the next heading. Rendered checks
+(p28, 35, 36, 39, 64) show clean transitions, no bad mid-section whitespace;
+"float too large" warnings are the pre-existing large setup/cost tables forced
+to their own page. Compiles clean (111 pp, +1 page, 0 err, 0 undef).
+
+Commits this session: `cb3fe5f` (OOM/OOC), `93616fd` (Fig4/5.3.1/Fig5),
+`88451bd` (FloatBarrier). Not pushed.
+
+---
+
 ## Full Glossary (by first-definition location, in reading order)
 
 ### Chapter 1 — Introduction (informal pre-definitions only, by design —
