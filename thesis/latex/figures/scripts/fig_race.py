@@ -28,8 +28,11 @@ import style
 CEILING = 2.7   # right edge of the SD drain band; death zone starts here
 BAND = (2.5, 2.7)
 # rho<1 failing cells split into two demand populations (free-running M/s):
-#   heavy TRUE-CAPACITY cells sit below SLOW_MAX; fast POOL-GEOMETRY cells above
-#   FAST_MIN. The two bands never overlap in the data (see report).
+#   SLOW cells (heavy, near-boundary) sit below SLOW_MAX; FAST cells above
+#   FAST_MIN. The two bands never overlap in the data. NB: both populations are
+#   pool-geometry failures -- both recover at the geometry-correct pool (the slow
+#   pair r500/r700 at 2048 reach 10/10 heap, 8/8 bounded). They differ only in
+#   ingest rate relative to the drain ceiling, NOT in whether the state fits.
 SLOW_MAX = 2.0
 FAST_MIN = 2.7
 
@@ -84,9 +87,11 @@ def main() -> None:
     # WHERE they sit relative to rho=1:
     #   completes                 : filled green
     #   fails, rho>1              : red hollow (the race death zone)
-    #   fails, rho<1, slow demand : TRUE-CAPACITY (heavy cell, orange)
-    #   fails, rho<1, fast demand : FAST-INGEST / POOL-GEOMETRY (state fits but a
-    #                               mis-sized pool kills it, purple)
+    #   fails, rho<1, slow demand : SLOW pool-geometry (heavy near-boundary cell,
+    #                               state fits, wrong pool, orange) -- var name
+    #                               fail_truecap is historical, NOT a capacity death
+    #   fails, rho<1, fast demand : FAST-INGEST pool-geometry (state fits, wrong
+    #                               pool + ingest out-runs the drain, purple)
     pts = {(a, o): ([], []) for a in ("heap", "bounded")
            for o in ("ok", "fail_race", "fail_truecap", "fail_poolgeom")}
     death_fail = death_total = 0
@@ -190,8 +195,8 @@ def main() -> None:
         Line2D([], [], marker="s", ls="", mfc=style.GREEN, mec="black", label="completes (bounded)"),
         Line2D([], [], marker="o", ls="", mfc="none", mec=style.RED, mew=1.15, label="fails, $\\rho>1$ (heap)"),
         Line2D([], [], marker="s", ls="", mfc="none", mec=style.RED, mew=1.15, label="fails, $\\rho>1$ (bounded)"),
-        Line2D([], [], marker="v", ls="", mfc=style.ORANGE, mec="black", label="fails, $\\rho<1$: capacity (slow; both arms)"),
-        Line2D([], [], marker="P", ls="", mfc=style.PURPLE, mec="black", label="fails, $\\rho<1$: pool geometry (fast; both arms)"),
+        Line2D([], [], marker="v", ls="", mfc=style.ORANGE, mec="black", label="fails, $\\rho<1$: slow, under drain ceiling (heap+bounded)"),
+        Line2D([], [], marker="P", ls="", mfc=style.PURPLE, mec="black", label="fails, $\\rho<1$: fast, over drain ceiling (heap+bounded)"),
     ]
     ax.legend(handles=handles, loc="lower left", bbox_to_anchor=(0.0, 1.015),
               fontsize=7.9, framealpha=1.0, ncol=3, borderpad=0.45,
@@ -202,7 +207,7 @@ def main() -> None:
     style.caption(fig)
     print(f"drain ceiling (max realized tps of a surviving rho>1 spilling cell) = {drain_ceiling:.3f} M/s")
     print(f"race death zone (rho>1 & rate>={CEILING}): {death_fail}/{death_total} fail")
-    print(f"rho<1 failures: true-capacity {n_truecap}, pool-geometry {n_poolgeom}")
+    print(f"rho<1 pool-geometry failures: slow(under ceiling) {n_truecap}, fast(over ceiling) {n_poolgeom}")
     style.save(fig, "fig_race")
 
 

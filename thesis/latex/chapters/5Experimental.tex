@@ -635,43 +635,57 @@ horizontal drain ceiling near 2.6\,M tuples/s, empirical rather than assumed
 (the highest throughput any surviving spilling cell realizes; no $\rho > 1$
 cell whose free-running demand exceeds about 2.7\,M tuples/s survives, 23 of
 23 fail). Past both lines, ingest outruns the drain and the run fails: this
-is the race. The $\rho < 1$ failures split by demand rate and carry their own two markers
-across both architectures (triangle = capacity, cross = pool geometry): the slow
-heavy cells (demand below about 2\,M tuples/s) are
-true capacity deaths, whose per-window state exceeds the pool and cap; the fast cells
-(demand above the ceiling) fail at a mis-sized pool although their state fits, and
-recover at the right pool. Section~\ref{sec:rq3} takes up the second group.\methodsnote}
+is the race. The $\rho < 1$ failures carry their own two markers, one shape per group covering
+both architectures (triangle = slow demand, below the drain ceiling; cross = fast
+demand, above it). Both groups are pool-geometry failures: each plotted cell fails
+only because the pool it was given is mis-sized, and the same cap-and-workload
+coordinate completes at the geometry-correct pool on \emph{both} arms --- the slow
+pair, r500 and r700 at 2048\,MB, reach 10 of 10 (heap, at 32k--64k and 16k--32k
+buffers) and 8 of 8 (bounded, at 96k). The two groups differ only in ingest rate:
+the slow pair's demand ($\approx 1.4$--$1.6$\,M tuples/s) stays well under the
+drain, so a wrong pool is their only stressor, while the fast group additionally
+out-runs the drain (the fast-ingest valley). Section~\ref{sec:rq3} takes up both.\methodsnote}
 \label{fig:race}
 \end{figure}
 
-% [7.2.7b] CLAIM-CHANGE: the low-ingest failure cluster splits into two groups,
-% only one of which is true capacity. The other is fast-ingest-valley / pool-geometry.
+% [7.2.7b] The two rho<1 failure groups: both recover at the geometry-correct
+% pool, so both are pool-geometry effects; they differ only in ingest rate.
 The figure draws every all-fail cell at its free-running reference rate, the
 speed the workload reaches unconstrained, because a run that dies produces no
 meaningful throughput of its own.
-Under this convention the $\rho < 1$ failures do not form one cluster but two, and
-only one of them is a capacity failure.
-The first group is the slow heavy workloads, r500 and r700 at the tighter caps,
-whose free-running demand sits below about 2 million tuples per second.
-Their per-window state exceeds what the pool and cap can hold, so they are true
-capacity deaths: the heap arms die by OOM kill and the bounded arms by
-pool exhaustion, the same two bounds the geometry law draws in
-Figures~\ref{fig:geometry-law-512}--\ref{fig:geometry-law-2048}.
-This group is the smaller one, 10 of the $\rho < 1$ fail-cells.
-The second and larger group, 23 cells, is different.
-These are fast workloads whose free-running demand exceeds the drain ceiling, yet
-whose state fits under the cap ($\rho < 1$).
-They fail not because the state is too large but because the pool is the wrong size
-for it, so most die by pool-exhaustion abort while the working set still fits.
-At the geometry-correct pool, five of the group's six cap-and-workload coordinates
-complete 90 to 100 percent of their runs; the exception is r300 at 2048\,MB, whose
-free-running demand of about 2.8 million tuples per second sits above the drain
-ceiling, and even the best pool recovers only 5 of 8 there, the heap arm none.
-This is the fast-ingest valley: fast ingest into a mis-sized pool, not a capacity
-limit.
-Calling every low-rate failure a capacity death would therefore be wrong; only the
-slow heavy group is capacity, and the valley group is a pool-geometry effect that
-Section~\ref{sec:rq3} resolves.
+Under this convention the $\rho < 1$ failures do not form one cluster but two,
+split by demand rate; but neither is a capacity failure, because both recover at
+the geometry-correct pool.
+The first group is the two heavy near-boundary workloads, r500 and r700 at the
+2048\,MB cap, whose footprint still fits ($\rho \approx 0.67$ and $0.82$) and
+whose free-running demand sits below about 1.6 million tuples per second, well
+under the drain ceiling.
+At the pools plotted they fail along the two bounds of the geometry law
+(Figures~\ref{fig:geometry-law-512}--\ref{fig:geometry-law-2048}): the bounded
+arms abort on pool exhaustion and the heap arms are OOM-killed at the largest
+pool.
+But these are not capacity deaths: at the geometry-correct pool the same
+cap-and-workload coordinate completes on both arms --- r500 reaches 10 of 10 on
+the heap arm at a 32k--64k pool and 8 of 8 on the bounded arm at 96k, and r700
+likewise at 16k--32k on the heap arm and 96k on the bounded.
+Their state fits; only the tested pool was wrong, and because their ingest stays
+below the drain rate a mis-sized pool is their sole stressor.
+This is the smaller group, 10 of the $\rho < 1$ fail-cells.
+The second and larger group, 23 cells, is the fast workloads whose free-running
+demand exceeds the drain ceiling while their state still fits under the cap
+($\rho < 1$).
+They too fail at a mis-sized pool, most by pool-exhaustion abort, and they too
+recover: at the geometry-correct pool, five of the group's six cap-and-workload
+coordinates complete 90 to 100 percent of their runs; the exception is r300 at
+2048\,MB, whose free-running demand of about 2.8 million tuples per second sits
+above the drain ceiling, and even the best pool recovers only 5 of 8 there, the
+heap arm none.
+The extra stressor on this second group is the fast-ingest valley: their ingest
+out-runs the drain even though the state fits.
+Calling either group a capacity death would therefore be wrong: both recover at
+the geometry-correct pool, so both are pool-geometry effects that
+Section~\ref{sec:rq3} resolves; they differ only in ingest rate, the heavy pair
+below the drain ceiling and the larger group above it.
 The race law governs the opposite edge: once $\rho > 1$, no cell whose demand
 exceeds the drain ceiling survives, because ingest outruns the drain.
 
@@ -696,12 +710,12 @@ Every Nexmark figure in this chapter carries a short pointer back to this note i
 
 Each query runs across three state scenarios, A, B, and C, that grow the per-window state by widening the window: A is the smallest, C the largest.
 Each memory cap pairs one scenario the in-memory engine can hold with one that stresses it: A and B under the 512\,MB cap, B and C under the 1024\,MB cap.
-Only the largest scenario at the larger cap, C at 1024\,MB, drives the window state past what the in-memory engine can fit; that single cell is the beyond-memory point, the coordinate where only out-of-core processing completes the workload.
-Each cell runs three arms at eight repetitions: the capped in-memory engine, the bounded pooled backend (B2: 15\% pool reserve, paced restore, soft and hard thresholds at one tenth and one fifth of the cap), and the heap out-of-core backend (U8).
+Only the largest scenario at the larger cap, C at 1024\,MB, drives the window state past what the in-memory engine can fit; that single cell is the beyond-memory point, the coordinate where only \ac{OOC} processing completes the workload.
+Each cell runs three arms at eight repetitions: the capped in-memory engine, the bounded pooled backend (B2: 15\% pool reserve, paced restore, soft and hard thresholds at one tenth and one fifth of the cap), and the heap \ac{OOC} backend (U8).
 The purpose is external validity.
 The synthetic grid is one stream shape, tuned with out-of-order jitter; a canonical benchmark with a different schema, hot-skewed auction popularity, and an in-order event stream tests whether the result holds beyond the conditions it was measured under.
 The bounded backend completes this workload where the capped in-memory engine cannot: 8 of 8 and 7 of 8 versus 0 of 8 ($p = 7.8 \times 10^{-5}$ and $7.0 \times 10^{-4}$).
-The runs perform verified out-of-core work: 610\,MB spilled, 234\,MB restored from the device.
+The runs perform verified \ac{OOC} work: 610\,MB spilled, 234\,MB restored from the device.
 Figure~\ref{fig:nexmark-sweep} places this win in context across scenarios and caps: the capped in-memory engine fits the small and medium scenarios and fails only at the beyond-memory point at 1024\,MB, which is exactly where the bounded backend completes.
 
 \begin{figure}[ht]
@@ -710,26 +724,26 @@ Figure~\ref{fig:nexmark-sweep} places this win in context across scenarios and c
 \caption[Nexmark completion across scenarios and caps]{Nexmark completion
 across scenarios and caps for queries q3 and q7. Bars are completion fraction
 (completed over attempted, labelled) for the capped in-memory engine, the
-bounded out-of-core backend, and the heap out-of-core backend. The in-memory
+bounded \ac{OOC} backend, and the heap \ac{OOC} backend. The in-memory
 engine fits scenarios A and B and fails only at the beyond-memory point C at
-1024\,MB, where the bounded backend completes (8/8 and 7/8 versus 0/8). At the
-fits cells the out-of-core arms can instead over-spill and fail under the fixed
-threshold; scenario B at 512\,MB for q7 is the starkest case, both arms
-0/8.\nexmarknote}
+1024\,MB, where the bounded backend completes (8/8 and 7/8 versus 0/8). Where the
+state fits in memory, the fixed threshold can still force the \ac{OOC} arms to
+over-spill and fail; the starkest case is scenario B at 512\,MB for q7, where both
+arms complete 0/8.\nexmarknote}
 \label{fig:nexmark-sweep}
 \end{figure}
 
 % [7.2.8b] The fits-cell collapse, and why q7 tips fully over while q3 survives.
-The same figure shows the out-of-core arms collapsing at a cell where the
+The same figure shows the \ac{OOC} arms collapsing at a cell where the
 in-memory engine is comfortable, most starkly at scenario B under the 512\,MB
-cap for q7: the capped in-memory engine completes 8 of 8, yet both out-of-core
+cap for q7: the capped in-memory engine completes 8 of 8, yet both \ac{OOC}
 arms complete 0 of 8.
 This cell is a fits cell, not a beyond-memory one.
 Its state fits in 512\,MB, so the in-memory engine never struggles, but the
 fixed cap-derived spill threshold, soft at one tenth of the cap, forces the
-out-of-core arms to spill anyway.
+\ac{OOC} arms to spill anyway.
 At the tight 512\,MB cap that over-spilling drives each arm into a different
-wall: the pooled arm's small pool, about 132\,MB at this cap, exhausts and
+wall: the pooled arm's small pool, about 125\,MB at this cap, exhausts and
 aborts (buffer-pool exhaustion, status 141), while the heap arm's unpooled
 buffers break the cap and are OOM killed (status 137).
 On q3 the same cell sits on a knife edge rather than over it, a few repetitions
@@ -742,6 +756,14 @@ It does not touch the headline, which is the one true beyond-memory coordinate,
 C at 1024\,MB, where the in-memory engine genuinely cannot fit (0 of 8) and the
 bounded backend completes (q7 7 of 8, q3 8 of 8).
 
+% [7.2.8c] The two OOC arms are not interchangeable; the trade-off flips across the sweep.
+The two \ac{OOC} arms are not interchangeable, and the trade-off between them changes sign across the sweep.
+On the fitting cells that over-spill but keep memory headroom under the cap --- scenario A at 512\,MB and scenario B at 1024\,MB --- the heap arm rides the gratuitous spilling out and completes every run (8 of 8 on all four query--cell combinations), while the bounded arm is throttled by its own fixed pool (125\,MB at the 512\,MB cap, 375\,MB at 1024\,MB): the spill-and-restore churn saturates the pool and drops the arm to between 2 and 6 of 8, most sharply at q3 scenario B under 1024\,MB (2 of 8 against the heap arm's 8 of 8).
+Here the pool is a liability and heap allocation is the better architecture.
+At the one tight fitting cell, scenario B at 512\,MB, the same over-spilling turns fatal for both arms but through different walls, as above: the bounded pool exhausts and aborts (status 141) while the heap buffers break the cap and are OOM killed (status 137).
+The ordering then reverses at the one genuine beyond-memory coordinate, C at 1024\,MB, where the in-memory engine cannot fit (0 of 8) and spilling is no longer gratuitous but required: the bounded arm's back-pressure and paced restore hold total memory under the cap and it completes most reliably (q3 8 of 8, q7 7 of 8), while the heap arm's unbounded restore intermittently crosses the cap and is OOM killed, completing only 6 of 8 and 3 of 8.
+This is the coordinate the backend exists for, and only the bounded architecture delivers it dependably.
+
 % [7.2.9]
 The same run tests the failure model outside its training data.
 The model passes.
@@ -751,20 +773,23 @@ Every bounded failure lands where the geometry law places it.
 % [7.2.10]
 The transfer has a real cost.
 In-order streams pay the full spill-and-restore round trip; the out-of-order jitter of the synthetic grid masked this cost, because hot slices never spilled there.
-With the pre-committed cap-derived threshold, fitting workloads over-spill and lose 42--54\% throughput for no benefit.
-The winning cell pays 46--59\% against the unlimited reference.
+With the pre-committed cap-derived threshold, fitting workloads over-spill and lose 42--61\% throughput for no benefit.
+The winning cell pays 50--63\% against the unlimited reference.
+The two arms price their spilling differently.
+On the repetitions they complete, the heap arm is the cheaper of the two at six of the seven cells where both produce a measurement, by 2 to 12 percentage points, because it skips the pool bookkeeping, back-pressure, and paced restore that the bounded arm carries; the bounded arm is cheaper only at q3 scenario B under 1024\,MB.
+The bounded arm therefore pays a throughput premium for exactly the memory discipline that keeps it alive at the beyond-memory point, and there the heap arm's lower cost is partly survivor bias, measured over only the 6 and 3 heap repetitions that finished rather than the bounded arm's 8 and 7.
 A state-aware spill threshold would remove the over-spilling; it is documented future work and was deliberately not tuned on the evaluation workloads.
-Figure~\ref{fig:nexmark-cost} quantifies the cost: every out-of-core point runs below the uncapped reference, deepest on the fitting scenarios that over-spill under the fixed threshold.
+Figure~\ref{fig:nexmark-cost} quantifies the cost: every \ac{OOC} point runs below the uncapped reference, deepest on the fitting scenarios that over-spill under the fixed threshold.
 
 \begin{figure}[ht]
 \centering
 \widefig{img/fig_nexmark_cost.pdf}
 \caption[Nexmark throughput cost]{Nexmark throughput cost: median throughput of
-each out-of-core arm (bounded B2, heap U8) relative to the uncapped reference
+each \ac{OOC} arm (bounded B2, heap U8) relative to the uncapped reference
 for the same scenario, per query. In-order streams pay the full spill-and-restore
 round trip, and the fixed cap-derived spill threshold over-spills the fitting
 scenarios for no benefit; the winning beyond-memory cell (C at 1024\,MB) pays
-46--59\% against the unlimited reference.\nexmarknote}
+50--63\% against the unlimited reference.\nexmarknote}
 \label{fig:nexmark-cost}
 \end{figure}
 
@@ -905,7 +930,7 @@ This is a device-level proxy, not RocksDB's internal counter; the internal count
 % [7.5.5]
 A pool-sizing rule combines the geometry law above with a designed safety margin.
 The pool must hold the hot band, the two-sided geometry law's lower bound (Section~\ref{sec:rq1}).
-What the data does not itemize on its own, the soft budget, the emission pipeline, and the I/O path, is covered instead by headroom: the pool plus its unpooled overhead plus the base footprint should stay below 90\% of the cap, a margin chosen to leave that headroom rather than measured from it.
+What the data does not itemize on its own, the soft budget, the emission pipeline, and the I/O path, is covered instead by headroom: the pool plus its unpooled overhead plus the base footprint (the resident memory outside the pool and the unpooled directories --- the engine and runtime baseline together with the working set the gauges do not attribute, the RocksDB set included; decomposed in Figure~\ref{fig:rb32-compartments}) should stay below 90\% of the cap, a margin chosen to leave that headroom rather than measured from it.
 
 \begin{figure}[ht]
 \centering
@@ -1216,14 +1241,14 @@ The cross-session $+15\%$ is therefore reported as a consistent directional tren
 Two findings are robust to the drift.
 The architecture sign-flip is a difference of differences, so the session drift cancels in the pooled-versus-heap contrast.
 And the memory footprint is stable across sessions: median peak anonymous memory shifts by under one percent while only throughput drifts.
-Figure~\ref{fig:rb32-compartments} decomposes that footprint into the pool floor, the unpooled bucket directories, the RocksDB resident set, and the base.
-The RocksDB compartment is small at every cap; the pool floor and the base dominate the budget.
+Figure~\ref{fig:rb32-compartments} decomposes that footprint into the pool floor, the unpooled bucket directories, the RocksDB resident set, and the base --- the residual holding everything else resident, the engine and runtime baseline plus the working set the gauges do not attribute (emission and in-flight buffers, slice-store bookkeeping, allocator retention).
+The RocksDB compartment is small at every cap; the pool floor and the base dominate the budget, the base being the largest compartment in the completing runs.
 A larger write buffer therefore moves completion only at the margin, because it enlarges the smallest compartment.
 
 \begin{figure}[ht]
 \centering
 \includegraphics[width=\textwidth]{img/fig_rb32_compartments.pdf}
-\caption[Where the memory budget goes]{Median resident anonymous memory of the
+\caption[Where the memory budget goes]{Median peak resident anonymous memory of the
 pooled grid (W\_) per cap and outcome, as stacked bars over four compartments.
 The \emph{pool floor} is the pre-allocated global buffer pool. The
 \emph{unpooled directories} are the bucket directories, the per-map
@@ -1232,9 +1257,17 @@ control-block table always unpooled regardless of page size
 rather than in the pool; ChainedHashMap's variable-sized-entry region is
 allocated the same way but is never populated by this thesis's fixed-size
 UINT64 schema, so it contributes nothing here. The \emph{RocksDB} compartment
-is the backend's own resident set; the \emph{base} is the fixed engine and
-runtime footprint present in every run. The RocksDB compartment is small at
-every cap; the pool floor and the base dominate. Completing cells carry a
+is the backend's own resident set; the \emph{base} is the residual, the peak
+resident anonymous memory left once the pool floor, the unpooled directories, and
+the RocksDB set are subtracted. It is not a fixed floor: it holds the engine and
+runtime baseline (resident code, thread stacks, the Nautilus and query-operator
+scaffolding, tens of MB on a release build) together with all resident working
+memory the three gauges do not attribute --- the emission pipeline and in-flight
+buffers, per-window slice-store bookkeeping, RocksDB working memory beyond its
+gauge, and allocator retention --- and it grows with the working set, from 198 to
+813\,MB across the three caps (about 40\% of each cap). The RocksDB compartment is
+small at every cap; the pool floor and the base dominate, the base being the
+single largest compartment in every completing bar. Completing cells carry a
 higher resident footprint than the failing ones, which abort before the
 working set fills.}
 \label{fig:rb32-compartments}

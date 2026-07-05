@@ -962,6 +962,63 @@ references; both new tables render cleanly (Tables 3 and 4).
 
 ---
 
+## Issue #26 — three figure clarifications: race capacity->pool-geometry, Fig 24 "base" defined, Nexmark expanded + stale cost ranges fixed (2026-07-05)
+
+Three parallel read-only investigation agents verified every number against the
+run data; I verified their load-bearing claims independently, then applied.
+
+**Fig 14 (fig:race) — SUBSTANTIVE NARRATIVE CHANGE.** The slow r500/r700 rho<1
+failures were labelled "true capacity deaths (per-window state exceeds pool and
+cap)". This is **contradicted by the data**: r500@2048 completes 10/10 (heap
+32k/64k) and 8/8 (bounded 96k); r700@2048 completes 10/10 (heap 16k/32k) and 8/8
+(bounded 96k). Their state fits (rho 0.67/0.82); they die only at a mis-sized
+pool. So BOTH rho<1 groups are pool-geometry failures; they differ only in ingest
+rate vs the drain ceiling (slow r500/r700 under it; fast r75-r300 above it =
+fast-ingest valley). Rewrote the fig_race.py legend ("capacity"/"pool geometry"
+-> "slow, under drain ceiling"/"fast, over drain ceiling (heap+bounded)"),
+caption, and the [7.2.7b] prose block; fixed the misleading code comments/print.
+The internal var names fail_truecap/n_truecap kept (historical) with a comment.
+Verified: r500/r700 @2048 completion-by-pool.
+
+**Fig 24 (fig:rb32-compartments) — "base" defined.** Generator is
+`thesis/experiments/rb32-config-contrast/fig_rb32.py` (not in figures/scripts/);
+`base = max(0, peak_anon - pool_mb - unpooled - rdb_rss)` — a pure residual over
+the W_b32_* cells. Old caption called it "the fixed engine and runtime footprint"
+— WRONG: reproduced medians show base(ok) = 198/419/813 MB at 512/1024/2048
+(~40% of cap, the single largest compartment), so it is NOT fixed. It comprises
+the release engine/runtime baseline (tens of MB) PLUS un-instrumented working set
+(emission + in-flight buffers, slice-store bookkeeping, RocksDB working memory
+beyond gauge, allocator retention). Fixed the figure legend ("base (residual:
+engine/runtime + working set)"), the caption (full definition + growth 198->813),
+the decomposition prose gloss, and the geometry-law "base footprint" first use
+(line 908, noting RocksDB is folded into that 3-term version). Also fixed caption
+"Median resident" -> "Median peak resident" (metric is per-cell peak_anon).
+
+**Figs 15/16 (Nexmark) — expanded + TWO STALE RANGES FIXED.** Verified the full
+completion matrix (q3/q7 x A/B/C x 512/1024 x inm/B2/U8) and cost matrix.
+- STALE (figures regenerated at badbb35, prose not updated): fitting-cell loss
+  "42--54%" -> **42--61%** (verified min -42.0 q3 B@1024 B2, max -61.2 q3 B@512
+  B2); winning-cell "46--59%" -> **50--63%** (verified C@1024 both-arms -50.3 to
+  -63.0). Fixed in prose (2x) and both figure captions.
+- pool "about 132 MB" -> **125 MB** (recorded pool_mb at 512).
+- Added a B2-vs-U8 three-regime paragraph (fits+headroom A@512/B@1024: heap 8/8
+  all four, bounded throttled 2-6/8; tight B@512: both fail, bounded 141 / heap
+  137; beyond-memory C@1024: bounded 8/8,7/8 vs heap 6/8,3/8) and a cost-
+  comparison paragraph (heap cheaper at 6/7 cells by 2-12pp; survivor bias at
+  C@1024). Reworded the awkward "At the fits cells..." caption sentence.
+- OOC acronym: `\acro{OOC}{out-of-core}` (Template.tex:217), first use Ch1 so
+  Ch5 renders short "OOC". Converted the 9 spelled-out "out-of-core" in the
+  Nexmark section (sec:nexmark, 693-795) to `\ac{OOC}`. **DEFERRED to wave 2:**
+  the chapter-wide OOC consistency sweep (18 more occurrences elsewhere in Ch5;
+  the one in fig:cost's \caption[...] LoF arg must stay spelled out).
+- NOT changed (agent false alarm I caught): "234 MB restored" IS reproducible =
+  the q7 C@1024 B2 cell's device reads (610 MB writes); it is a valid number.
+
+fig_race.pdf and fig_rb32_compartments.pdf regenerated; full doc compiles at
+108 pages, zero errors, zero undefined references; all three verified in-render.
+
+---
+
 ## Full Glossary (by first-definition location, in reading order)
 
 ### Chapter 1 — Introduction (informal pre-definitions only, by design —
