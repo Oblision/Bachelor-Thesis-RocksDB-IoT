@@ -381,6 +381,7 @@ orders of magnitude; see the text for the narrative behind each row.\methodsnote
 \label{fig:pvalues}
 \end{figure}
 
+\FloatBarrier
 \subsection{Operating Windows of the Two Architectures\label{sec:rq1-windows}}
 
 % [7.2.3]
@@ -448,6 +449,7 @@ heap-resident state grows.\methodsnote}
 \label{fig:heatmap-2048}
 \end{figure}
 
+\FloatBarrier
 \subsection{The Two-Sided Geometry of the Bounded Window\label{sec:rq1-geometry}}
 
 % [7.2.4] Two-sided geometry law + per-cell failure breakdown, in its own figure.
@@ -522,6 +524,7 @@ completion falls from 10 of 10 at a 16k-buffer pool to 6 of 10 at 32k and
 \label{fig:knife}
 \end{figure}
 
+\FloatBarrier
 \subsection{Where Each Architecture Wins\label{sec:rq1-division}}
 
 % [7.2.5]
@@ -605,6 +608,7 @@ because \ac{OOC} completion is governed by pool geometry, not total footprint
 \label{fig:effectiveness}
 \end{figure}
 
+\FloatBarrier
 \subsection{Completion as a Race\label{sec:rq1-race}}
 
 % [7.2.6]
@@ -702,6 +706,7 @@ below the drain ceiling and the larger group above it.
 The race law governs the opposite edge: once $\rho > 1$, no cell whose demand
 exceeds the drain ceiling survives, because ingest outruns the drain.
 
+\FloatBarrier
 \FloatBarrier
 \subsection{Transfer to a Realistic Workload\label{sec:nexmark}}
 
@@ -1126,6 +1131,7 @@ A memory-corruption crash cluster appears at high-churn cells, only in cells tha
 The two architectures' windows are complementary, and the allocation deadlock is the proven reason the pooled window cannot widen.
 A pool that reserved buffers for the drain side, which the fill side could not consume, is the single mechanism that would merge the two windows.
 
+\FloatBarrier
 \subsection{Separating the Two Effects of the Flag\label{sec:disambiguation}}
 
 % [7.6o]
@@ -1147,6 +1153,7 @@ Pooling with levers reaches 11 of 16 in the confirmation runs (4 of 8 and 7 of 8
 The pairwise edge over matched-granularity heap is directionally positive but not separable at this sample size ($p = 0.15$).
 The five-point ladder is reported in full: 0/10, 3/8, 0/8, 5/8, 7/8.
 
+\FloatBarrier
 \subsection{Geometry, the Valley, and the Crash Cluster\label{sec:geometry-valley}}
 
 % [7.6r]
@@ -1196,6 +1203,7 @@ Unmediated pointers into evictable state require an invalidation protocol.
 Flink's backend mediates every state access; NebulaStream's slice cache does not.
 The precise upstream fix is an epoch-stamped cache entry that is invalidated on spill, at the cost of one comparison per cache hit.
 
+\FloatBarrier
 \subsection{The Growth Signal and Page Release in Operation\label{sec:growth-release-results}}
 
 % [7.6x]
@@ -1224,6 +1232,7 @@ It is correctly specific: on the single-hot-slice workload it reclaims the cold 
 This sharpens the recycling advantage reported earlier.
 Recycling bounds the pool to what is concurrently live, reusing freed buffers instead of growing it; page release acts on the resident side, returning freed pages to the operating system so anonymous memory falls back with the working set instead of staying pinned at the peak it once reached.
 
+\FloatBarrier
 \subsection{Backend Sizing Across the Two Architectures\label{sec:rb32}}
 
 % [RB32-1] Second experiment: a one-variable contrast on the RocksDB backend size.
