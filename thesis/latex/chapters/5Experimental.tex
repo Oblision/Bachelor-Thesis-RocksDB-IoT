@@ -317,29 +317,30 @@ The corrected configuration uses bounded allocation: hash map pages live in the 
 For brevity, this chapter also calls the first the heap architecture and the second the pooled architecture.
 Why two architectures exist is the subject of Section~\ref{sec:rq3}.
 RQ1 asks whether the backend prevents the OOM failures that a fixed cap forces on the in-memory engine, and for which workloads and memory budgets it does so.
-This section answers that by mapping the operating windows of both architectures --- the region of workload and pool sizes over which each completes --- and closes with a transfer of the result to a realistic Nexmark workload.
+This section answers that empirically: it maps the \emph{operating window} of each architecture --- the region of workload and pool sizes over which it completes --- across the three memory caps.
 All figures and statistics in this section use the 16/8 RocksDB configuration fixed in Section~\ref{sec:rocksdb-config} (16\,MB write buffer, 8\,MB block cache), at 8 to 10 repetitions per cell.
 A separate experiment reran parts of the grid under the larger 32/32 configuration; that single-variable contrast has findings of its own and is analyzed in Section~\ref{sec:rb32}, not mixed into the counts here.
 
 \subsection{Headline Contrasts\label{sec:rq1-headline}}
 
-% [7.2.1]
-The flagship result stands at the smallest cap (Figure~\ref{fig:flagship}).
-At 512\,MB under the heap architecture, the backend completes 14 of 24 runs.
-The capped in-memory engine completes 0 of 18.
-Fisher's exact test gives $p = 4.1 \times 10^{-5}$.
+% [7.2.1] Preview the anchor contrast, then outline how the section develops it.
+One contrast previews the section.
+At the tightest cap the heap architecture keeps running where the capped in-memory engine cannot: at 512\,MB it completes 14 of 24 runs across the three beyond-memory pressures, against 0 of 18 for the in-memory engine (Figure~\ref{fig:flagship}; Fisher's exact test $p = 4.1 \times 10^{-5}$).
+That number is the headline, not yet the argument.
+The subsections that follow build the argument around it: they map the operating window of each architecture cap by cap (Section~\ref{sec:rq1-windows}), derive the two-sided pool geometry that bounds those windows (Section~\ref{sec:rq1-geometry}), locate which architecture wins where (Section~\ref{sec:rq1-division}), show that completion inside a window is a race between ingest and drain rather than a state-size threshold (Section~\ref{sec:rq1-race}), and test whether the effect survives on a realistic Nexmark workload (Section~\ref{sec:nexmark}).
 
-% [7.2.2]
-Correctness holds while spilling is active.
-Output checksums match the uncapped in-memory reference under both architectures.
+% [7.2.2] Correctness underwrites every completion count that follows.
+One property underwrites every completion count below: while spilling is active, output checksums match the uncapped in-memory reference under both architectures, so a completed run is a correct run rather than a truncated one.
 
 \begin{figure}[ht]
 \centering
 \widefig{img/fig_flagship.pdf}
 \caption[Completion at the flagship cell (512\,MB)]{Completion at the flagship
-cell. \ac{OOC} (8 repetitions per workload) versus the capped in-memory
-engine (6 repetitions) at the three beyond-memory state pressures of the
-512\,MB cap. Totals: 14/24 versus 0/18, Fisher's exact test
+cell. \ac{OOC} under the heap architecture (8 repetitions per workload) versus
+the capped in-memory engine (6 repetitions) at the three beyond-memory state
+pressures of the 512\,MB cap. Only the heap architecture is shown here; the
+bounded architecture at this cap is mapped in Section~\ref{sec:rq1-windows}.
+Totals: 14/24 versus 0/18, Fisher's exact test
 $p = 4.1 \times 10^{-5}$ (two-sided).\methodsnote}
 \label{fig:flagship}
 \end{figure}
@@ -351,9 +352,20 @@ comparison of completed against attempted runs with its Fisher's exact $p$-value
 The contrasts sit far from chance: the flagship at $p = 4.1 \times 10^{-5}$, the
 attribution ladder from 0/8 to 7/8 at the decisive cell at $p = 7.0 \times 10^{-4}$,
 pooled lever arms against unpooled levers (12/16 versus 0/16) at $p = 8.1 \times 10^{-6}$,
-the pooled-versus-heap allocation win at 512\,MB (8/8 versus 0/8) at $p = 7.8 \times 10^{-5}$,
+the allocation-type win at 512\,MB (r200: pooled 8/8 versus matched-granularity heap 0/8) at $p = 7.8 \times 10^{-5}$,
 and the intrinsic-backpressure cell (23/24 versus 3/10) at $p = 1.6 \times 10^{-4}$.
 Every headline claim clears $p < 10^{-3}$.
+
+% [7.2.2c] Resolve the apparent tension: the heap arm appears in three rows
+% against different baselines and, in the allocation row, as the matched-
+% granularity control -- so its flagship win and its allocation-row loss measure
+% different things rather than contradicting each other.
+Three of these rows involve the heap architecture, and read side by side they can mislead: the heap wins the flagship yet loses the allocation-type row, at the very same workload and cap.
+The two rows measure different things.
+The flagship sets the heap arm against the capped in-memory engine, which cannot spill at all, so its axis is spilling versus its absence, and the heap wins by completing out-of-core (14/24 versus 0/18).
+The allocation-type row instead sets two arms that both spill and holds the I/O buffer granularity fixed so that only the allocation type differs; its heap side is therefore not the engine-default heap of the flagship but the \emph{matched-granularity} control introduced in Section~\ref{sec:disambiguation}.
+At r200 and 512\,MB that control's unbounded per-slice growth drives resident memory to 496 of 512\,MB and it is OOM-killed 0 of 8, whereas the bounded pool holds the same working set at 390\,MB and completes 8 of 8; the flagship's default heap, with its smaller buffers, instead fits at 411\,MB and completes 8 of 8.
+The heap arm is thus better than not spilling and worse than bounded spilling at the tightest cell --- a difference of baseline and configuration, not a contradiction.
 
 \begin{figure}[ht]
 \centering

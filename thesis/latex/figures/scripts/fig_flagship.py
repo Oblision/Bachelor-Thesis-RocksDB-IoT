@@ -42,7 +42,7 @@ def main() -> None:
     frac_ooc = [o / n for o, n in counts["ooc"]]
     frac_inm = [o / n for o, n in counts["inm"]]
     bars_o = ax.bar(x - width / 2, frac_ooc, width, color=style.BLUE,
-                    label="out-of-core (8 reps)")
+                    label="out-of-core, heap arm (8 reps)")
     bars_i = ax.bar(x + width / 2, frac_inm, width, color=style.ORANGE,
                     label="in-memory, capped (6 reps)")
     for bars, cnt in ((bars_o, counts["ooc"]), (bars_i, counts["inm"])):

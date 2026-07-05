@@ -20,12 +20,16 @@ from scipy.stats import norm
 import style
 
 # (label, ok_A, n_A, ok_B, n_B, p_value) — completions and p verbatim from prose.
+# Each label names the ISOLATED axis and, where the heap arm appears, WHICH heap
+# configuration (the flagship uses the engine-default heap; the allocation-type
+# row uses the matched-granularity heap control). This is what keeps the heap's
+# flagship win and its allocation-row loss from reading as a contradiction.
 CONTRASTS = [
-    ("flagship\n(OOC backend vs capped in-memory)", 14, 24, 0, 18, 4.1e-5),
+    ("flagship: spill vs no spill\n(heap OOC vs capped in-memory)", 14, 24, 0, 18, 4.1e-5),
     ("attribution ladder\n(levers on vs off)", 7, 8, 0, 8, 7.0e-4),
     ("pooled lever arms\n(pooled vs unpooled)", 12, 16, 0, 16, 8.1e-6),
-    ("allocation-type win @512\n(pooled vs heap)", 8, 8, 0, 8, 7.8e-5),
-    ("intrinsic backpressure\n(bounded vs heap)", 23, 24, 3, 10, 1.6e-4),
+    ("allocation type (r200, 512 MB)\n(pooled vs matched-gran. heap)", 8, 8, 0, 8, 7.8e-5),
+    ("intrinsic backpressure (r200)\n(bounded vs heap)", 23, 24, 3, 10, 1.6e-4),
 ]
 
 
