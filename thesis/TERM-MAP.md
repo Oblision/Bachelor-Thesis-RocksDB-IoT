@@ -911,6 +911,57 @@ zero errors, zero undefined references.
 
 ---
 
+## Issue #25 — what the r-labels mean (now a table); Figure 13 boundary + pool-geometry misreads fixed (2026-07-05)
+
+User (reading Figure 13 = fig:effectiveness, "Completion at the memory
+boundary") raised three things: (a) r300's ρ > r500's "doesn't make sense";
+(b) a 10/10 in-memory cell sits just past the ρ=1 line in panel (a); (c) the
+r-codes (r200/r300/r500) are never explained — "is it memory? throughput?".
+
+**What r$N$ actually is (reverse-engineered from the run harness; CSVs are
+gitignored, `.planning/eval-phase/lag-validation/work/gen_skew.py` +
+`large_matrix.sh`):** each label names one pre-generated Zipfian/out-of-order
+input stream. The number is the stream's **target state pressure ρ×100 at the
+512 MB reference cap** for the original family. Measured footprints (median of
+10 uncapped in-memory reps, ±6 MB spread) confirm it:
+`r075=327, r100=458, r150=736, r200=1034, r300=1582` MB → ρ@512 =
+`0.64, 0.89, 1.44, 2.02, 3.09` (matches 0.75/1.0/1.5/2.0/3.0). A **later batch**
+`r500=1374, r700=1676, r1000=2078` MB was regenerated on a different scale
+(the harness calls them "new ρ-files"); monotonic within itself but offset, so
+**r500 (1374) < r300 (1582)** — the one inversion. → New **Table~\ref{tab:workloads}**
+in §5.1 (sec:setup) listing footprint + ρ at each cap; prose para [7.1.2b]
+states the measured ρ, not the label, is authoritative.
+
+**Exit-code taxonomy now tabulated** (user asked for the "R-codes" as a table
+in ~5.1). New **Table~\ref{tab:outcomes}**: Complete=0; OOM kill=137/137c/134;
+Pool abort=141; Crash=139/11. Mirrors `gridcells.classify_rc` exactly. Para
+[7.1.5] frames OOM (footprint > cap) vs pool abort (pool < hot band) as the two
+sides of the geometry law with opposite cures.
+
+**Figure 13 panel (a) — the 10/10 past ρ=1** is r200@1024 (ρ=1.0098). NOT an
+error: ρ is measured on an *uncapped* run (footprint 1034 MB, `unc_r200`), which
+runs ~10% fatter with no reclaim pressure; the same workload **capped at 1024
+peaks at 948 MB** (`L_c1024_inm_r200` peak_anon median) and fits. The two cells
+at ρ≈1.01 split on this margin: r200@1024 completes 10/10, r1000@2048 (genuinely
+> cap) fails 0/10. Added an on-figure callout + prose [7.2.6c] + caption note;
+reworded panel-(a) annotation from "no completion past ρ≈1" to "collapses once
+state clearly exceeds memory".
+
+**Figure 13 panel (b) — r500@1024 fails (0/10 both) while r300 to its right
+(higher ρ) completes 8/8.** The central out-of-core lesson, not a mislabel:
+completion is set by **pool geometry, not total footprint**. r500's hot band
+needs a 96k pool (96000×8192 B ≈ 786 MB) that can't fit under 1024; its heap
+failures are all rc137 (OOM), bounded all rc141 (pool abort). r300 completes
+through a 48k pool that fits (`W_c1024_p48k_r300` 8/8). Added a panel-(b) callout
+arrow + prose + caption note. Cross-referenced tab:workloads from the
+heatmap-1024 r500 paragraph.
+
+fig_effectiveness.py: two annotations added, both visually verified via
+pdftoppm. Full document recompiled: 107 pages, zero errors, zero undefined
+references; both new tables render cleanly (Tables 3 and 4).
+
+---
+
 ## Full Glossary (by first-definition location, in reading order)
 
 ### Chapter 1 — Introduction (informal pre-definitions only, by design —

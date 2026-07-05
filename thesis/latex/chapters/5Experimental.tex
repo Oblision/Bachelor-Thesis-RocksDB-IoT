@@ -114,6 +114,44 @@ It is the working-set state divided by the cap, so $\rho = 1$ is the point where
 Each workload runs once uncapped in memory; its steady anonymous-memory footprint divided by the cap under test gives $\rho$.
 Steady means the mean over the middle 20 to 80 percent of the run, which excludes startup and the terminal emission flush; the flush peak is tracked as its own quantity.
 
+% [7.1.2b] What the r-labels mean --- they recur in every figure and confuse if unexplained.
+Each workload carries a short label of the form \texttt{r}$N$ (\texttt{r200}, \texttt{r300}, \texttt{r500}, and so on) that recurs in every figure.
+The label is not a measured quantity: it names one specific pre-generated input stream, a single CSV file that differs from the others only in how much window state it drives.
+The number is that stream's \emph{target} state pressure at the 512\,MB reference cap, times one hundred, so \texttt{r200} was sized to reach $\rho \approx 2$ there and \texttt{r300} to reach $\rho \approx 3$.
+Table~\ref{tab:workloads} lists the streams with their measured footprints and the resulting $\rho$ at each cap.
+For the original family (\texttt{r075} through \texttt{r300}) the measured footprint follows the label closely and monotonically.
+A later batch (\texttt{r500}, \texttt{r700}, \texttt{r1000}) was regenerated on a different scale: it is ordered by footprint within itself, but its lightest member \texttt{r500} measures a \emph{smaller} footprint than the earlier \texttt{r300} (1374\,MB against 1582\,MB), so the label number orders each family internally but is not comparable across the two.
+The axis every result is read against is therefore not the label but the measured state pressure $\rho$ printed beside it; where the two disagree, as they do for \texttt{r300} and \texttt{r500}, $\rho$ is authoritative.
+
+\begin{table}[ht]
+\centering
+\small
+\begin{tabular}{|l|r|r|r|r|}
+\hline
+\textbf{Workload} & \textbf{Footprint (MB)} & \textbf{$\rho$ @ 512} & \textbf{$\rho$ @ 1024} & \textbf{$\rho$ @ 2048} \\
+\hline
+\texttt{r075}  & 327  & 0.64 & ---  & ---  \\
+\texttt{r100}  & 458  & 0.89 & 0.45 & ---  \\
+\texttt{r150}  & 736  & 1.44 & 0.72 & ---  \\
+\texttt{r200}  & 1034 & 2.02 & 1.01 & 0.50 \\
+\texttt{r300}  & 1582 & 3.09 & 1.54 & 0.77 \\
+\texttt{r500}  & 1374 & ---  & 1.34 & 0.67 \\
+\texttt{r700}  & 1676 & ---  & ---  & 0.82 \\
+\texttt{r1000} & 2078 & ---  & ---  & 1.01 \\
+\hline
+\end{tabular}
+\caption{The synthetic workloads. Footprint is the measured steady
+anonymous-memory footprint of an uncapped in-memory run (median over 10
+repetitions, spread within $\pm 6$\,MB); $\rho$ is that footprint divided by the
+cap, shown only for the caps at which the workload was run. The label number is
+the target $\rho \times 100$ at 512\,MB for the original family
+(\texttt{r075}--\texttt{r300}); \texttt{r500}--\texttt{r1000} are a later batch
+on a different scale, which is why \texttt{r300} has a larger footprint than
+\texttt{r500} despite the smaller number. The measured $\rho$, not the label, is
+the physical axis.}
+\label{tab:workloads}
+\end{table}
+
 % [7.1.3]
 Three variants run on identical workloads.
 The in-memory engine without a cap is the correctness reference.
@@ -124,6 +162,38 @@ The out-of-core backend runs under the same cap.
 The measurement matrix spans memory caps of 512, 1024, and 2048\,MB, several pool sizes, and $\rho$ from 0.45 to about 3.
 Each cell runs 8 to 10 times.
 The core evaluation comprises about 460 cells and roughly 3{,}100 measured runs; the backend-size contrast of Section~\ref{sec:rb32} adds a further 1{,}938 paired cells (\hyperref[app:rocksdb-tables]{Appendix~E}). How the operating-window figures make use of those extra cells is explained in Section~\ref{sec:rq1}, once the RocksDB configuration behind them has been introduced.
+
+% [7.1.5] Outcome taxonomy: how each run's exit is classified (used chapter-wide).
+Every run ends in one of a small set of outcomes, read from the process exit status and used unchanged throughout the chapter; the completion counts reported everywhere (an $n/m$ label) count the \emph{Complete} outcome over a cell's repetitions.
+A run either completes or it fails in one of three ways, and the failure reason is what the analysis turns on: an out-of-memory kill means the total footprint did not fit the cap, while a pool-exhaustion abort means the buffer pool was too small for the concurrently live state even though the total might have fit.
+These two are the two sides of the geometry law of Section~\ref{sec:rq1-geometry}; the third, a crash, is a rare corruption on the restore path confined to cells that already fail for a memory reason (Section~\ref{sec:rq3}).
+Table~\ref{tab:outcomes} lists the categories and the exit codes that map to them.
+
+\begin{table}[ht]
+\centering
+\small
+\begin{tabular}{|l|l|>{\raggedright\arraybackslash}p{6.9cm}|}
+\hline
+\textbf{Outcome} & \textbf{Exit code(s)} & \textbf{Meaning} \\
+\hline
+Complete & 0 & The run finished and its output checksum matched the uncapped in-memory reference. \\
+\hline
+OOM kill & 137, 137c, 134 & The working set exceeded the cap: the cgroup out-of-memory killer terminated the process (137; 137c is the same kill under checksum verification), or the allocator aborted under the cap (134). Total footprint too large. \\
+\hline
+Pool abort & 141 & The buffer pool could not satisfy an allocation: a worker found no free buffer for the concurrently live window state and the run aborted. Pool too small for the demand. \\
+\hline
+Crash & 139, 11 & A segmentation fault on the restore path (the slice-cache corruption of Section~\ref{sec:rq3}); occurs only inside cells that also fail for a memory reason. \\
+\hline
+\end{tabular}
+\caption{Run-outcome taxonomy. Every repetition of every cell is scored into one
+of these categories from its process exit status; a signalled death reports as
+128 plus the signal number ($137 = 128 + \texttt{SIGKILL}$,
+$134 = 128 + \texttt{SIGABRT}$, $139 = 128 + \texttt{SIGSEGV}$), while 141 is the
+engine's own pool-exhaustion abort. An OOM kill and a pool abort are distinct
+failures with opposite cures --- a smaller pool versus a larger one --- which is
+why they are separated rather than pooled into a single ``failed'' count.}
+\label{tab:outcomes}
+\end{table}
 
 % [7.1.5]
 The fixed configuration is: window length $W$ = 50{,}000\,ms of event time, emit lag $L$ = 4 million\,ms ($N_w$ = 80 retained windows), page size 8192 bytes, lz4 compression, 16\,MB write buffer, 8\,MB block cache, 4 partitions, 2 processor cores.
@@ -334,7 +404,7 @@ At the mid cap (Figure~\ref{fig:heatmap-1024}) the two architectures first pull 
 The bounded arm's completion rises with pool size in almost every row (r150: 0/8, 4/8, 8/8; r300: 0/8, 0/8, 8/8), so its window reads simply: more pool, more completion.
 The heap arm has no such column order: r100 completes 10 of 10 at 32k but 2 of 10 at 16k, and r200 completes only at the largest pool.
 One row defeats both architectures at every pool: r500.
-Its state pressure ($\rho \approx 1.34$) is lower than r300's ($\rho \approx 1.54$), which completes 8 of 8, and this is not a data error: the label numbers order the input streams, not the footprints, and the uncapped calibration runs measure r300's total footprint above r500's.
+Its state pressure ($\rho \approx 1.34$) is lower than r300's ($\rho \approx 1.54$), which completes 8 of 8, and this is not a data error: the label numbers order the input streams, not the footprints (Table~\ref{tab:workloads}), and the uncapped calibration runs measure r300's total footprint above r500's.
 What kills r500 is the pool, not the total footprint: every bounded failure in this row is a pool-exhaustion abort, including at the largest pool tested, and the same workload at 2048\,MB completes only once the pool reaches 96k buffers, a size that cannot fit under a 1024\,MB cap alongside the state outside the pool.
 
 \begin{figure}[ht]
@@ -488,9 +558,15 @@ bounded rows are the corrected 8192-byte flag that engages pooling.}
 
 % [7.2.6c] Multi-cap completion headline (generalizes the 512\,MB flagship).
 Figure~\ref{fig:effectiveness} draws the headline of this table in two focused panels.
-Panel (a) isolates the baseline: apart from r200 at 1024\,MB, which sits on the boundary itself ($\rho \approx 1.01$) and completes, no capped in-memory cell completes once state pressure passes $\rho = 1$.
+Panel (a) isolates the baseline: no capped in-memory cell completes once state clearly exceeds memory.
+The one apparent exception is r200 at 1024\,MB, which completes 10 of 10 at $\rho \approx 1.01$, one percent past the line.
+This is a measurement-boundary effect, not completion beyond memory: $\rho$ is taken from an uncapped run, which runs about ten percent fatter with no reclaim pressure, so a workload measured just over $\rho = 1$ can still fit when actually capped --- r200's capped peak is 948\,MB, comfortably under 1024.
+The two cells that sit exactly at $\rho \approx 1.01$ split on this margin: r200 at 1024\,MB fits and completes, while r1000 at 2048\,MB genuinely exceeds its cap and fails 0 of 10; away from this one-percent band the collapse is sharp.
 Panel (b) compares the two arms at and beyond the boundary; the lighter workloads, which both arms complete in full, are omitted there because Figures~\ref{fig:heatmap-512}--\ref{fig:heatmap-2048} already show the full grids.
 At 512 and 1024\,MB the best out-of-core operating point, taken over pool sizes and both architectures, extends completion past the memory boundary.
+One cell in panel (b) breaks the left-to-right order of $\rho$: r500 at 1024\,MB ($\rho \approx 1.34$) fails on both arms, while r300 immediately to its right ($\rho \approx 1.54$, a \emph{larger} footprint) completes 8 of 8 out-of-core.
+This is not a mislabeling but the central lesson of the out-of-core window: completion is set by pool geometry, not by total footprint.
+r500's concurrently live state needs a 96k-buffer pool ($\approx 786$\,MB) that cannot fit under a 1024\,MB cap, so every r500 run there dies --- the heap arm by OOM kill, the bounded arm by pool-exhaustion abort --- whereas r300, despite its larger total state, completes through a 48k pool that does fit (Section~\ref{sec:rq1-windows}).
 At 2048\,MB the single beyond-memory workload, r1000 at $\rho \approx 1$, defeats every configuration; this cell is the edge of the demonstrated result and is marked as such.
 
 \begin{figure}[ht]
@@ -507,8 +583,12 @@ Figures~\ref{fig:heatmap-512}--\ref{fig:heatmap-2048} show the full grids):
 bars compare the capped in-memory baseline with the best
 out-of-core operating point (maximum completion over pool sizes and both
 architectures), labeled completed/attempted; shaded spans mark the
-beyond-memory pairs ($\rho > 1$). See the text for the per-cap
-reading.\methodsnote}
+beyond-memory pairs ($\rho > 1$). The one green baseline cell past $\rho = 1$
+in panel (a), r200 at 1024\,MB ($\rho \approx 1.01$), is a measurement-boundary
+effect --- $\rho$ is measured uncapped and the capped peak still fits (text). In
+panel (b), r500 at 1024\,MB fails at a \emph{lower} $\rho$ than r300 beside it
+because out-of-core completion is governed by pool geometry, not total footprint
+(text). See the text for the per-cap reading.\methodsnote}
 \label{fig:effectiveness}
 \end{figure}
 

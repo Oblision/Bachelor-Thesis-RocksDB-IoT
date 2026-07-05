@@ -90,10 +90,19 @@ def main() -> None:
     ax_a.axvline(1.0, color="#666666", lw=1.0, ls="--")
     ax_a.text(0.985, -0.45, "$\\rho = 1$", ha="right", va="center",
               fontsize=8.5, color="#555555", rotation=90)
-    ax_a.text(1.98, 0.38, "the baseline collapses at the boundary:\n"
-              "no completion past $\\rho \\approx 1$",
+    ax_a.text(2.28, 0.02, "the baseline collapses once\nstate clearly exceeds memory",
               ha="center", va="center", fontsize=8.2, color="#8a1500",
               style="italic")
+    # The one green cell past the line is r200 at 1024 MB (rho=1.01, one percent
+    # over). rho is measured on an UNCAPPED run, which runs fatter with no
+    # reclaim pressure; the same workload capped at 1024 peaks at 948 MB and
+    # fits. r1000 at 2048 (also rho~1.01) genuinely exceeds its cap and fails --
+    # the two boundary cells split. Explained in the caption and text.
+    ax_a.annotate("$\\rho\\!\\approx\\!1.01$, 1% over:\ncapped peak (948 MB) fits",
+                  xy=(1.01, 1.0), xytext=(1.34, 1.86),
+                  fontsize=6.3, color="#0b5c46", ha="left", va="center",
+                  arrowprops=dict(arrowstyle="->", color="#0b5c46", lw=0.7,
+                                  connectionstyle="arc3,rad=-0.25"))
     ax_a.set_xlim(0.35, 3.3)
     ax_a.set_ylim(-0.85, 2.75)
     ax_a.set_yticks((2, 1, 0), ("512 MB", "1024 MB", "2048 MB"), fontsize=8)
@@ -190,6 +199,18 @@ def main() -> None:
     for i in range(1, len(coords)):
         if coords[i][0] != coords[i - 1][0]:
             ax_b.axvline((x[i] + x[i - 1]) / 2, color="#bbbbbb", lw=0.8)
+
+    # r500 @ 1024 is the pool-geometry counterexample: lower rho than r300 to
+    # its right, yet 0/10 on both arms -- its hot band needs a 96k pool that
+    # cannot fit under 1024 MB. Flag it so the non-monotonic-in-rho outcome is
+    # not misread as an error (see caption / Section rq1-windows).
+    for idx, (cap, w, _r) in enumerate(coords):
+        if cap == 1024 and w == 500:
+            ax_b.annotate("r500: lower $\\rho$ than r300,\nyet 0/10 — its hot band needs\n"
+                          "a 96k pool, too big for 1024 MB",
+                          xy=(x[idx] + width / 2, 0.03), xytext=(x[idx], 0.72),
+                          fontsize=6.1, color="#8a1500", ha="center", va="bottom",
+                          arrowprops=dict(arrowstyle="->", color="#8a1500", lw=0.7))
 
     ax_b.set_xticks(x, [f"r{w}\n$\\rho$ {rho:.2f}" for _c, w, rho in coords],
                     fontsize=7.5)
