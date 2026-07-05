@@ -20,7 +20,7 @@ import style
 
 # (label, ok_A, n_A, ok_B, n_B, p_value) — completions and p verbatim from prose.
 CONTRASTS = [
-    ("flagship\n(default vs corrected)", 14, 24, 0, 18, 4.1e-5),
+    ("flagship\n(OOC backend vs capped in-memory)", 14, 24, 0, 18, 4.1e-5),
     ("attribution ladder\n(levers on vs off)", 7, 8, 0, 8, 7.0e-4),
     ("pooled lever arms\n(pooled vs unpooled)", 12, 16, 0, 16, 8.1e-6),
     ("allocation-type win @512\n(pooled vs heap)", 8, 8, 0, 8, 2.3e-5),
@@ -77,11 +77,17 @@ def main() -> None:
     axf.grid(True, axis="x", alpha=0.25)
 
     # p-value column (log scale, small p to the left = stronger).
+    xmin_log = np.log10(1e-6)
     for y, (_, _, _, _, _, p) in zip(ys, CONTRASTS):
         axp.scatter([p], [y], s=60, color=style.RED, zorder=3,
                     edgecolors="black", linewidths=0.5)
-        axp.annotate(_fmt_p(p), xy=(p, y), xytext=(0, 7), textcoords="offset points",
-                     ha="center", va="bottom", fontsize=7.4, color="#8a1500")
+        # Centering the label over points close to the left edge pushes half the
+        # text past the axis spine; anchor those to the left of the point instead.
+        near_left_edge = (np.log10(p) - xmin_log) < 0.6
+        ha = "left" if near_left_edge else "center"
+        xoff = 5 if near_left_edge else 0
+        axp.annotate(_fmt_p(p), xy=(p, y), xytext=(xoff, 7), textcoords="offset points",
+                     ha=ha, va="bottom", fontsize=7.4, color="#8a1500")
     axp.axvline(0.05, color=style.GREY, lw=1.1, ls="--", zorder=1)
     axp.text(0.05, len(CONTRASTS) - 0.45, "p = 0.05", rotation=90, fontsize=7.2,
              ha="right", va="top", color="#555555")

@@ -42,9 +42,9 @@ Input data & RAM-backed tmpfs & \texttt{/dev/shm} bind-mounted at \texttt{/input
 \hline
 \end{tabular}
 \caption{Container device profile: the four imposed constraints that emulate the
-resource envelope of a memory-constrained edge device, not a specific device.
+resource envelope of a memory-constrained edge device.
 The memory cap is varied per experiment (512, 1024, 2048\,MB); the other three
-are held fixed.}
+values are held fixed.}
 \label{tab:edge-profile}
 \end{table}
 
@@ -55,17 +55,19 @@ Each cell writes one row with 34 measured columns.
 
 % [6.6]
 Correctness is verified with output checksums against the in-memory baseline.
-The gated binary itself is verified with a levers-off regression arm, which must behave identically to the unmodified engine.
+The gated binary, the engine build containing the levers, is verified separately: with every lever switched off, it must behave identically to the unmodified engine, confirming that the levers introduce no regression when inactive.
 
 % [7.1.1]
-The workloads are synthetic sensor streams.
-Each stream is a pre-generated CSV file of sensor readings that a NebulaStream file source replays into the query below.
+Each workload runs the query (Listing~\ref{lst:query}) over a synthetic sensor stream that supplies its input.
+The stream is a pre-generated CSV file of sensor readings that a NebulaStream file source replays into the query.
 Keys follow a Zipf distribution with skew $1.0$ over a universe of $1.5$ million sensor ids, so few sensors are hot and many are rare; the ten most frequent keys carry about 20\% of the traffic.
 Each row also carries an event-time timestamp.
 The generator adds a positive jitter to each timestamp, drawn uniformly on $[0, D]$, so the stream arrives out of order.
 The jitter is bounded by the lateness bound $L$: here $D = L$, so a row is displaced by at most $L$ in event time, and the mean displacement is $L/2$.
+This bound is the same configured delay as the emit lag of Section~\ref{sec:architecture}: holding a completed window back by $L$ before emission is exactly what lets a row up to $L$ late still land in it correctly.
 The jitter is applied to the timestamp independently of the key, so disorder and skew are orthogonal: a hot key is no more or less likely to arrive late than a rare one.
-The generator scales key count and rows per window together, so a target state size translates into a defined workload.
+State size is governed by how many distinct keys are held open at once, which is capped by whichever is smaller: the key universe, or the rows seen per window.
+The generator raises both together, since growing only one saturates against the other and stops increasing the state.
 The query is a single tumbling-window aggregation, the operator whose state this backend spills.
 It groups the stream by key and sums a value field per key per window (Listing~\ref{lst:query}).
 Table~\ref{tab:workload} lists the workload parameters.
@@ -121,11 +123,10 @@ The out-of-core backend runs under the same cap.
 % [7.1.4]
 The measurement matrix spans memory caps of 512, 1024, and 2048\,MB, several pool sizes, and $\rho$ from 0.45 to about 3.
 Each cell runs 8 to 10 times.
-The core evaluation comprises about 460 cells and roughly 3{,}100 measured runs; the backend-size contrast of Section~\ref{sec:rb32} adds a further 1{,}938 paired cells (Appendix~E).
-The operating-window figures additionally pool each grid cell with its backend-size twin from Section~\ref{sec:rb32}, so their cells carry 16 to 20 runs; the headline statistics quoted in the text use the 16/8 baseline arms alone.
+The core evaluation comprises about 460 cells and roughly 3{,}100 measured runs; the backend-size contrast of Section~\ref{sec:rb32} adds a further 1{,}938 paired cells (\hyperref[app:rocksdb-tables]{Appendix~E}). How the operating-window figures make use of those extra cells is explained in Section~\ref{sec:rq1}, once the RocksDB configuration behind them has been introduced.
 
 % [7.1.5]
-The fixed configuration: window length $W$ = 50{,}000\,ms of event time, emit lag $L$ = 4 million\,ms ($N_w$ = 80 retained windows), page size 8192 bytes, lz4 compression, 16\,MB write buffer, 8\,MB block cache, 4 partitions, 2 processor cores.
+The fixed configuration is: window length $W$ = 50{,}000\,ms of event time, emit lag $L$ = 4 million\,ms ($N_w$ = 80 retained windows), page size 8192 bytes, lz4 compression, 16\,MB write buffer, 8\,MB block cache, 4 partitions, 2 processor cores.
 The RocksDB parameters follow the experimental analysis behind Section~\ref{sec:rocksdb-config}.
 
 % [7.1.6]
@@ -149,7 +150,7 @@ The paired backend-size contrast of Section~\ref{sec:rb32} uses McNemar's test i
 
 \subsection{Methods Note for the Synthetic Grid\label{sec:methods-grid}}
 
-Every synthetic-grid figure in this chapter carries a short pointer back to this note instead of repeating the full setup under every plot.
+Every synthetic-grid figure in this chapter uses this configuration.
 
 \methodsnotefull
 
@@ -176,7 +177,7 @@ It varies the three knobs across 200 configurations at 50 repetitions each, 10{,
 
 Table~\ref{tab:rocksdb-char} reports the result.
 Compression is the dominant knob: lz4 raises concurrent throughput 4.4-fold over no compression, and together with a write buffer of at least 16\,MB it holds write stalls below one percent.
-The block cache barely matters: enlarging it from 8 to 256\,MB leaves throughput flat although its hit rate climbs from 6 to 77 percent, because the write path dominates the run time.
+The block cache barely matters: enlarging it from 8 to 256\,MB raises its hit rate from 6 to 77 percent, but throughput stays flat because the write path dominates run time.
 A larger write buffer lowers write amplification, from 2.68 at 4\,MB to 0.91 at 32\,MB, and raises concurrent throughput, but the memory it commits competes with the window state.
 Every OOM kill in the analysis occurs only as the write buffer and the block cache together approach the cap.
 
@@ -197,14 +198,14 @@ Write buffer & from 4 to 32\,MB, write amplification falls $2.68 \to 0.91$ and c
 \caption{Experimental analysis of the RocksDB backend with \texttt{db\_bench}
 under a 512\,MB cap (10{,}000 runs, 9{,}665 completing; means over completing
 runs, concurrent workload \texttt{readwhilewriting}). Full per-parameter tables
-are in Appendix~E.}
+are in \hyperref[app:rocksdb-tables]{Appendix~E}.}
 \label{tab:rocksdb-char}
 \end{table}
 
 The analysis fixes the backend at the values of Table~\ref{tab:rocksdb-config}: lz4 compression, a 16\,MB write buffer, and an 8\,MB block cache.
 This is the memory-fit point for the tightest cap.
 Compression costs nothing, the small cache costs almost no throughput, and a 16\,MB write buffer already removes the write stalls while leaving the most memory for window state.
-The three values are the smallest that still perform well under the tightest 512\,MB cap; window state, not the storage backend, is the scarce consumer of memory on an edge device.
+The three values are the smallest that still perform well under the tightest 512\,MB cap, chosen because memory is the scarce resource on an edge device, and window state, not the storage backend, is what competes for it.
 The evaluation holds this configuration constant across all caps (Section~\ref{sec:setup}).
 
 \begin{table}[ht]
@@ -243,13 +244,13 @@ The evaluation therefore holds the backend at 16 and 8\,MB across all caps.
 Two architectures appear throughout this chapter, named by their allocation type from Section~\ref{sec:bg-windows}.
 The engine-default configuration uses unbounded allocation: hash map pages live on the heap.
 The corrected configuration uses bounded allocation: hash map pages live in the global buffer pool.
-For short, this chapter also calls the first the heap architecture and the second the pooled architecture.
+For brevity, this chapter also calls the first the heap architecture and the second the pooled architecture.
 Why two architectures exist is the subject of Section~\ref{sec:rq3}.
 This section reports the operating windows of both.
 
 % [7.2.1]
 The flagship result stands at the smallest cap.
-At 512\,MB under the default architecture, the backend completes 14 of 24 runs.
+At 512\,MB under the heap architecture, the backend completes 14 of 24 runs.
 The capped in-memory engine completes 0 of 18.
 Fisher's exact test gives $p = 4.1 \times 10^{-5}$.
 
@@ -283,36 +284,36 @@ Every headline claim clears $p < 10^{-3}$.
 \centering
 \widefig{img/fig_pvalues.pdf}
 \caption[Headline completion contrasts and their significance]{Headline
-completion contrasts and their significance. Each row is a two-arm comparison of
-completed over attempted runs, with the point estimate of the completion
-difference, its 95\% confidence interval, and the Fisher's exact $p$-value. From
-top: the 512\,MB flagship (14/24 vs 0/18, $p = 4.1 \times 10^{-5}$); the
-attribution ladder at the decisive cell (7/8 vs 0/8, $p = 7.0 \times 10^{-4}$);
-pooled lever arms vs unpooled levers (12/16 vs 0/16, $p = 8.1 \times 10^{-6}$);
-the allocation-type win at 512\,MB (8/8 vs 0/8, $p = 2.3 \times 10^{-5}$); and the
-intrinsic-backpressure cell (23/24 vs 3/10, $p = 1.6 \times 10^{-4}$). The dashed
-line marks $p = 0.05$; every contrast sits far past it.\methodsnote}
+completion contrasts and their significance, one row per contrast (labeled on
+the plot, with its underlying completion counts annotated beside each point).
+(a) Effect size: the completion-difference point estimate with its 95\%
+confidence interval (Newcombe's method, built from Wilson score intervals on
+each arm's completion proportion). (b) Significance: the Fisher's exact $p$-value on a log
+scale, with a dashed reference at $p = 0.05$. Every contrast clears that line by
+orders of magnitude; see the text for the narrative behind each row.\methodsnote}
 \label{fig:pvalues}
 \end{figure}
 
 % [7.2.3]
-The default architecture has cap-dependent operating windows.
+The heap architecture has cap-dependent operating windows.
 At 512\,MB it covers $\rho \approx 1.2$ to $2.2$.
 At 1024\,MB it extends at least to $\rho = 1.54$ (r300, the largest pressure tested at this cap).
 Both windows are significant at $p = 3.6 \times 10^{-4}$.
 At 2048\,MB it completes heavy workloads below $\rho \approx 1$; a beyond-memory win above $\rho = 1$ is not demonstrated at this cap.
+
+% [7.2.3b] Why the heatmap's cells carry more runs than the rest of the chapter's.
+The figure below combines two separate experiments into one displayed count: the core grid (8 to 10 runs per cell) and its backend-size twin, the same cells rerun under the paired 32/32 RocksDB configuration of Section~\ref{sec:rb32}, giving each displayed cell 16 to 20 runs instead of 8 to 10. Treating the two experiments as one dataset here is justified by Figure~\ref{fig:rb32-arch}, which shows the two configurations complete at the same rate once between-session drift is controlled for. The headline statistics quoted throughout this chapter keep the two experiments separate and use the 16/8 grid alone.
 
 \begin{figure}[ht]
 \centering
 \widefig{img/fig_heatmap.pdf}
 \caption[Operating windows of both architectures]{Operating windows of both
 architectures over cap $\times$ pool $\times$ workload. State pressure $\rho$
-appears in parentheses; $\rho$ is the workload's steady memory footprint
-divided by the cap, so $\rho > 1$ means the state does not fit in memory.
-Each cell reports completed over attempted runs. Grid cells pool the 16/8
-baseline with its 32/32 backend-size twin (Section~\ref{sec:rb32}) as
-additional repetitions, so counts read out of 16 or 20; the headline
-statistics in the text use the 16/8 arms alone. Untested cells are marked by
+(steady footprint $\div$ cap; $\rho > 1$ = beyond memory) appears in
+parentheses. Each cell reports completed over attempted runs. Grid cells combine the
+16/8 baseline with its 32/32 backend-size twin as explained above, so counts
+read out of 16 or 20; the headline statistics in the text use the 16/8
+experiment alone. Untested cells are marked by
 a grey dot. Top row: heap architecture (engine-default, all window state
 outside the pool) with its capped in-memory baseline; bottom row: pooled
 architecture. Figure~\ref{fig:geometry-law} breaks the failing cells down by
@@ -354,6 +355,7 @@ dot. Repetition pooling as in Figure~\ref{fig:heatmap}.\methodsnote}
 
 % [7.2.4b] The heap arm's pool sensitivity, isolated at one cell.
 The heap arm is sensitive to the same knob.
+The pool is a fixed slab the engine reserves at process start regardless of whether hash-map pages live in it (Section~\ref{sec:bg-nes}); growing it enlarges that up-front reservation and leaves less of the cap for the heap-resident window state, whose pages never enter the pool.
 At 512\,MB, r75, the pool is the only variable, and completion falls from 20 of 20 at a 16k-buffer pool through 11 of 20 at 32k to 0 of 20 at 64k; every failure is an OOM kill.
 Figure~\ref{fig:knife} isolates this sweep.
 
@@ -387,7 +389,7 @@ One workload marks the absolute edge: r1000 at 2048\,MB ($\rho \approx 1.03$) fa
 % [7.2.6]
 State pressure alone does not decide completion.
 Recall that $\rho$ is the working-set state divided by the cap: at a 512\,MB cap, $\rho = 1$ means a working set of about 512\,MB.
-Under the default architecture, a workload at $\rho \approx 0.74$ ingesting 2.9 million tuples per second fails.
+Under the heap architecture, a workload at $\rho \approx 0.74$ ingesting 2.9 million tuples per second fails.
 A heavier workload at $\rho \approx 0.80$ ingesting 1.1 million tuples per second completes 10 of 10.
 The lighter workload fails and the heavier one completes, so the footprint is not what decides the outcome.
 
@@ -449,21 +451,15 @@ At 2048\,MB the single beyond-memory workload, r1000 at $\rho \approx 1$, defeat
 \caption[Completion at the memory boundary]{Completion at the memory
 boundary, in two panels. (a) The capped in-memory baseline alone: one row per
 cap, one marker per workload cell at its state pressure $\rho$, labeled
-completed over attempted runs (pooled repetitions). Filled green = all
-repetitions complete, orange = partial, open red = all fail. The collapse at
-the boundary is immediate: the only completion at or past $\rho = 1$ is r200
-at 1024\,MB, which sits on the boundary itself ($\rho \approx 1.01$); every
-cell further out fails in full, and below the boundary every cell completes
-except r700 at 2048\,MB (10 of 20). (b) The
-head-to-head at and beyond the boundary: pairs with $\rho \geq 0.75$ only,
-grouped by cap; the lighter workloads, which both arms complete in full, are
-omitted (Figure~\ref{fig:heatmap} shows the full grid). Bars compare the
-capped in-memory baseline with the best out-of-core operating point (maximum
-completion over pool sizes and both architectures); labels are
-completed/attempted runs; shaded spans mark the beyond-memory pairs
-($\rho > 1$). Out-of-core extends completion past the boundary at 512 and
-1024\,MB; at 2048\,MB the lone beyond-memory workload (r1000,
-$\rho \approx 1.01$) fails under every configuration.\methodsnote}
+completed over attempted runs (pooled repetitions); filled green = all
+repetitions complete, orange = partial, open red = all fail. (b) Head-to-head
+at and beyond the boundary ($\rho \geq 0.75$ only; lighter workloads, which
+both arms complete in full, are omitted since Figure~\ref{fig:heatmap} shows
+the full grid): bars compare the capped in-memory baseline with the best
+out-of-core operating point (maximum completion over pool sizes and both
+architectures), labeled completed/attempted; shaded spans mark the
+beyond-memory pairs ($\rho > 1$). See the text for the per-cap
+reading.\methodsnote}
 \label{fig:effectiveness}
 \end{figure}
 
@@ -481,14 +477,13 @@ architecture (circle = heap, square = bounded), both for completions and for
 beyond-boundary failures; fill is the outcome (filled =
 completes, plotted at its realized throttled throughput; hollow = fails, plotted
 at the workload's free-running demand rate because a dead run has no realized rate
-of its own). Two lines cut the plane. The vertical $\rho = 1$ memory boundary is
-exact by definition: $\rho$ is the footprint divided by the cap, so $\rho = 1$ is
-the point where the state exactly fills memory. The horizontal drain ceiling near
-2.6\,M tuples/s is empirical, not assumed: it is the highest throughput any surviving
-spilling cell realizes, and no $\rho > 1$ cell whose free-running demand exceeds
-about 2.7\,M tuples/s survives (40 of 40 fail). Above the ceiling and past $\rho = 1$,
-ingest outruns the drain, the spiller falls behind, and the run fails. This is the
-race. The $\rho < 1$ failures split by demand rate and carry their own two markers
+of its own). Two lines cut the plane: the vertical $\rho = 1$ memory boundary,
+exact by definition ($\rho$ is the footprint divided by the cap), and the
+horizontal drain ceiling near 2.6\,M tuples/s, empirical rather than assumed
+(the highest throughput any surviving spilling cell realizes; no $\rho > 1$
+cell whose free-running demand exceeds about 2.7\,M tuples/s survives, 40 of
+40 fail). Past both lines, ingest outruns the drain and the run fails: this
+is the race. The $\rho < 1$ failures split by demand rate and carry their own two markers
 across both architectures (triangle = capacity, cross = pool geometry): the slow
 heavy cells (demand below about 2\,M tuples/s) are
 true capacity deaths, whose per-window state exceeds the pool and cap; the fast cells
@@ -641,7 +636,7 @@ Earlier comparisons showed a 2--5$\times$ gap.
 That gap was the buffer granularity, not the architecture: per-task latency scales with buffer size in every variant, including the in-memory engine.
 
 % [7.3.5]
-Buffer granularity is an engine-wide performance factor in its own right.
+Buffer granularity is an engine-wide performance factor in its own right, not specific to out-of-core processing: the same per-task latency scaling with buffer size noted above shows up in throughput too.
 Raising the default 4096-byte buffers to about 8{,}000 bytes speeds up even the in-memory engine by up to 13\%.
 The shipped default loses at every tested cell.
 This is an actionable finding for the engine itself, independent of out-of-core processing.
@@ -659,10 +654,12 @@ Spill and restore latencies are distributions, not single numbers: their effect 
 \widefig{img/fig_cost.pdf}
 \caption[The cost of out-of-core processing]{The cost of out-of-core processing
 at matched I/O granularity ($\sim$8\,K buffers in every variant, same pool per
-coordinate; means over completing repetitions). The heap $-28\%$ at 512/r075 is
-the stated outlier on 3--4\,s cells and is reported as measured. Panel (c)
-shows the bounded architecture's footprint advantage: $-33\%$ versus the
-in-memory engine at 2048/r200 (924 vs 1387\,MB).\methodsnote}
+coordinate; means over completing repetitions), in three panels: (a) throughput,
+(b) tail latency, (c) resident footprint, each relative to the in-memory
+reference. Panel (a): the heap $-28\%$ at 512/r075 is the stated outlier on
+3--4\,s cells and is reported as measured. Panel (c): the bounded
+architecture's footprint advantage, $-33\%$ versus the in-memory engine at
+2048/r200 (924 vs 1387\,MB).\methodsnote}
 \label{fig:cost}
 \end{figure}
 
@@ -702,7 +699,7 @@ On short in-memory runs (median about 13.5 seconds) that fixed cost holds mean u
 The in-memory engine has zero disk traffic.
 Spilling winners run at 89--92\% with write-dominated disk traffic; their restores are served from the operating system's page cache.
 The lower figures below are genuine idle, not the compilation cost.
-The throttled regime (Section~\ref{sec:rq3}) shows 63\% utilization with heavy read and write traffic; the idle share is disk wait and the workload is disk-bound.
+The throttled regime — demand exceeds the pool, but the cap throttles ingest instead of the run deadlocking (regime two of the three-regime feasibility law, Section~\ref{sec:rq3}) — shows 63\% utilization with heavy read and write traffic; the idle share is disk wait and the workload is disk-bound.
 The heaviest bounded cells show 54\%; the idle share is pool backpressure.
 
 % [7.4.2]
@@ -714,13 +711,12 @@ The SD card's write bandwidth bounds the drain rate in the race from Section~\re
 \widefig{img/fig_cpu_io.pdf}
 \caption[Average processor and disk behavior across state pressure]{Average
 processor and disk behavior across state pressure (completing cells of the grids;
-cgroup CPU and I/O accounting, medians per cell). Utilization is the mean over the
-whole run, including the one-off single-threaded Nautilus query-compilation phase
-at startup. On short in-memory runs that fixed cost holds utilization at 91--97\%;
-long no-spill runs amortize it to about 99.6\%. Spilling winners stay at 89--92\%
-with write-dominated traffic. The throttled and heavy bounded regimes drop to 63\%
-and 54\%; that idle share is genuine disk wait and pool backpressure, not the
-compilation cost.\methodsnote}
+cgroup CPU and I/O accounting, medians per cell). (a) CPU utilization; the
+plot itself annotates the one-off compilation-phase effect on short runs.
+Spilling winners stay at 89--92\% with write-dominated traffic; the throttled
+and heavy bounded regimes' lower utilization (63\%, 54\%) is genuine disk wait
+and pool backpressure, not that compilation cost. (b) Disk read/write volume
+for spilling cells.\methodsnote}
 \label{fig:cpu-io}
 \end{figure}
 
@@ -740,7 +736,8 @@ The removal requires an entry-inheritance refactor; it is documented and not imp
 
 % [7.5.3]
 A one-line shrink of the bucket directory did not work.
-Two-thirds of the maps obtain their directory size on code paths the change did not cover.
+The fix changed the bucket count only at slice-creation time, but hash maps also get their bucket count assigned at two other sites, the per-worker build and the unspill/merge path, which the fix left untouched.
+Two-thirds of the maps, the ones built through those other two sites, therefore kept their original directory size.
 Completion was unaffected.
 
 % [7.5.4]
@@ -748,9 +745,9 @@ Write amplification is measured at device level: disk bytes written divided by s
 This is a device-level proxy, not RocksDB's internal counter; the internal counter was not captured uniformly.
 
 % [7.5.5]
-A pool-sizing rule follows from the data.
-The pool must hold the hot band, the soft budget, the emission pipeline, and the I/O path.
-The pool plus its unpooled overhead plus the base footprint must stay below 90\% of the cap.
+A pool-sizing rule combines the geometry law above with a designed safety margin.
+The pool must hold the hot band, the two-sided geometry law's lower bound (Section~\ref{sec:rq1}).
+What the data does not itemize on its own, the soft budget, the emission pipeline, and the I/O path, is covered instead by headroom: the pool plus its unpooled overhead plus the base footprint should stay below 90\% of the cap, a margin chosen to leave that headroom rather than measured from it.
 
 \begin{figure}[ht]
 \centering
@@ -816,8 +813,8 @@ The baseline completes 0 of 10.
 (A further arm, matched granularity without pooling, recovers 3 of 8; it appears as the second rung of Figure~\ref{fig:ladder} and is treated in Section~\ref{sec:disambiguation}.)
 Levers without pooling complete 0 of 16.
 Pooling without levers completes 0 of 8.
-Pooling with the reserve lever completes 5 of 8.
-Pooling with reserve and paced restore completes 7 of 8; within pooling, the levers carry the cell from 0 of 8 to 7 of 8 ($p = 7.0 \times 10^{-4}$).
+Pooling with the reserve lever (Lever 1a) completes 5 of 8.
+Pooling with the reserve lever and paced restore (Lever 1c) completes 7 of 8; within pooling, the levers carry the cell from 0 of 8 to 7 of 8 ($p = 7.0 \times 10^{-4}$).
 Taken together, the pooled lever arms complete 12 of 16 where levers without pooling complete 0 of 16 ($p = 8.1 \times 10^{-6}$).
 
 \begin{figure}[ht]
@@ -918,7 +915,7 @@ A pool that reserved buffers for the drain side, which the fill side could not c
 % [7.6o]
 The one-flag correction changes two things at once: the allocation type and the I/O buffer granularity.
 A dedicated arm separates them.
-A buffer size of 8128 bytes is 99.2\% of the page size but still below it, so maps stay on the heap at matched granularity.
+A buffer size of 8128 bytes is 99.2\% of the page size but still below it: since a page is pooled only when it fits inside the buffer (Section~\ref{sec:integration}), maps stay on the heap at matched granularity.
 
 % [7.6p]
 The arm confirms the attributions where it matters.
@@ -1035,11 +1032,14 @@ H2 is therefore refuted for the pooled store it was meant to describe and holds 
 \caption[Backend-size effect on completion, by architecture]{The backend-size
 effect on completion, split by memory architecture, shown at the tight 512\,MB cap. Change in
 completion when the RocksDB write buffer and block cache move from 16/8 to
-32/32, per campaign, paired by cell. The pooled grids (W\_, N\_) gain; the heap
-arms (U\_, L\_) do not. Because both 32/32 arms ran in one session and both 16/8
-arms in another, the sign flip is a difference of differences, so the
-between-session drift that confounds the absolute numbers cancels in the
-contrast.}
+32/32, per campaign, paired by cell. The pooled grids, W\_ (the baseline pooled
+architecture) and N\_ (the pooled architecture with pool-pressure levers
+enabled), gain; the heap arms, U\_ (the matched-granularity heap control) and
+L\_ (the default-granularity heap arm), do not. Because both 32/32 arms ran in
+one session and both 16/8 arms in another, the sign flip is a difference of
+differences, so the between-session drift that confounds the absolute numbers
+cancels in the contrast. Full per-campaign, per-cap numbers are in
+\hyperref[app:rocksdb-tables]{Appendix~E.6}.}
 \label{fig:rb32-arch}
 \end{figure}
 
@@ -1064,28 +1064,32 @@ A larger write buffer therefore moves completion only at the margin, because it 
 \centering
 \includegraphics[width=\textwidth]{img/fig_rb32_compartments.pdf}
 \caption[Where the memory budget goes]{Median resident anonymous memory of the
-pooled grid (W\_) per cap and outcome, decomposed into four compartments. The
-\emph{pool floor} is the pre-allocated global buffer pool. The \emph{unpooled
-directories} are the bucket directories and the map arena; NebulaStream allocates
-these as tuple buffers too, but on the process heap rather than in the pool. The
-\emph{RocksDB} compartment is the backend's own resident set. The \emph{base} is
-the fixed engine and runtime footprint present in every run. The RocksDB
-compartment is small at every cap; the pool floor and the base dominate.
-Completing cells carry a higher resident footprint than the failing ones, which
-abort before the working set fills.}
+pooled grid (W\_) per cap and outcome, as stacked bars over four compartments.
+The \emph{pool floor} is the pre-allocated global buffer pool. The
+\emph{unpooled directories} are the bucket directories, the per-map
+control-block table always unpooled regardless of page size
+(Section~\ref{sec:bg-windows}) and allocated as tuple buffers on the heap
+rather than in the pool; ChainedHashMap's variable-sized-entry region is
+allocated the same way but is never populated by this thesis's fixed-size
+UINT64 schema, so it contributes nothing here. The \emph{RocksDB} compartment
+is the backend's own resident set; the \emph{base} is the fixed engine and
+runtime footprint present in every run. The RocksDB compartment is small at
+every cap; the pool floor and the base dominate. Completing cells carry a
+higher resident footprint than the failing ones, which abort before the
+working set fills.}
 \label{fig:rb32-compartments}
 \end{figure}
 
 % [RB32-5] H3 did not transfer from the component benchmark to the system.
 The mechanism behind H3 did not survive the move from the component benchmark to the system.
-On pairs where both configurations complete, 32/32 writes about 11\% fewer bytes to the device at 1024\,MB ($p < 0.001$), far short of the microbenchmark's third; it writes more at 512\,MB and breaks even at 2048\,MB (Appendix~E).
+On pairs where both configurations complete, 32/32 writes about 11\% fewer bytes to the device at 1024\,MB ($p < 0.001$), far short of the microbenchmark's third; it writes more at 512\,MB and breaks even at 2048\,MB (\hyperref[app:rocksdb-tables]{Appendix~E}).
 A byte-level gain measured on \texttt{db\_bench} in isolation does not predict the system-level drain under a memory cap.
 
 % [RB32-6] Method and error policy.
 The analysis is paired throughout.
 Each 32/32 cell is matched to its 16/8 twin on cap, pool, state pressure, and arm, and completion is compared with McNemar's test on the discordant pairs; the unpaired Fisher's test of the pre-registration is underpowered at this pairing.
 Cells that die by pool exhaustion or OOM kill are counted as failures, not dropped, so the completion fractions carry no survivorship bias.
-The full per-arm tables are in Appendix~E.
+The full per-arm tables are in \hyperref[app:rocksdb-tables]{Appendix~E}.
 
 \section{Summary of Results\label{sec:eval-summary}}
 

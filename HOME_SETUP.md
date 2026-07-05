@@ -1,12 +1,11 @@
 # HOME_SETUP.md — Run the 10k OOC evaluation on your home device
 
 > **For the Claude Code session on the home machine.** Lives at the root of the
-> private thesis wrapper repo `Bachelor-Thesis-RocksDB-IoT`. This file bootstraps
-> a fresh machine: installs Docker + git, clones the NES OOC fork (branch
-> `feat/ooc-phase1-spill-skeleton`) as a sibling directory, builds the dev image +
-> the `systest` binary, runs a 10-cell smoke test, then launches the full
-> **10,044-cell** sweep at **4-way parallelism** (~3.5 days). Resumable —
-> Ctrl-C and re-launch is safe.
+> Bachelor Thesis project (private repo `Bachelor-Thesis-RocksDB-IoT`), with NES OOC source
+> already vendored at `nebulastream-Out-of-Core-Stream-Processing/`. This file bootstraps
+> the evaluation: installs Docker + git, builds the dev image + the `systest` binary,
+> runs a 10-cell smoke test, then launches the full **10,044-cell** sweep at
+> **4-way parallelism** (~3.5 days). Resumable — Ctrl-C and re-launch is safe.
 >
 > Reference plan: `nebulastream-Out-of-Core-Stream-Processing/.planning/eval-phase/EXPERIMENT-PLAN-FULL.md`.
 > Harness reference: `nebulastream-Out-of-Core-Stream-Processing/.planning/eval-phase/e3big/HANDOFF.md`.

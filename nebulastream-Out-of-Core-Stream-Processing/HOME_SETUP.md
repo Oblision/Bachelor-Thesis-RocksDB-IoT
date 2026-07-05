@@ -1,9 +1,9 @@
 # HOME_SETUP.md — Run the 10k OOC evaluation on your home device
 
-> **For the Claude Code session on the home machine.** This file bootstraps a fresh
-> clone of `nebulastream-Out-of-Core-Stream-Processing` (branch
-> `feat/ooc-phase1-spill-skeleton`), installs everything needed, runs a 10-cell
-> smoke test, then launches the full **10,044-cell** sweep at **4-way parallelism**
+> **For the Claude Code session on the home machine.** This folder contains the NES OOC
+> source (branch `feat/ooc-phase1-spill-skeleton`), vendored into the Bachelor Thesis
+> project. This file documents the evaluation pipeline: installs everything needed, runs
+> a 10-cell smoke test, then launches the full **10,044-cell** sweep at **4-way parallelism**
 > (~3.5 days). Resumable — Ctrl-C and re-launch is safe.
 >
 > Reference plan: `.planning/eval-phase/EXPERIMENT-PLAN-FULL.md`.
@@ -81,15 +81,16 @@ git --version
 
 ---
 
-## 3. Clone the repo
+## 3. Access the NES source (already vendored in the thesis repo)
+
+This NES OOC source is already present at `nebulastream-Out-of-Core-Stream-Processing/`
+within the Bachelor Thesis project. No cloning needed.
 
 ```bash
-git clone -b feat/ooc-phase1-spill-skeleton \
-  git@github.com:Oblision/nebulastream-Out-of-Core-Stream-Processing.git
+# Verify the vendored NES source is present:
 cd nebulastream-Out-of-Core-Stream-Processing
+git log --oneline | head -3    # confirm branch is feat/ooc-phase1-spill-skeleton
 ```
-
-> If SSH isn't set up on the home machine, swap for the HTTPS URL.
 
 ---
 
