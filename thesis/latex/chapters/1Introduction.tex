@@ -54,7 +54,7 @@ The backend processes workloads whose state exceeds memory, without crashing, in
 Against the in-memory engine, on workloads where both complete, the throughput cost is measured at 11\% to 15\% (Table~\ref{tab:cost}).
 During the evaluation, one engine configuration default turned out to silently disable the engine's intended memory architecture.
 Correcting it requires one flag (Section~\ref{sec:disambiguation}). 
-The correction, combined with new pool-pressure levers, recovers most of the failing workloads and matches the in-memory engine's throughput at 25\% less anonymous memory (working memory the kernel cannot reclaim; Section~\ref{sec:bg-metrics}), 517 versus 685\,MB (Figure~\ref{fig:ladder}).
+The correction, combined with new pool-pressure levers, recovers most of the failing workloads and, at the decisive operating point, matches the in-memory engine's throughput at 25\% less anonymous memory (working memory the kernel cannot reclaim; Section~\ref{sec:bg-metrics}), 517 versus 685\,MB (Section~\ref{sec:rq3}).
 The one remaining failure mode is diagnosed precisely, and its fix is specified as future work (Figure~\ref{fig:gridlock}).
 
 \section{Contributions\label{sec:contributions}}
@@ -75,7 +75,7 @@ This thesis makes seven contributions.
   \item \textbf{C4 — A load-bearing architecture finding.}
     The engine's default buffer size silently kept all window state outside the engine's buffer pool in every configuration.
     One flag corrects this.
-    The corrected configuration, plus the new pool-pressure levers, reaches near-parity with the in-memory engine's throughput at lower memory cost (Figure~\ref{fig:ladder}).
+    The corrected configuration, plus the new pool-pressure levers, reaches near-parity with the in-memory engine's throughput at lower memory cost (Section~\ref{sec:rq3}).
     The same pooled-versus-heap distinction also decides how the RocksDB backend should be sized (Section~\ref{sec:rb32}).
   \item \textbf{C5 — A failure taxonomy with a diagnosed root cause.}
     Failures follow a three-regime feasibility law.

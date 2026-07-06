@@ -182,6 +182,8 @@ OOM kill & 137, 137c, 134 & The working set exceeded the cap: the cgroup OOM kil
 \hline
 Pool abort & 141 & The buffer pool could not satisfy an allocation: a worker found no free buffer for the concurrently live window state and the run aborted. Pool too small for the demand. \\
 \hline
+Timeout & 124 & The run exceeded the wall-clock time budget and was terminated before completing (the \texttt{timeout} utility reports 124). Rare, and distinct from a memory failure: the state never stabilized within the allotted time. \\
+\hline
 Crash & 139, 11 & A segmentation fault on the restore path (the slice-cache corruption of Section~\ref{sec:rq3}); occurs only inside cells that also fail for a memory reason. \\
 \hline
 \end{tabular}
@@ -189,7 +191,7 @@ Crash & 139, 11 & A segmentation fault on the restore path (the slice-cache corr
 of these categories from its process exit status; a signalled death reports as
 128 plus the signal number ($137 = 128 + \texttt{SIGKILL}$,
 $134 = 128 + \texttt{SIGABRT}$, $139 = 128 + \texttt{SIGSEGV}$), while 141 is the
-engine's own pool-exhaustion abort. An OOM kill and a pool abort are distinct
+engine's own pool-exhaustion abort and 124 the harness wall-clock timeout. An OOM kill and a pool abort are distinct
 failures with opposite cures --- a smaller pool versus a larger one --- which is
 why they are separated rather than pooled into a single ``failed'' count.}
 \label{tab:outcomes}
@@ -314,7 +316,7 @@ The evaluation therefore holds the backend at 16 and 8\,MB across all caps.
 Two architectures appear throughout this chapter, named by their allocation type from Section~\ref{sec:bg-windows}.
 The engine-default configuration uses unbounded allocation: hash map pages live on the heap.
 The corrected configuration uses bounded allocation: hash map pages live in the global buffer pool.
-For brevity, this chapter also calls the first the heap architecture and the second the pooled architecture.
+For brevity, this chapter also calls the first the \emph{heap} architecture and the second the \emph{pooled} architecture; where the tables and appendices name the same pair, they label them \emph{unbounded} and \emph{bounded}.
 Why two architectures exist is the subject of Section~\ref{sec:rq3}.
 RQ1 asks whether the backend prevents the OOM failures that a fixed cap forces on the in-memory engine, and for which workloads and memory budgets it does so.
 This section answers that empirically: it maps the \emph{operating window} of each architecture --- the region of workload and pool sizes over which it completes --- across the three memory caps.
@@ -349,11 +351,13 @@ $p = 4.1 \times 10^{-5}$ (two-sided).\methodsnote}
 The flagship is one of several completion contrasts this chapter reports.
 Figure~\ref{fig:pvalues} collects the headline ones in a single view, each a two-arm
 comparison of completed against attempted runs with its Fisher's exact $p$-value.
-The contrasts sit far from chance: the flagship at $p = 4.1 \times 10^{-5}$, the
-attribution ladder from 0/8 to 7/8 at the decisive cell at $p = 7.0 \times 10^{-4}$,
-pooled lever arms against unpooled levers (12/16 versus 0/16) at $p = 8.1 \times 10^{-6}$,
-the allocation-type win at 512\,MB (r200: pooled 8/8 versus matched-granularity heap 0/8) at $p = 7.8 \times 10^{-5}$,
-and the intrinsic-backpressure cell (23/24 versus 3/10) at $p = 1.6 \times 10^{-4}$.
+Each row is developed in full later in the chapter; the one-line glosses here are only enough to read the figure in place.
+The contrasts sit far from chance.
+The \emph{flagship} (spilling versus its absence, above) clears $p = 4.1 \times 10^{-5}$.
+The \emph{attribution ladder} --- completion at the decisive cell as pooling and its levers are switched on one factor at a time --- rises from 0/8 to 7/8 at $p = 7.0 \times 10^{-4}$ (Section~\ref{sec:rq3}).
+The \emph{pooled lever arms} set the pool-pressure levers with pooling engaged against the same levers without it, 12/16 versus 0/16, at $p = 8.1 \times 10^{-6}$.
+The \emph{allocation-type} win at 512\,MB holds two spilling arms at equal buffer granularity so that only heap-versus-pool allocation differs (r200: pooled 8/8 versus matched-granularity heap 0/8) at $p = 7.8 \times 10^{-5}$.
+The \emph{intrinsic-backpressure} cell, where the bounded pool's own throttling of ingest to the drain rate recovers a stall the heap does not, reads 23/24 versus 3/10 at $p = 1.6 \times 10^{-4}$.
 Every headline claim clears $p < 10^{-3}$.
 
 % [7.2.2c] Resolve the apparent tension: the heap arm appears in three rows
@@ -377,7 +381,7 @@ the plot, with its underlying completion counts annotated beside each point).
 confidence interval (Newcombe's method, built from Wilson score intervals on
 each arm's completion proportion). (b) Significance: the Fisher's exact $p$-value on a log
 scale, with a dashed reference at $p = 0.05$. Every contrast clears that line by
-orders of magnitude; see the text for the narrative behind each row.\methodsnote}
+orders of magnitude; each row is glossed where it is named above and developed in full in Section~\ref{sec:rq3}.\methodsnote}
 \label{fig:pvalues}
 \end{figure}
 
@@ -644,26 +648,18 @@ This reframing drives the rest of the chapter.
 \widefig{img/fig_race.pdf}
 \caption[Completion as a race between ingest and drain]{Completion as a race
 between ingest and drain: one point per cell of both grids. Marker shape is the
-architecture (circle = heap, square = bounded), both for completions and for
-beyond-boundary failures; fill is the outcome (filled =
+architecture (circle = heap, square = bounded); fill is the outcome (filled =
 completes, plotted at its realized throttled throughput; hollow = fails, plotted
-at the workload's free-running demand rate because a dead run has no realized rate
+at the workload's free-running demand rate, since a dead run has no realized rate
 of its own). Two lines cut the plane: the vertical $\rho = 1$ memory boundary,
-exact by definition ($\rho$ is the footprint divided by the cap), and the
-horizontal drain ceiling near 2.6\,M tuples/s, empirical rather than assumed
-(the highest throughput any surviving spilling cell realizes; no $\rho > 1$
-cell whose free-running demand exceeds about 2.7\,M tuples/s survives, 23 of
-23 fail). Past both lines, ingest outruns the drain and the run fails: this
-is the race. The $\rho < 1$ failures carry their own two markers, one shape per group covering
-both architectures (triangle = slow demand, below the drain ceiling; cross = fast
-demand, above it). Both groups are pool-geometry failures: each plotted cell fails
-only because the pool it was given is mis-sized, and the same cap-and-workload
-coordinate completes at the geometry-correct pool on \emph{both} arms --- the slow
-pair, r500 and r700 at 2048\,MB, reach 10 of 10 (heap, at 32k--64k and 16k--32k
-buffers) and 8 of 8 (bounded, at 96k). The two groups differ only in ingest rate:
-the slow pair's demand ($\approx 1.4$--$1.6$\,M tuples/s) stays well under the
-drain, so a wrong pool is their only stressor, while the fast group additionally
-out-runs the drain (the fast-ingest valley). Section~\ref{sec:rq3} takes up both.\methodsnote}
+exact by definition, and the horizontal drain ceiling near 2.6\,M tuples/s,
+empirical (the highest throughput any surviving spilling cell realizes; no
+$\rho > 1$ cell whose demand exceeds about 2.7\,M tuples/s survives, 23 of 23
+fail). Past both lines ingest outruns the drain and the run fails --- the race.
+The $\rho < 1$ failures carry two further markers, one per group across both
+architectures (triangle = slow demand, below the ceiling; cross = fast demand,
+above it); both are pool-geometry failures that recover at the geometry-correct
+pool, as the text below sets out cell by cell.\methodsnote}
 \label{fig:race}
 \end{figure}
 
@@ -845,8 +841,9 @@ This is an actionable finding for the engine itself, independent of \ac{OOC} pro
 
 % [7.3.6]
 The bounded architecture's footprint advantage is confirmed at matched granularity (Figure~\ref{fig:cost}(c)).
-It uses 33\% less anonymous memory than the in-memory engine (924 versus 1388\,MB).
+It uses 33\% less anonymous memory than the in-memory engine (924 versus 1388\,MB) at this cell (2048/r200).
 It uses 27\% less than heap-allocated \ac{OOC} at the same cell.
+This 33\% is the widest of several footprint margins over the in-memory engine, not a single global figure: the advantage is 14--22\% across identical completing workloads and 25\% at the throughput-parity cell where speed also matches (517 versus 685\,MB), both reported in Section~\ref{sec:rq3}, and it grows as the pool shrinks.
 
 \begin{figure}[ht]
 \centering
@@ -1046,7 +1043,9 @@ Taken together, the pooled lever arms complete 12 of 16 where levers without poo
 \widefig{img/fig_ladder.pdf}
 \caption[The attribution ladder]{The attribution ladder at the decisive cell
 (1024\,MB / 32k pool / r150). Each arm changes exactly one factor:
-buffer granularity alone recovers 3/8; pooling without levers recovers
+buffer granularity alone --- 8128-byte buffers, just under the 8192-byte page,
+so map pages stay on the heap (Section~\ref{sec:disambiguation}) --- recovers 3/8;
+pooling without levers recovers
 nothing; the reserve lever and paced restore carry the cell to 7/8
 (levers within pooling, 0/8 $\to$ 7/8: Fisher $p = 7.0 \times 10^{-4}$).\methodsnote}
 \label{fig:ladder}

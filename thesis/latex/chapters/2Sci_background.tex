@@ -199,11 +199,13 @@ $\rho$ is the steady-state anonymous-memory footprint of a workload divided by t
 A workload with $\rho > 1$ does not fit into the allowed memory.
 
 % [2.19]
-A measured run ends in one of four outcomes.
+A measured run ends in one of a few outcomes.
 It completes.
 It is killed by the OOM killer because the cap is exceeded.
 It aborts because the buffer pool is exhausted (Section~\ref{sec:bg-nes}).
-Or it exceeds the time limit.
+It exceeds the time limit.
+Or, rarely, it crashes on the restore path, an outcome confined to cells that already fail for a memory reason (Section~\ref{sec:rq3}).
+The full mapping of each outcome to its process exit code is given later, in Table~\ref{tab:outcomes}.
 
 % [2.20] The statistical tests are introduced in the evaluation itself
 % (Section 5.1, [7.1.8]), next to the measurements they are applied to.
