@@ -1259,6 +1259,39 @@ caption keying gaps. All logged in CONSOLIDATED.md.
 
 ---
 
+## Issue #33 — in-figure annotations shortened to Hinweise (task #11, 2026-07-06)
+
+Six Ch5 figures carried embedded discussion sentences that duplicated the
+caption/body. Reduced each to a short region tag; verified the removed content
+is already in prose before trimming. Data and numbers unchanged. Regenerated
+**only** these six (not `make_all.sh`, which would re-timestamp all 16 PDFs).
+Commit `b198958`.
+
+- **fig_race** — region labels → names only: "throttled", "the race", "state
+  fits in memory", "$\rho=1$" (dropped ": spiller keeps up", "ingest outruns
+  drain / 23/23 fail", ": above, state must spill"; all in caption/body
+  `:670–709`). Pairs with the T8 caption trim.
+- **fig_effectiveness** — dropped the "baseline collapses once state clearly
+  exceeds memory" italic sentence (shown by marker fills + red band + $\rho=1$);
+  suptitle → "Completion at the memory boundary".
+- **fig_flagship** — dropped the redundant checksum sub-line from the title
+  (in caption/methods note); the 14/24-vs-0/18 finding box kept.
+- **fig_gridlock** — pool-line callout → "windowed state on the heap, outside
+  the 250 MB pool" (deadlock mechanism in prose `:1084–1103` + caption).
+- **fig_composition** — header-byte callout → "$\approx$20% recoverable (unused
+  header pointer)" (full detail in prose `:950–951` and caption `:989–991`).
+- **fig_nexmark_sweep** — dropped the "out-of-core matters only beyond memory"
+  conclusion clause from the suptitle.
+
+Build clean, 112 pp, 0 errors/undefined. While regenerating I reconfirmed the
+flagship Fisher value: **two-sided $p = 4.105\times10^{-5}$** (= the stated
+4.1e-5); the script's console `3.71e-05` is its one-sided diagnostic, not a
+document number. Residual figure-density items still open: fig_race's 6-marker
+plot and the W_/N_/U_/L_ axis ticks on fig_rb32_architecture (both plot geometry,
+not annotations) — left as-is; would need a genuine redesign, not a trim.
+
+---
+
 ## Full Glossary (by first-definition location, in reading order)
 
 ### Chapter 1 — Introduction (informal pre-definitions only, by design —
