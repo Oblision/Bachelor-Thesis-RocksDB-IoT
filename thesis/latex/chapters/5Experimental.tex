@@ -651,8 +651,8 @@ between ingest and drain: one point per cell of both grids. Marker shape is the
 architecture (circle = heap, square = bounded); fill is the outcome (filled =
 completes, plotted at its realized throttled throughput; hollow = fails, plotted
 at the workload's free-running demand rate, since a dead run has no realized rate
-of its own). Two lines cut the plane: the vertical $\rho = 1$ memory boundary,
-exact by definition, and the horizontal drain ceiling near 2.6\,M tuples/s,
+of its own). Two lines cut the plane: the horizontal $\rho = 1$ memory boundary,
+exact by definition, and the vertical drain ceiling near 2.6\,M tuples/s,
 empirical (the highest throughput any surviving spilling cell realizes; no
 $\rho > 1$ cell whose demand exceeds about 2.7\,M tuples/s survives, 23 of 23
 fail). Past both lines ingest outruns the drain and the run fails --- the race.
