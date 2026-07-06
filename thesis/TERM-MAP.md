@@ -1187,14 +1187,18 @@ text-only + short caption note). Prose 578--580 and caption reworded. Commit
 restored") — these are q7 C@1024 B2 io_w MEAN (610) and io_r MEAN (234), a
 consistent single-cell statement, exactly as concluded in a prior session.
 
-**Held for author sign-off (NOT applied):** (1) HIGH rb32 drain "11% fewer at
-1024 MB" (:1318 / Annex E.7 :259): the 0.89x is a ratio-of-medians that
-reproduces exactly from fig_rb32, but it REVERSES the per-pair effect --- 15/18
-non-tied W_ pairs write MORE, Wilcoxon p=1.1e-4 in the MORE direction, so the
-"fewer ... (p<0.001)" pairs a fragile point estimate with a paired test that
-proves the opposite. H3-didn't-transfer conclusion unchanged/strengthened.
-(2) fig:race caption/text duplication (M10). (3) db_bench write-buffer/block-
-cache sub-rows (:250--265) not reproducible with straightforward holds.
+**RESOLVED (commit `e82b6d1`, neutral wording per user):** (1) rb32 drain claim
+(Ch5 :1323 + Annex E.7). Replaced "32/32 writes about 11% fewer bytes ...
+(p<0.001)" with a plain statement of both statistics: ratio of medians
+1.60/0.89/1.00 across 512/1024/2048, but per-pair 32/32 writes more at 1024 MB
+(15 of 18 non-tied W_ pairs, Wilcoxon p<0.001), so the p<0.001 is now attached
+to the per-pair result it actually describes, not the median ratio. Conclusion
+(H3 does not transfer) unchanged; no overstatement.
+
+**Still held (NOT applied):** (2) fig:race caption/text duplication (M10) ---
+belongs with task #11 (figure-annotation shortening). (3) db_bench write-buffer/
+block-cache sub-rows (:250--265) not reproducible with straightforward holds ---
+needs the author's intended aggregation before any change.
 
 All reviewers confirmed CLEAN: all p-values, every completion count, Table 3,
 cost figure, race, RQ3 decisive cell, RQ4, rb32 deltas, Nexmark grid; no broken
