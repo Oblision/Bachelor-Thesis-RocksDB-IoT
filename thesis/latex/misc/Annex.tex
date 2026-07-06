@@ -256,8 +256,9 @@ On cells both configurations complete, the footprint barely drifts between sessi
 The drift-free in-session contrast is shown in Figure~\ref{fig:rb32-insession}, and the anonymous-memory trace of one completing run of each backend size in Figure~\ref{fig:rb32-trace}.
 
 The pre-registered drain mechanism (H3) is the bytes the backend writes to the device.
-On W\_ pairs where both configurations complete, the median device write of 32/32 relative to 16/8 is $1.60\times$ at 512\,MB, $0.89\times$ at 1024\,MB ($p < 0.001$), and $1.00\times$ at 2048\,MB.
-Only the 1024\,MB cap shows the predicted reduction, and at about 11\% rather than the third the component benchmark suggested.
+On W\_ pairs where both configurations complete, the ratio of median device writes (32/32 to 16/8) is $1.60\times$ at 512\,MB, $0.89\times$ at 1024\,MB, and $1.00\times$ at 2048\,MB, so only the 1024\,MB medians fall below one.
+That ratio is sensitive to the aggregation: taken pair by pair, 32/32 writes more at 1024\,MB in 15 of the 18 non-tied pairs (Wilcoxon signed-rank $p < 0.001$), so the per-pair difference runs opposite to the ratio of medians.
+No cap shows the byte reduction the component benchmark predicted, and H3 does not transfer to the system.
 
 \begin{figure}[ht]
 \centering

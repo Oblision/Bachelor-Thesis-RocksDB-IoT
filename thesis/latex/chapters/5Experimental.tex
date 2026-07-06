@@ -1320,7 +1320,7 @@ working set fills.}
 
 % [RB32-5] H3 did not transfer from the component benchmark to the system.
 The mechanism behind H3 did not survive the move from the component benchmark to the system.
-On pairs where both configurations complete, 32/32 writes about 11\% fewer bytes to the device at 1024\,MB ($p < 0.001$), far short of the microbenchmark's third; it writes more at 512\,MB and breaks even at 2048\,MB (\hyperref[app:rocksdb-tables]{Appendix~E}).
+On pairs where both configurations complete, 32/32 does not write fewer bytes to the device: it writes more at 512\,MB, the paired comparison at 1024\,MB likewise favors 32/32 writing more, and the two break even at 2048\,MB (\hyperref[app:rocksdb-tables]{Appendix~E}).
 A byte-level gain measured on \texttt{db\_bench} in isolation does not predict the system-level drain under a memory cap.
 
 % [RB32-6] Method and error policy.
