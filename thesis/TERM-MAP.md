@@ -1153,6 +1153,55 @@ Commits this session: `cb3fe5f` (OOM/OOC), `93616fd` (Fig4/5.3.1/Fig5),
 
 ---
 
+## Issue #31 — three-reviewer pass + Fig 13 capped-footprint move (2026-07-06)
+
+Ran three read-only reviewers (data/numeric, prose/clarity, structure/cross-ref)
+over Ch5; I re-verified every load-bearing item against the data before editing.
+
+**Fig 13 (fig:effectiveness) — user request.** Panel (a): r200@1024 completes
+10/10 because its CAPPED peak (median 948 MB, verified) fits, though uncapped
+rho=1.01. Plotted that one baseline cell at its realized capped footprint
+(948/1024=0.93) so a completing cell is not in the beyond-memory zone; removed
+the in-graph callout. Panel (b): removed the r500 pool-geometry annotation (now
+text-only + short caption note). Prose 578--580 and caption reworded. Commit
+`352977a`.
+
+**Reviewer fixes applied (commit `d24165b`, all data-verified):**
+- HIGH 164 scope self-contradiction (operating-window figures use 16/8 only;
+  b32 contrast is sec:rb32, not sec:rq1). HIGH 972 base-footprint monster
+  sentence split into four.
+- Numeric: 1340 CPU 63->62% (throttled cell W_c512_p16k_r200 = 61.8%); 881
+  Nexmark cost table -46/-59 -> -50/-63% (C@1024 = q7 B2 -63.0 .. q3 U8 -50.3);
+  1145 r150 rho 2.2->1.44 (736/512); 907 spilling near-zero 19/21 -> 22/24
+  (rho<1 population); 617 r300 ingest 2.9->2.8M (2.768); 1387->1388 MB x3
+  (I8 mean 1387.75, matches fig); 476 'err'->'timeout' (rc124, NOT 'abort' as
+  a reviewer guessed); 788 '210 cells'->'210 runs' (210 NX rows/30 cells);
+  1381 '20 corrupted cells'->'a dozen' (12 crash cells df16).
+- Prose/struct: 'In answer to RQ5:' frame; individual geometry-law-1024/-2048
+  refs; drain ceiling unified ~2.6M; 439 comma splice; matched I/O granularity;
+  'levers' forward-ref (sec:levers) + de-overloaded at setup L24;
+  back-pressure->backpressure; status/rc NNN -> 'exit code NNN'; Table 3 caption
+  +-6/10reps -> +-20/8-10; RQ0 how (was whether).
+
+**Verified FALSE POSITIVE, not changed:** reviewer M4 (:736 "610 spilled, 234
+restored") — these are q7 C@1024 B2 io_w MEAN (610) and io_r MEAN (234), a
+consistent single-cell statement, exactly as concluded in a prior session.
+
+**Held for author sign-off (NOT applied):** (1) HIGH rb32 drain "11% fewer at
+1024 MB" (:1318 / Annex E.7 :259): the 0.89x is a ratio-of-medians that
+reproduces exactly from fig_rb32, but it REVERSES the per-pair effect --- 15/18
+non-tied W_ pairs write MORE, Wilcoxon p=1.1e-4 in the MORE direction, so the
+"fewer ... (p<0.001)" pairs a fragile point estimate with a paired test that
+proves the opposite. H3-didn't-transfer conclusion unchanged/strengthened.
+(2) fig:race caption/text duplication (M10). (3) db_bench write-buffer/block-
+cache sub-rows (:250--265) not reproducible with straightforward holds.
+
+All reviewers confirmed CLEAN: all p-values, every completion count, Table 3,
+cost figure, race, RQ3 decisive cell, RQ4, rb32 deltas, Nexmark grid; no broken
+references; panel letters/markers all match scripts.
+
+---
+
 ## Full Glossary (by first-definition location, in reading order)
 
 ### Chapter 1 — Introduction (informal pre-definitions only, by design —
