@@ -901,7 +901,7 @@ This section follows that evolution along the state-pressure axis --- from workl
 
 % [7.4.1] --- measurement basis and the in-memory baseline
 All utilization figures here are the mean over the whole run.
-The whole run includes the one-off Nautilus query-compilation phase at startup, which is single-threaded and pays a fixed cost regardless of the workload.
+The whole run includes the one-off Nautilus query-compilation phase at startup --- NebulaStream's \ac{JIT} query compiler (Section~\ref{sec:architecture}) --- which is single-threaded and pays a fixed cost regardless of the workload.
 On short in-memory runs (two to fifteen seconds) that fixed cost holds mean utilization just below full, so the in-memory engine runs at 84--97\%, lowest on the shortest cells; on long runs it amortizes away and utilization reaches about 99.6\%.
 The in-memory engine has zero disk traffic.
 

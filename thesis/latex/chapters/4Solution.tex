@@ -34,7 +34,7 @@ When pressure crosses a hard threshold despite it, the backend forces a synchron
 The forced spill evicts state as quickly as the storage device permits, so an \ac{OOM} failure is averted rather than merely deferred.
 Third, it never changes query results.
 A window that was spilled and restored must produce the same output, byte for byte, as one that never left memory; Section~\ref{sec:reproducibility} describes how this is verified.
-Fourth, it leaves the \ac{JIT} pipeline untouched.
+Fourth, it leaves the \ac{JIT} pipeline untouched: NebulaStream JIT-compiles each query pipeline to native code at startup with its \emph{Nautilus} query compiler, and the backend integrates behind the slice-store interface without changing that compiled path (Figure~\ref{fig:ooc-integration}).
 
 \section{The Spillable Slice Store\label{sec:architecture}}
 
