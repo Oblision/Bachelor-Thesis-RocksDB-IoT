@@ -1206,6 +1206,59 @@ references; panel letters/markers all match scripts.
 
 ---
 
+## Issue #32 — cold-reader comprehension audit: Tier-1+2 fixes T1–T8 (2026-07-06)
+
+Ran three "naive examiner" reviewers over the compiled 112-page PDF **only** (no
+data, term maps, figure scripts, or planning docs — exactly what an external
+examiner holds), to test whether the document is understandable cold. All three
+converged; every concrete flag was re-verified against source before editing.
+Consolidated report: `scratchpad/cold-review/CONSOLIDATED.md`. Fixes committed
+`d0e6138`:
+
+- **T1 (verified mis-citation).** "517 vs 685 MB / 25%" cited
+  `Figure~\ref{fig:ladder}` — the completion-fraction ladder, which shows no
+  memory numbers — in `1Introduction:57`, `:78` (C4), and `7Conclusion:16`.
+  Repointed all three to `Section~\ref{sec:rq3}` (where the number is derived,
+  `5Experimental:1057`). fig:ladder's other refs (:353, :1037, :1157) are correct
+  and were kept.
+- **T2.** §5.3.1 (`:352–357`) now glosses each of Figure 5's five rows in place
+  (flagship / attribution ladder / pooled lever arms / allocation-type /
+  intrinsic backpressure), from their own §rq3 definitions, + a sec:rq3 pointer;
+  fig:pvalues caption "see the text" → "Section~\ref{sec:rq3}".
+- **T3.** `:317` adds the one missing bridge — prose heap/pooled = tables'/appendix
+  unbounded/bounded. (The definition at `:314–318` was already clean; not a
+  full rename.)
+- **T4.** Scoped the 25% (517/685) to "the decisive/parity cell" in intro +
+  conclusion; `§RQ2:849` now ties the footprint margins into one range:
+  14–22% (identical workloads) / 25% (parity cell) / 33% (2048/r200), not
+  competing numbers.
+- **T5.** ladder caption (`:1050`) decodes the "8128" x-axis tick in place (just
+  under the 8192-byte page, so maps stay on the heap; sec:disambiguation).
+- **T6 (verified gap).** Table 4 had no row for exit code 124 though `:477` says
+  "1 timeout" and rc124 is in the data; §2.5 (`2Sci_bg:202–206`) listed "time
+  limit" as its 4th outcome while Table 4 listed "Crash". Added a Timeout/124 row
+  to Table 4 (+caption note), and added the rare crash + a Table-4 forward-ref to
+  §2.5 — both sources now list the full five outcomes. Rendered PDF verified
+  (Table 4 = 5 rows).
+- **T7.** W_/N_/U_/L_ already glossed at first prose use (`:1255–1256`) and fully
+  in the Fig 23 caption (`:1265–1268`); residual is only the figure's bare axis
+  ticks → task #11 (figure pass). No prose change.
+- **T8.** Halved the fig:race caption (`:645–666`): kept the marker/line/race
+  decode, dropped the r500/r700 recovery detail that the following prose
+  (`:670–709`) already carries in full. The plot itself (6 markers / 3 zones)
+  is left for task #11.
+
+Build clean: 112 pp, 0 errors, 0 undefined refs. The two structural changes
+(Table 4's Timeout row; the §5.3.1 glosses) were confirmed in the rendered PDF.
+
+**Not applied (Tier 3, T9–T25):** appendix cell-code token legend, heatmap
+panel column non-alignment (Figs 6–8), r75/r075 inconsistency, Nexmark/Nautilus
+one-line intros, the two "feasibility law" names, `rc` in the abbreviation list,
+scattered run-counts, the Acknowledgments placeholder (author TODO), and small
+caption keying gaps. All logged in CONSOLIDATED.md.
+
+---
+
 ## Full Glossary (by first-definition location, in reading order)
 
 ### Chapter 1 — Introduction (informal pre-definitions only, by design —
