@@ -61,9 +61,7 @@ def main() -> None:
     # Label the band between the pool line and the anon curve in place: that gap
     # is windowed state (emitted-but-unprocessed slices) on the heap, outside the
     # pool. The pool is the floor; the climb above it is state, not pool.
-    ax.text(2.6, 360, "everything above the pool line is\n"
-            "windowed state on the heap, outside\n"
-            "the 250 MB pool (only the floor)",
+    ax.text(2.6, 360, "windowed state on the heap,\noutside the 250 MB pool",
             fontsize=7.0, ha="left", va="center", color=style.BLUE,
             bbox=dict(boxstyle="round,pad=0.3", fc="white",
                       ec=style.BLUE, alpha=0.92, lw=0.7))

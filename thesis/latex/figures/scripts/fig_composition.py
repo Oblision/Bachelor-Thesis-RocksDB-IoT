@@ -43,9 +43,7 @@ def main() -> None:
     # The 51% is what headers ARE. The =~20% is a SEPARATE quantity: the state
     # that removing the unused 8-byte vtable pointer (of the 24-byte header)
     # would recover. Annotate it distinctly so the two numbers do not read as one.
-    ax.annotate("8 B of the 24 B header is an unused\n"
-                "vtable pointer (1/3 of the header):\n"
-                "dropping it recovers $\\approx$20% per entry",
+    ax.annotate("$\\approx$20% recoverable\n(unused header pointer)",
                 xy=(0.26, 13), fontsize=7.1, va="center", ha="left",
                 style="italic", color="#7a4a00")
     ax.set_xlim(-0.4, 1.6)

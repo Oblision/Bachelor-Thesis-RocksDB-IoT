@@ -56,8 +56,7 @@ def main() -> None:
     ax.set_ylim(0, 1.18)
     ax.set_ylabel("completion fraction (completed / attempted)")
     ax.set_xlabel("state pressure ρ at the 512 MB cap (workload id in parentheses)")
-    ax.set_title("Out-of-core completes beyond the budget where capped in-memory cannot\n"
-                 "512 MB cap · output verified by checksum against the uncapped reference",
+    ax.set_title("Out-of-core completes beyond the budget where capped in-memory cannot",
                  fontsize=10)
     ax.legend(loc="upper right", title="backend (reps per ρ point)")
     ax.text(0.02, 0.97,

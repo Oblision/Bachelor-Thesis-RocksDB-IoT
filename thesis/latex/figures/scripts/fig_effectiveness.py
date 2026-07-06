@@ -99,9 +99,8 @@ def main() -> None:
     ax_a.axvline(1.0, color="#666666", lw=1.0, ls="--")
     ax_a.text(0.985, -0.45, "$\\rho = 1$", ha="right", va="center",
               fontsize=8.5, color="#555555", rotation=90)
-    ax_a.text(2.28, 0.02, "the baseline collapses once\nstate clearly exceeds memory",
-              ha="center", va="center", fontsize=8.2, color="#8a1500",
-              style="italic")
+    # The collapse beyond rho=1 is shown by the marker fills and the red band;
+    # the text discusses it (Hinweise only in the figure).
     ax_a.set_xlim(0.35, 3.3)
     ax_a.set_ylim(-0.85, 2.75)
     ax_a.set_yticks((2, 1, 0), ("512 MB", "1024 MB", "2048 MB"), fontsize=8)
@@ -215,8 +214,7 @@ def main() -> None:
                 loc="lower right", bbox_to_anchor=(1.0, 1.0), ncol=2,
                 fontsize=7.8, framealpha=1.0, borderaxespad=0.15)
 
-    fig.suptitle("Completion at the memory boundary: baseline collapse and the "
-                 "out-of-core head-to-head", fontsize=11, fontweight="bold")
+    fig.suptitle("Completion at the memory boundary", fontsize=11, fontweight="bold")
     fig.tight_layout(rect=(0, 0, 1, 0.97))
     style.caption(fig)
     print(f"panel (b) pairs: {len(coords)}")

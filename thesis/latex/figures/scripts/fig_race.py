@@ -171,16 +171,16 @@ def main() -> None:
             f"drain ceiling $\\approx${drain_ceiling:.1f} M/s",
             ha="center", va="center", fontsize=8.2, style="italic", color="#3a3a3a",
             bbox=dict(boxstyle="round,pad=0.22", fc="white", ec="#bbbbbb", lw=0.5, alpha=0.9))
-    ax.text(0.66, 1.05, "$\\rho = 1$: above, state must spill",
+    ax.text(0.66, 1.05, "$\\rho = 1$",
             ha="left", va="bottom", fontsize=8.2, color="#444444")
 
-    # Region tags: three short labels, colored to their region, kept away from
-    # the data clusters (upper strip and lower-left corner are point-free).
+    # Region tags: three short names, colored to their region, kept away from the
+    # data clusters. The caption and body carry the mechanism; the plot only
+    # names the regions (Hinweise), it does not explain them.
     GREEN_T, BLUE_T, RED_T = "#0b5c46", "#0a4a6e", "#8a1500"
-    ax.text(1.45, 3.05, "throttled: spiller keeps up",
+    ax.text(1.45, 3.05, "throttled",
             ha="center", va="center", fontsize=8.6, color=BLUE_T, fontweight="bold")
-    ax.text(3.14, 2.62,
-            f"the race: ingest outruns drain\n{death_fail}/{death_total} fail",
+    ax.text(3.14, 2.62, "the race",
             ha="center", va="center", fontsize=8.6, color=RED_T, fontweight="bold")
     ax.text(0.72, 0.44, "state fits\nin memory",
             ha="left", va="center", fontsize=8.6, color=GREEN_T, fontweight="bold")
