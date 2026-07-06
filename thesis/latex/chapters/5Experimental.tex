@@ -654,12 +654,16 @@ at the workload's free-running demand rate, since a dead run has no realized rat
 of its own). Two lines cut the plane: the horizontal $\rho = 1$ memory boundary,
 exact by definition, and the vertical drain ceiling near 2.6\,M tuples/s,
 empirical (the highest throughput any surviving spilling cell realizes; no
-$\rho > 1$ cell whose demand exceeds about 2.7\,M tuples/s survives, 23 of 23
+$\rho > 1$ cell whose demand exceeds about 2.7\,M tuples/s survives, 25 of 25
 fail). Past both lines ingest outruns the drain and the run fails --- the race.
 The $\rho < 1$ failures carry two further markers, one per group across both
 architectures (triangle = slow demand, below the ceiling; cross = fast demand,
 above it); both are pool-geometry failures that recover at the geometry-correct
-pool, as the text below sets out cell by cell.\methodsnote}
+pool, as the text below sets out cell by cell. The dashed ring marks the
+$\rho > 1$ cells that die on pool geometry rather than the race --- their ingest
+stays under the ceiling, so no pool both holds the hot band and fits under the
+cap (on the heap, no pool exists and the map grows unbounded until it is
+OOM-killed; Section~\ref{sec:rq1-geometry}).\methodsnote}
 \label{fig:race}
 \end{figure}
 

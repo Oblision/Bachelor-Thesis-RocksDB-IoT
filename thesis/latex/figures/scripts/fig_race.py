@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
-from matplotlib.patches import Rectangle
+from matplotlib.patches import Ellipse, Rectangle
 
 import data
 import gridcells as gc
@@ -103,11 +103,19 @@ def main() -> None:
         n_ok, reps = int(runs["ok"].sum()), len(runs)
         completes = n_ok >= reps / 2
         ok_tps = runs[runs["ok"]]["tps"]
-        rate = float(ok_tps.median()) if n_ok else free.get(w)
-        if rate is None:
-            continue
-        if not n_ok:  # dodge only proxy-rate points
-            rate *= 1 + 0.012 * (runs["pool_rank"].iloc[0] - 2)
+        # A completing cell sits at its realized (throttled) throughput. A failing
+        # cell -- including one that completes only a minority of its reps -- sits
+        # at the workload's free-running demand, the rate that defines both its
+        # marker and the race. Plotting a partial failure at its few survivors'
+        # throttled rate would put a fast cell LEFT of the drain ceiling,
+        # contradicting its (fast/cross) marker.
+        if completes:
+            rate = float(ok_tps.median())
+        else:
+            rate = free.get(w)
+            if rate is None:
+                continue
+            rate *= 1 + 0.012 * (runs["pool_rank"].iloc[0] - 2)  # dodge proxy points
         rateM = rate / 1e6
         if completes:
             outcome = "ok"
@@ -184,6 +192,18 @@ def main() -> None:
             ha="center", va="center", fontsize=8.6, color=RED_T, fontweight="bold")
     ax.text(0.72, 0.44, "state fits\nin memory",
             ha="left", va="center", fontsize=8.6, color=GREEN_T, fontweight="bold")
+
+    # Ring the rho>1 cells that fail LEFT of the drain ceiling: slow ingest, so
+    # not the race -- they die because no pool both holds the hot band and fits
+    # under the cap (on the heap there is no pool at all, so the map grows
+    # unbounded and is OOM-killed). Short pointer only; the mechanism is in text.
+    ax.add_patch(Ellipse((1.45, 1.18), width=0.64, height=0.56, angle=0,
+                         fill=False, edgecolor="#1a1a1a", lw=1.3, ls="--", zorder=5))
+    ax.annotate("mis-sized pool\n(or none, on the heap)",
+                xy=(1.20, 1.42), xytext=(0.70, 2.15),
+                fontsize=8.0, ha="left", va="center", color="#1a1a1a",
+                arrowprops=dict(arrowstyle="->", color="#1a1a1a", lw=0.9,
+                                connectionstyle="arc3,rad=-0.2"))
 
     ax.set_xlim(xlo, xhi)
     ax.set_ylim(ylo, yhi)
