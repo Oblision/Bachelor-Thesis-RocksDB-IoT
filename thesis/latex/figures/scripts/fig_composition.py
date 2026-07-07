@@ -52,7 +52,7 @@ def main() -> None:
     ax.set_title("(a) hash-map state composition")
     # Provenance so the figure is self-describing: the 26 M-entry census is the
     # r150 workload (~996 maps, ~25.9 M entries) from the HMGAUGE per-map dump.
-    ax.text(0.5, -0.14, "census: r150 workload, $\\approx$996 maps / $\\approx$25.9 M entries",
+    ax.text(0.5, -0.14, "census: s150 workload, $\\approx$996 maps / $\\approx$25.9 M entries",
             transform=ax.transAxes, ha="center", va="top", fontsize=7.0,
             color="#555555", style="italic")
     ax.grid(False)

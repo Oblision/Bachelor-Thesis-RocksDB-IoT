@@ -65,7 +65,7 @@
 \node[newcomp] (spillstore)   at (\cB,\rOne)  {SpillableTime\-Based\\SliceStore};
 \node[newcomp] (spillslice)   at (\cB,\rTwo)  {SpillableAggregationSlice\\\footnotesize\itshape : HashMapSlice (subclass)};
 \node[smnew]   (buildpath)    at (\cBL,\rThr) {Build path\\\footnotesize\itshape getHashMapPtr\\\footnotesize\itshape state == FILLING};
-\node[smnew]   (probepath)    at (\cBR,\rThr) {Probe path\\\footnotesize\itshape force-unspill before\\\footnotesize\itshape the Nautilus-compiled\\\footnotesize\itshape probe runs};
+\node[smnew]   (probepath)    at (\cBR,\rThr) {Probe path\\\footnotesize\itshape force-unspill\\\footnotesize\itshape before the\\\footnotesize\itshape probe runs};
 \node[newcomp] (backendiface) at (\cB,\rFou)  {SpillBackend\\\footnotesize\itshape interface (RocksDB / file / mmap)};
 % ---- THIS THESIS'S EXTENSIONS, called out explicitly ----
 % Background spiller thread: bottom row of the spill column, under the build
@@ -167,13 +167,10 @@ spiller, the \texttt{SpillBackend} interface with its RocksDB implementation,
 \texttt{SpillConfig} and \texttt{MemoryBudgetTracker}, and two
 \texttt{BufferManager} extensions: an availability query and the pool-pressure
 hooks of Section~\ref{sec:levers}. \texttt{SpillableAggregationSlice} subclasses
-\texttt{HashMapSlice} rather than wrapping it, so the \emph{Nautilus} \ac{JIT} build path keeps
+\texttt{HashMapSlice} rather than wrapping it, so the build path keeps
 using \texttt{getHashMapPtr(WorkerId)} unchanged; only the probe path must
-force-unspill first, since the Nautilus-compiled probe reads the hash map through
-raw pointers. Nautilus query compilation itself is untouched: the store restores
-state before compiled code runs, rather than teaching the compiler about spilling. A slice becomes spill-eligible once its end timestamp falls below the
-watermark and it has left \texttt{WINDOW\_FILLING}. \texttt{SpillBackend} keeps
-the backend swappable for evaluation; \texttt{MemoryBudgetTracker} observes the
-existing \texttt{BufferManager} rather than maintaining a parallel pool.}
+force-unspill first, so that the state is back in memory before the probe runs.
+A slice becomes spill-eligible once its end timestamp falls below the
+watermark and it has left \texttt{WINDOW\_FILLING}.}
 \label{fig:ooc-integration}
 \end{figure}

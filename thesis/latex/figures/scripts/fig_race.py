@@ -176,7 +176,7 @@ def main() -> None:
     # Reference-line labels: one short tag per line, horizontal, in empty space.
     # The caption carries the full explanation; the plot only names the regions.
     ax.text(drain_ceiling, 3.16,
-            f"drain ceiling $\\approx${drain_ceiling:.1f} M/s",
+            f"storage-bandwidth ceiling $\\approx${drain_ceiling:.1f} M/s",
             ha="center", va="center", fontsize=8.2, style="italic", color="#3a3a3a",
             bbox=dict(boxstyle="round,pad=0.22", fc="white", ec="#bbbbbb", lw=0.5, alpha=0.9))
     ax.text(0.66, 1.05, "$\\rho = 1$",
@@ -188,7 +188,7 @@ def main() -> None:
     GREEN_T, BLUE_T, RED_T = "#0b5c46", "#0a4a6e", "#8a1500"
     ax.text(1.45, 3.05, "throttled",
             ha="center", va="center", fontsize=8.6, color=BLUE_T, fontweight="bold")
-    ax.text(3.14, 2.62, "the race",
+    ax.text(3.14, 2.62, "ingest exceeds\nstorage bandwidth",
             ha="center", va="center", fontsize=8.6, color=RED_T, fontweight="bold")
     ax.text(0.72, 0.44, "state fits\nin memory",
             ha="left", va="center", fontsize=8.6, color=GREEN_T, fontweight="bold")
@@ -215,8 +215,8 @@ def main() -> None:
         Line2D([], [], marker="s", ls="", mfc=style.GREEN, mec="black", label="completes (bounded)"),
         Line2D([], [], marker="o", ls="", mfc="none", mec=style.RED, mew=1.15, label="fails, $\\rho>1$ (heap)"),
         Line2D([], [], marker="s", ls="", mfc="none", mec=style.RED, mew=1.15, label="fails, $\\rho>1$ (bounded)"),
-        Line2D([], [], marker="v", ls="", mfc=style.ORANGE, mec="black", label="fails, $\\rho<1$: slow, under drain ceiling (heap+bounded)"),
-        Line2D([], [], marker="P", ls="", mfc=style.PURPLE, mec="black", label="fails, $\\rho<1$: fast, over drain ceiling (heap+bounded)"),
+        Line2D([], [], marker="v", ls="", mfc=style.ORANGE, mec="black", label="fails, $\\rho<1$: slow, under the storage-bandwidth ceiling"),
+        Line2D([], [], marker="P", ls="", mfc=style.PURPLE, mec="black", label="fails, $\\rho<1$: fast, over the storage-bandwidth ceiling"),
     ]
     ax.legend(handles=handles, loc="lower left", bbox_to_anchor=(0.0, 1.015),
               fontsize=7.9, framealpha=1.0, ncol=3, borderpad=0.45,

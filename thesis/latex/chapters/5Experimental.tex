@@ -62,17 +62,19 @@ Each workload runs the query (Listing~\ref{lst:query}) over a synthetic sensor s
 The stream is a pre-generated CSV file of sensor readings that a NebulaStream file source replays into the query.
 Keys follow a Zipf distribution with skew $1.0$ over a universe of $1.5$ million sensor ids, so few sensors are hot and many are rare; the ten most frequent keys carry about 20\% of the traffic.
 Each row also carries an event-time timestamp.
+
 The generator adds a positive jitter to each timestamp, drawn uniformly on $[0, D]$, so the stream arrives out of order.
 The jitter is bounded by the lateness bound $L$: here $D = L$, so a row is displaced by at most $L$ in event time, and the mean displacement is $L/2$.
 This bound is the same configured delay as the emit lag of Section~\ref{sec:architecture}: holding a completed window back by $L$ before emission is exactly what lets a row up to $L$ late still land in it correctly.
 The jitter is applied to the timestamp independently of the key, so disorder and skew are orthogonal: a hot key is no more or less likely to arrive late than a rare one.
 State size is governed by how many distinct keys are held open at once, which is capped by whichever is smaller: the key universe, or the rows seen per window.
 The generator raises both together, since growing only one saturates against the other and stops increasing the state.
+
 The query is a single tumbling-window aggregation, the operator whose state this backend spills.
 It groups the stream by key and sums a value field per key per window (Listing~\ref{lst:query}).
 Table~\ref{tab:workload} lists the workload parameters.
 
-\begin{lstlisting}[language=SQL,float=ht,caption={The synthetic tumbling-window aggregation evaluated across the grid (NebulaStream systest dialect). \texttt{s} is a pre-generated CSV stream of Zipfian sensor keys with out-of-order event timestamps.},label={lst:query}]
+\begin{lstlisting}[language=SQL,float=ht,caption={The synthetic tumbling-window aggregation evaluated across the grid (NebulaStream systest dialect). \texttt{s} is a pre-generated CSV stream of Zipfian sensor keys with out-of-order event timestamps. The \texttt{\$\{\dots\}} placeholders are filled by the harness: \texttt{\$\{FILECSV\}} selects the input stream and is the variable varied per experiment (one file per workload of Table~\ref{tab:workloads}); \texttt{\$\{WINDOW\}} is fixed at 50{,}000\,ms in every run.},label={lst:query}]
 CREATE LOGICAL SOURCE s(key UINT64 NOT NULL, val UINT64 NOT NULL, ts UINT64 NOT NULL);
 CREATE PHYSICAL SOURCE FOR s TYPE File SET('${FILECSV}' AS `SOURCE`.FILE_PATH, 'CSV' AS PARSER.`TYPE`, ',' AS PARSER.FIELD_DELIMITER);
 CREATE SINK out(s.start UINT64 NOT NULL, s.end UINT64 NOT NULL, s.key UINT64 NOT NULL, s.sumVal UINT64 NOT NULL) TYPE Void;
@@ -114,14 +116,16 @@ It is the working-set state divided by the cap, so $\rho = 1$ is the point where
 Each workload runs once uncapped in memory; its steady anonymous-memory footprint divided by the cap under test gives $\rho$.
 Steady means the mean over the middle 20 to 80 percent of the run, which excludes startup and the terminal emission flush; the flush peak is tracked as its own quantity.
 
-% [7.1.2b] What the r-labels mean --- they recur in every figure and confuse if unexplained.
-Each workload carries a short label of the form \texttt{r}$N$ (\texttt{r200}, \texttt{r300}, \texttt{r500}, and so on) that recurs in every figure.
+% [7.1.2b] What the workload labels mean --- they recur in every figure and confuse if unexplained.
+Each workload carries a short label (\texttt{s200}, \texttt{s300}, \texttt{b500}, and so on) that recurs in every figure.
 The label is not a measured quantity: it names one specific pre-generated input stream, a single CSV file that differs from the others only in how much window state it drives.
-The number is that stream's \emph{target} state pressure at the 512\,MB reference cap, times one hundred, so \texttt{r200} was sized to reach $\rho \approx 2$ there and \texttt{r300} to reach $\rho \approx 3$.
-Table~\ref{tab:workloads} lists the streams with their measured footprints and the resulting $\rho$ at each cap.
-For the original family (\texttt{r075} through \texttt{r300}) the measured footprint follows the label closely and monotonically.
-A later batch (\texttt{r500}, \texttt{r700}, \texttt{r1000}) was regenerated on a different scale: it is ordered by footprint within itself, but its lightest member \texttt{r500} measures a \emph{smaller} footprint than the earlier \texttt{r300} (1374\,MB against 1582\,MB), so the label number orders each family internally but is not comparable across the two.
-The axis every result is read against is therefore not the label but the measured state pressure $\rho$ printed beside it; where the two disagree, as they do for \texttt{r300} and \texttt{r500}, $\rho$ is authoritative.
+The two letters mark two separately generated families whose numbers must not be read as one comparable scale.
+The \texttt{s} (small-state) family was sized against the 512\,MB reference cap; its number is the target state pressure there, times one hundred, so \texttt{s200} was sized to reach $\rho \approx 2$ at 512\,MB.
+The \texttt{b} (big-state) family was generated later, on its own scale, for the larger caps.
+The reference run that would tie the \texttt{b} numbers to the same 512\,MB scale was not possible: these workloads exceed the small cap so far that the capped reference itself is killed.
+Consequently \texttt{b500} measures a \emph{smaller} footprint than \texttt{s300} (1374\,MB against 1582\,MB) although its number is larger.
+One conversion example makes the labels concrete: \texttt{s150} has a measured uncapped footprint of 736\,MB, so at the 512\,MB cap its state pressure is $\rho = 736/512 \approx 1.44$, and at the 1024\,MB cap the same stream sits at $\rho = 736/1024 \approx 0.72$; every other $\rho$ in this chapter is the same division of footprint by cap.
+Table~\ref{tab:workloads} lists all streams with their measured footprints and the resulting $\rho$ at each cap; in the repository the run labels keep their original \texttt{r} prefix (\texttt{s75} = \texttt{r075}, \texttt{b500} = \texttt{r500}).
 
 \begin{table}[ht]
 \centering
@@ -130,25 +134,24 @@ The axis every result is read against is therefore not the label but the measure
 \hline
 \textbf{Workload} & \textbf{Footprint (MB)} & \textbf{$\rho$ @ 512} & \textbf{$\rho$ @ 1024} & \textbf{$\rho$ @ 2048} \\
 \hline
-\texttt{r075}  & 327  & 0.64 & ---  & ---  \\
-\texttt{r100}  & 458  & 0.89 & 0.45 & ---  \\
-\texttt{r150}  & 736  & 1.44 & 0.72 & ---  \\
-\texttt{r200}  & 1034 & 2.02 & 1.01 & 0.50 \\
-\texttt{r300}  & 1582 & 3.09 & 1.54 & 0.77 \\
-\texttt{r500}  & 1374 & ---  & 1.34 & 0.67 \\
-\texttt{r700}  & 1676 & ---  & ---  & 0.82 \\
-\texttt{r1000} & 2078 & ---  & ---  & 1.01 \\
+\texttt{s75}  & 327  & 0.64 & ---  & ---  \\
+\texttt{s100}  & 458  & 0.89 & 0.45 & ---  \\
+\texttt{s150}  & 736  & 1.44 & 0.72 & ---  \\
+\texttt{s200}  & 1034 & 2.02 & 1.01 & 0.50 \\
+\texttt{s300}  & 1582 & 3.09 & 1.54 & 0.77 \\
+\texttt{b500}  & 1374 & ---  & 1.34 & 0.67 \\
+\texttt{b700}  & 1676 & ---  & ---  & 0.82 \\
+\texttt{b1000} & 2078 & ---  & ---  & 1.01 \\
 \hline
 \end{tabular}
 \caption{The synthetic workloads. Footprint is the measured steady
 anonymous-memory footprint of an uncapped in-memory run (median over 8 to 10
 repetitions, spread within about $\pm 20$\,MB); $\rho$ is that footprint divided by the
-cap, shown only for the caps at which the workload was run. The label number is
-the target $\rho \times 100$ at 512\,MB for the original family
-(\texttt{r075}--\texttt{r300}); \texttt{r500}--\texttt{r1000} are a later batch
-on a different scale, which is why \texttt{r300} has a larger footprint than
-\texttt{r500} despite the smaller number. The measured $\rho$, not the label, is
-the physical axis.}
+cap, shown only for the caps at which the workload was run. The \texttt{s}
+(small-state) and \texttt{b} (big-state) families are separately generated
+scales, so their numbers are not comparable across families; the measured $\rho$,
+not the label, is the physical axis. Repository run labels keep the original
+\texttt{r} prefix (\texttt{s75} = \texttt{r075}, \texttt{b500} = \texttt{r500}).}
 \label{tab:workloads}
 \end{table}
 
@@ -213,18 +216,21 @@ Section~\ref{sec:threats} reports the incident that taught this rule.
 % [7.1.8] Statistical method, tied to what is measured (moved here from Chapter 2).
 Two kinds of measurement carry the results, and each uses its own test.
 The first is completion.
-A cell runs its repetitions under two arms and each repetition either completes or fails, which forms a two-by-two table of completed and failed runs across the two arms.
+A cell runs its repetitions under two configurations and each repetition either completes or fails, which forms a two-by-two table of completed and failed runs across the two configurations.
 Completion is compared with Fisher's exact test on that table.
 The second is a mean, such as throughput or 99th-percentile latency.
-Means are compared with Welch's t-test, which does not assume the two arms share a variance~\cite{welch1947}.
+Means are compared with Welch's t-test, which does not assume the two configurations share a variance~\cite{welch1947}.
 Where a Welch comparison is quoted, its statistic is given with it.
 The paired backend-size contrast of Section~\ref{sec:rb32} uses McNemar's test instead, because there each cell is matched to a twin.
 
-\subsection{Methods Note for the Synthetic Grid\label{sec:methods-grid}}
-
-Every synthetic-grid figure in this chapter uses this configuration.
-
-\methodsnotefull
+% Methods note written out as normal prose (was a grey-footnote subsection 5.1.1).
+Unless a caption states otherwise, every synthetic-grid figure in this chapter uses one configuration.\label{sec:methods-grid}
+The stream is the Zipfian sensor stream above ($s \approx 1.0$, 1.5 million keys, top ten keys $\approx$ 20\% of traffic).
+The window is tumbling over 50{,}000\,ms of event time with an emit lag of 4 million\,ms ($N_w = 80$ retained windows).
+Every run uses two pinned cores under a hard cgroup cap and spills lz4-compressed to the SD card.
+Each cell carries 8 to 10 repetitions unless labelled otherwise.
+The data source is the lag-validation campaign, 3{,}133 runs in 457 cells, on a debug build and a single host; the device profile is Table~\ref{tab:edge-profile}.
+The short grey note under each figure points back to this paragraph.
 
 \section{Experimental Analysis of the RocksDB Backend\label{sec:rocksdb-eval}}
 
@@ -308,18 +314,18 @@ At 1024 or 2048\,MB a 32\,MB write buffer and a 32\,MB block cache fit, and the 
 The storage device's write bandwidth bounds the drain rate (Section~\ref{sec:rq4}), so writing fewer bytes should let more runs finish where the larger backend fits.
 A dedicated single-variable contrast tests this prediction inside NebulaStream, holding every other knob fixed (Section~\ref{sec:rb32}).
 The prediction does not hold in general.
-The larger backend helps only when window-map pages live in the buffer pool, and even there only as a directional trend under the tight cap; with headroom it is neutral, and on the heap architecture its fixed memory cost makes it a net loss.
+The larger backend helps only when window-map pages live in the buffer pool, and even there only as a directional trend under the tight cap; with headroom it is neutral, and on the heap configuration its fixed memory cost makes it a net loss.
 The evaluation therefore holds the backend at 16 and 8\,MB across all caps.
 
 \section{Effectiveness (RQ1)\label{sec:rq1}}
 
-Two architectures appear throughout this chapter, named by their allocation type from Section~\ref{sec:bg-windows}.
+Two memory configurations appear throughout this chapter, named by their allocation type from Section~\ref{sec:bg-windows}.
 The engine-default configuration uses unbounded allocation: hash map pages live on the heap.
 The corrected configuration uses bounded allocation: hash map pages live in the global buffer pool.
-For brevity, this chapter also calls the first the \emph{heap} architecture and the second the \emph{pooled} architecture; where the tables and appendices name the same pair, they label them \emph{unbounded} and \emph{bounded}.
-Why two architectures exist is the subject of Section~\ref{sec:rq3}.
+For brevity, this chapter also calls the first the \emph{heap} configuration and the second the \emph{pooled} configuration; where the tables and appendices name the same pair, they label them \emph{unbounded} and \emph{bounded}.
+Why two allocation types exist is the subject of Section~\ref{sec:rq3}.
 RQ1 asks whether the backend prevents the OOM failures that a fixed cap forces on the in-memory engine, and for which workloads and memory budgets it does so.
-This section answers that empirically: it maps the \emph{operating window} of each architecture --- the region of workload and pool sizes over which it completes --- across the three memory caps.
+This section answers that empirically: it maps the \emph{operating window} of each allocation type --- the region of workload and pool sizes over which it completes --- across the three memory caps.
 All figures and statistics in this section use the 16/8 RocksDB configuration fixed in Section~\ref{sec:rocksdb-config} (16\,MB write buffer, 8\,MB block cache), at 8 to 10 repetitions per cell.
 A separate experiment reran parts of the grid under the larger 32/32 configuration; that single-variable contrast has findings of its own and is analyzed in Section~\ref{sec:rb32}, not mixed into the counts here.
 
@@ -327,21 +333,21 @@ A separate experiment reran parts of the grid under the larger 32/32 configurati
 
 % [7.2.1] Preview the anchor contrast, then outline how the section develops it.
 One contrast previews the section.
-At the tightest cap the heap architecture keeps running where the capped in-memory engine cannot: at 512\,MB it completes 14 of 24 runs across the three beyond-memory pressures, against 0 of 18 for the in-memory engine (Figure~\ref{fig:flagship}; Fisher's exact test $p = 4.1 \times 10^{-5}$).
+At the tightest cap the heap configuration keeps running where the capped in-memory engine cannot: at 512\,MB it completes 14 of 24 runs across the three beyond-memory pressures, against 0 of 18 for the in-memory engine (Figure~\ref{fig:flagship}; Fisher's exact test $p = 4.1 \times 10^{-5}$).
 That number is the headline, not yet the argument.
-The subsections that follow build the argument around it: they map the operating window of each architecture cap by cap (Section~\ref{sec:rq1-windows}), derive the two-sided pool geometry that bounds those windows (Section~\ref{sec:rq1-geometry}), locate which architecture wins where (Section~\ref{sec:rq1-division}), show that completion inside a window is a race between ingest and drain rather than a state-size threshold (Section~\ref{sec:rq1-race}), and test whether the effect survives on a realistic Nexmark workload (Section~\ref{sec:nexmark}).
+The subsections that follow build the argument around it: they map the operating window of each allocation type cap by cap (Section~\ref{sec:rq1-windows}), derive the two-sided pool geometry that bounds those windows (Section~\ref{sec:rq1-geometry}), locate which allocation type wins where (Section~\ref{sec:rq1-division}), show that completion inside a window is a race between ingest and drain rather than a state-size threshold (Section~\ref{sec:rq1-race}), and test whether the effect survives on a realistic Nexmark workload (Section~\ref{sec:nexmark}).
 
 % [7.2.2] Correctness underwrites every completion count that follows.
-One property underwrites every completion count below: while spilling is active, output checksums match the uncapped in-memory reference under both architectures, so a completed run is a correct run rather than a truncated one.
+One property underwrites every completion count below: while spilling is active, output checksums match the uncapped in-memory reference under both allocation types, so a completed run is a correct run rather than a truncated one.
 
 \begin{figure}[ht]
 \centering
 \widefig{img/fig_flagship.pdf}
 \caption[Completion at the flagship cell (512\,MB)]{Completion at the flagship
-cell. \ac{OOC} under the heap architecture (8 repetitions per workload) versus
+cell. \ac{OOC} under the heap configuration (8 repetitions per workload) versus
 the capped in-memory engine (6 repetitions) at the three beyond-memory state
-pressures of the 512\,MB cap. Only the heap architecture is shown here; the
-bounded architecture at this cap is mapped in Section~\ref{sec:rq1-windows}.
+pressures of the 512\,MB cap. Only the heap configuration is shown here; the
+pooled configuration at this cap is mapped in Section~\ref{sec:rq1-windows}.
 Totals: 14/24 versus 0/18, Fisher's exact test
 $p = 4.1 \times 10^{-5}$ (two-sided).\methodsnote}
 \label{fig:flagship}
@@ -349,27 +355,27 @@ $p = 4.1 \times 10^{-5}$ (two-sided).\methodsnote}
 
 % [7.2.2b] Headline significance across the whole chapter, collected in one figure.
 The flagship is one of several completion contrasts this chapter reports.
-Figure~\ref{fig:pvalues} collects the headline ones in a single view, each a two-arm
+Figure~\ref{fig:pvalues} collects the headline ones in a single view, each a two-configuration
 comparison of completed against attempted runs with its Fisher's exact $p$-value.
 Each row is developed in full later in the chapter; the one-line glosses here are only enough to read the figure in place.
 The contrasts sit far from chance.
 The \emph{flagship} (spilling versus its absence, above) clears $p = 4.1 \times 10^{-5}$.
 The \emph{attribution ladder} --- completion at the decisive cell as pooling and its levers are switched on one factor at a time --- rises from 0/8 to 7/8 at $p = 7.0 \times 10^{-4}$ (Section~\ref{sec:rq3}).
-The \emph{pooled lever arms} set the pool-pressure levers with pooling engaged against the same levers without it, 12/16 versus 0/16, at $p = 8.1 \times 10^{-6}$.
-The \emph{allocation-type} win at 512\,MB holds two spilling arms at equal buffer granularity so that only heap-versus-pool allocation differs (r200: pooled 8/8 versus matched-granularity heap 0/8) at $p = 7.8 \times 10^{-5}$.
+The \emph{pooled lever configurations} set the pool-pressure levers with pooling engaged against the same levers without it, 12/16 versus 0/16, at $p = 8.1 \times 10^{-6}$.
+The \emph{allocation-type} win at 512\,MB holds two spilling configurations at equal buffer granularity so that only heap-versus-pool allocation differs (s200: pooled 8/8 versus matched-granularity heap 0/8) at $p = 7.8 \times 10^{-5}$.
 The \emph{intrinsic-backpressure} cell, where the bounded pool's own throttling of ingest to the drain rate recovers a stall the heap does not, reads 23/24 versus 3/10 at $p = 1.6 \times 10^{-4}$.
 Every headline claim clears $p < 10^{-3}$.
 
-% [7.2.2c] Resolve the apparent tension: the heap arm appears in three rows
+% [7.2.2c] Resolve the apparent tension: the heap configuration appears in three rows
 % against different baselines and, in the allocation row, as the matched-
 % granularity control -- so its flagship win and its allocation-row loss measure
 % different things rather than contradicting each other.
-Three of these rows involve the heap architecture, and read side by side they can mislead: the heap wins the flagship yet loses the allocation-type row, at the very same workload and cap.
+Three of these rows involve the heap configuration, and read side by side they can mislead: the heap wins the flagship yet loses the allocation-type row, at the very same workload and cap.
 The two rows measure different things.
-The flagship sets the heap arm against the capped in-memory engine, which cannot spill at all, so its axis is spilling versus its absence, and the heap wins by completing out-of-core (14/24 versus 0/18).
-The allocation-type row instead sets two arms that both spill and holds the I/O buffer granularity fixed so that only the allocation type differs; its heap side is therefore not the engine-default heap of the flagship but the \emph{matched-granularity} control introduced in Section~\ref{sec:disambiguation}.
-At r200 and 512\,MB that control's unbounded per-slice growth drives resident memory to 496 of 512\,MB and it is OOM-killed 0 of 8, whereas the bounded pool holds the same working set at 390\,MB and completes 8 of 8; the flagship's default heap, with its smaller buffers, instead fits at 411\,MB and completes 8 of 8.
-The heap arm is thus better than not spilling and worse than bounded spilling at the tightest cell --- a difference of baseline and configuration, not a contradiction.
+The flagship sets the heap configuration against the capped in-memory engine, which cannot spill at all, so its axis is spilling versus its absence, and the heap wins by completing out-of-core (14/24 versus 0/18).
+The allocation-type row instead sets two configurations that both spill and holds the I/O buffer granularity fixed so that only the allocation type differs; its heap side is therefore not the engine-default heap of the flagship but the \emph{matched-granularity} control introduced in Section~\ref{sec:disambiguation}.
+At s200 and 512\,MB that control's unbounded per-slice growth drives resident memory to 496 of 512\,MB and it is OOM-killed 0 of 8, whereas the bounded pool holds the same working set at 390\,MB and completes 8 of 8; the flagship's default heap, with its smaller buffers, instead fits at 411\,MB and completes 8 of 8.
+The heap configuration is thus better than not spilling and worse than bounded spilling at the tightest cell --- a difference of baseline and configuration, not a contradiction.
 
 \begin{figure}[ht]
 \centering
@@ -379,7 +385,7 @@ completion contrasts and their significance, one row per contrast (labeled on
 the plot, with its underlying completion counts annotated beside each point).
 (a) Effect size: the completion-difference point estimate with its 95\%
 confidence interval (Newcombe's method, built from Wilson score intervals on
-each arm's completion proportion). (b) Significance: the Fisher's exact $p$-value on a log
+each configuration's completion proportion). (b) Significance: the Fisher's exact $p$-value on a log
 scale, with a dashed reference at $p = 0.05$. Every contrast clears that line by
 orders of magnitude; each row is glossed where it is named above and developed in full in Section~\ref{sec:rq3}.\methodsnote}
 \label{fig:pvalues}
@@ -389,18 +395,18 @@ orders of magnitude; each row is glossed where it is named above and developed i
 \subsection{Operating Windows of the Two Architectures\label{sec:rq1-windows}}
 
 % [7.2.3]
-The heap architecture has cap-dependent operating windows.
+The heap configuration has cap-dependent operating windows.
 At 512\,MB it covers $\rho \approx 1.2$ to $2.2$.
-At 1024\,MB it extends at least to $\rho = 1.54$ (r300, the largest pressure tested at this cap).
+At 1024\,MB it extends at least to $\rho = 1.54$ (s300, the largest pressure tested at this cap).
 Both windows are significant at $p = 3.6 \times 10^{-4}$.
 At 2048\,MB it completes heavy workloads below $\rho \approx 1$; a beyond-memory win above $\rho = 1$ is not demonstrated at this cap.
-Figures~\ref{fig:heatmap-512}--\ref{fig:heatmap-2048} show the completion grids one cap at a time, the heap architecture with its in-memory baseline in the top panel and the bounded architecture in the bottom panel; the paragraphs below read each cap in turn.
+Figures~\ref{fig:heatmap-512}--\ref{fig:heatmap-2048} show the completion grids one cap at a time, the heap configuration with its in-memory baseline in the top panel and the pooled configuration in the bottom panel; the paragraphs below read each cap in turn.
 Figures~\ref{fig:geometry-law-512}--\ref{fig:geometry-law-2048} break the failing bounded cells down by failure reason.
 
 % [7.2.3c] 512 MB, cell by cell.
 At the tightest cap (Figure~\ref{fig:heatmap-512}), the in-memory baseline completes only the two fitting workloads and nothing beyond $\rho = 1$.
-The heap arm wins its beyond-memory window at the 16k pool (8 of 10 at $\rho \approx 1.44$), but the winning pool moves with the workload: r100 completes 9 of 10 at 32k yet 0 of 10 at 16k and 64k.
-Beyond the lightest workload, the bounded arm completes only in the 16k column, and non-monotonically in $\rho$ (8/8, 2/8, 1/8, 8/8 reading upward); Section~\ref{sec:rq1-race} explains that shape as a race between ingest and drain.
+The heap configuration wins its beyond-memory window at the 16k pool (8 of 10 at $\rho \approx 1.44$), but the winning pool moves with the workload: s100 completes 9 of 10 at 32k yet 0 of 10 at 16k and 64k.
+Beyond the lightest workload, the bounded configuration completes only in the 16k column, and non-monotonically in $\rho$ (8/8, 2/8, 1/8, 8/8 reading upward); Section~\ref{sec:rq1-race} explains that shape as a race between ingest and drain.
 
 \begin{figure}[ht]
 \centering
@@ -408,39 +414,39 @@ Beyond the lightest workload, the bounded arm completes only in the 16k column, 
 \caption[Operating windows at 512\,MB]{Operating windows at the 512\,MB cap
 over pool $\times$ workload, 16/8 baseline only. State pressure $\rho$ (steady
 footprint $\div$ cap; $\rho > 1$ = beyond memory) appears in parentheses; each
-cell reports completed over attempted runs. Top panel: heap architecture
+cell reports completed over attempted runs. Top panel: heap configuration
 (engine-default, all window state outside the pool) with its capped in-memory
-baseline; bottom panel: bounded architecture.
+baseline; bottom panel: pooled configuration.
 Figure~\ref{fig:geometry-law-512} breaks the failing bounded cells down by
-failure reason; Figure~\ref{fig:knife} isolates the heap arm's r75 pool
+failure reason; Figure~\ref{fig:knife} isolates the heap configuration's s75 pool
 sweep.\methodsnote}
 \label{fig:heatmap-512}
 \end{figure}
 
-% [7.2.3d] 1024 MB: the two architectures pull apart in shape.
-At the mid cap (Figure~\ref{fig:heatmap-1024}) the two architectures first pull apart in shape.
-The bounded arm's completion rises with pool size in almost every row (r150: 0/8, 4/8, 8/8; r300: 0/8, 0/8, 8/8), so its window reads simply: more pool, more completion.
-The heap arm has no such column order: r100 completes 10 of 10 at 32k but 2 of 10 at 16k, and r200 completes only at the largest pool.
-One row defeats both architectures at every pool: r500.
-Its state pressure ($\rho \approx 1.34$) is lower than r300's ($\rho \approx 1.54$), which completes 8 of 8, and this is not a data error: the label numbers order the input streams, not the footprints (Table~\ref{tab:workloads}), and the uncapped calibration runs measure r300's total footprint above r500's.
-What kills r500 is the pool, not the total footprint: every bounded failure in this row is a pool-exhaustion abort, including at the largest pool tested, and the same workload at 2048\,MB completes only once the pool reaches 96k buffers, a size that cannot fit under a 1024\,MB cap alongside the state outside the pool.
+% [7.2.3d] 1024 MB: the two allocation types pull apart in shape.
+At the mid cap (Figure~\ref{fig:heatmap-1024}) the two allocation types first pull apart in shape.
+The bounded configuration's completion rises with pool size in almost every row (s150: 0/8, 4/8, 8/8; s300: 0/8, 0/8, 8/8), so its window reads simply: more pool, more completion.
+The heap configuration has no such column order: s100 completes 10 of 10 at 32k but 2 of 10 at 16k, and s200 completes only at the largest pool.
+One row defeats both allocation types at every pool: b500.
+Its state pressure ($\rho \approx 1.34$) is lower than s300's ($\rho \approx 1.54$), which completes 8 of 8, and this is not a data error: the label numbers order the input streams, not the footprints (Table~\ref{tab:workloads}), and the uncapped calibration runs measure s300's total footprint above b500's.
+What kills b500 is the pool, not the total footprint: every bounded failure in this row is a pool-exhaustion abort, including at the largest pool tested, and the same workload at 2048\,MB completes only once the pool reaches 96k buffers, a size that cannot fit under a 1024\,MB cap alongside the state outside the pool.
 
 \begin{figure}[ht]
 \centering
 \includegraphics[width=0.72\textwidth]{img/fig_heatmap_1024.pdf}
 \caption[Operating windows at 1024\,MB]{Operating windows at the 1024\,MB cap,
 same layout as Figure~\ref{fig:heatmap-512}. The bounded panel (bottom) rises
-with pool size in almost every row; the r500 row completes nowhere under
-either architecture (see the text).\methodsnote}
+with pool size in almost every row; the b500 row completes nowhere under
+either allocation type (see the text).\methodsnote}
 \label{fig:heatmap-1024}
 \end{figure}
 
 % [7.2.3e] 2048 MB: bounded consolidates at the large-pool edge, heap scatters.
-At the largest cap (Figure~\ref{fig:heatmap-2048}) the bounded pattern continues: completion arrives at the large-pool edge (r200 from 64k, the rest at 96k), and no smaller pool completes anything.
-r1000 ($\rho \approx 1.01$) completes nowhere, and every one of its bounded failures is a pool-exhaustion abort even at 96k, so the tested pools never cross its abort edge; whether a still larger pool would complete it under this cap is untested.
-The heap arm scatters instead: each workload completes in its own narrow pool band (r700 at 16k--32k, r500 at 32k--64k, r200 at 64k--128k), and the band moves toward smaller pools as the workload's heap-resident state grows, because the pool is a fixed up-front reservation that competes with that state for the cap (Section~\ref{sec:rq1-geometry} isolates this mechanism).
+At the largest cap (Figure~\ref{fig:heatmap-2048}) the bounded pattern continues: completion arrives at the large-pool edge (s200 from 64k, the rest at 96k), and no smaller pool completes anything.
+b1000 ($\rho \approx 1.01$) completes nowhere, and every one of its bounded failures is a pool-exhaustion abort even at 96k, so the tested pools never cross its abort edge; whether a still larger pool would complete it under this cap is untested.
+The heap configuration scatters instead: each workload completes in its own narrow pool band (b700 at 16k--32k, b500 at 32k--64k, s200 at 64k--128k), and the band moves toward smaller pools as the workload's heap-resident state grows, because the pool is a fixed up-front reservation that competes with that state for the cap (Section~\ref{sec:rq1-geometry} isolates this mechanism).
 No single heap pool column completes more than two of the five workloads, where the bounded 96k column completes four.
-The exception to the band pattern is r300, which completes nowhere on the heap although workloads with larger footprints do; Section~\ref{sec:rq1-race} resolves this: r300 free-runs at more than twice r700's ingest rate, so completion is decided by that race, not by footprint alone.
+The exception to the band pattern is s300, which completes nowhere on the heap although workloads with larger footprints do; Section~\ref{sec:rq1-race} resolves this: s300 free-runs at more than twice b700's ingest rate, so completion is decided by that race, not by footprint alone.
 
 \begin{figure}[ht]
 \centering
@@ -457,7 +463,7 @@ heap-resident state grows.\methodsnote}
 \subsection{The Two-Sided Geometry of the Bounded Window\label{sec:rq1-geometry}}
 
 % [7.2.4] Two-sided geometry law + per-cell failure breakdown, in its own figure.
-The bounded architecture follows a different law.
+The pooled configuration follows a different law.
 Its window is governed by geometry, not by $\rho$.
 The pool must hold the hot band of slices, the roughly $N_w$ windows that are concurrently open at any moment; this is the lower bound.
 When the pool cannot supply the concurrently open hot band, a worker's buffer request finds the pool empty and NebulaStream aborts that allocation (Section~\ref{sec:backpressure}), which kills the run.
@@ -473,12 +479,12 @@ The three caps show the law in complementary partial views: at 512\,MB both edge
 \centering
 \includegraphics[width=0.6\textwidth]{img/fig_geometry_law_512.pdf}
 \caption[The two-sided geometry law at 512\,MB]{The two-sided geometry law
-at 512\,MB. The small pool (8k) aborts the lighter workloads (r75 completes
-3 of 8; r100 and r150 abort in full), while the two heaviest rows are past
-the OOM edge already at this pool size (r200 and r300, 0 of 8 by OOM). The
-middle pool (16k) carries every full completion, the fitting r75 and the
-throttled r200, both 8 of 8. The large pool (24k) tips every workload above
-r75 into OOM. The one mixed cell is r300 at 24k (6 OOM, 1 timeout, 1 crash).
+at 512\,MB. The small pool (8k) aborts the lighter workloads (s75 completes
+3 of 8; s100 and s150 abort in full), while the two heaviest rows are past
+the OOM edge already at this pool size (s200 and s300, 0 of 8 by OOM). The
+middle pool (16k) carries every full completion, the fitting s75 and the
+throttled s200, both 8 of 8. The large pool (24k) tips every workload above
+s75 into OOM. The one mixed cell is s300 at 24k (6 OOM, 1 timeout, 1 crash).
 Format: ``N ok / failure split'', e.g. ``0 ok / 8 abort''.\methodsnote}
 \label{fig:geometry-law-512}
 \end{figure}
@@ -489,10 +495,10 @@ Format: ``N ok / failure split'', e.g. ``0 ok / 8 abort''.\methodsnote}
 \caption[The two-sided geometry law at 1024\,MB]{The two-sided geometry
 law at 1024\,MB, where only the abort edge is reached: every plain failing
 cell is a pool abort, and the OOM edge does not appear at any tested pool
-(a single OOM repetition hides inside r300's mixed 16k cell). Even the
+(a single OOM repetition hides inside s300's mixed 16k cell). Even the
 largest pool tested (48k) still fully aborts the most pool-demanding
-workload (r500, 0 of 8). The middle pool (32k) is transitional rather
-than a clean sweet spot: full completion at r100, half at r150 (4 of 8),
+workload (b500, 0 of 8). The middle pool (32k) is transitional rather
+than a clean sweet spot: full completion at s100, half at s150 (4 of 8),
 nothing above. Same format as Figure~\ref{fig:geometry-law-512}.}
 \label{fig:geometry-law-1024}
 \end{figure}
@@ -501,28 +507,28 @@ nothing above. Same format as Figure~\ref{fig:geometry-law-512}.}
 \centering
 \includegraphics[width=0.6\textwidth]{img/fig_geometry_law_2048.pdf}
 \caption[The two-sided geometry law at 2048\,MB]{The two-sided geometry
-law at 2048\,MB, where the workloads tested are heavier (r200 to r1000, against
-r75 to r300 at 512\,MB) and the abort edge dominates the entire probed
+law at 2048\,MB, where the workloads tested are heavier (s200 to b1000, against
+s75 to s300 at 512\,MB) and the abort edge dominates the entire probed
 grid: only the largest pool (96k), or the lightest workload at 64k,
 complete, and every plain failing cell is a pool abort. The OOM edge is
-never reached at this cap (a single OOM repetition hides inside r300's
+never reached at this cap (a single OOM repetition hides inside s300's
 mixed 16k cell); the tested pool sizes fall short of the abort-to-OOM
 transition rather than crossing it.
 Same format as Figure~\ref{fig:geometry-law-512}.}
 \label{fig:geometry-law-2048}
 \end{figure}
 
-% [7.2.4b] The heap arm's pool sensitivity, isolated at one cell.
-The heap arm is sensitive to the same knob.
+% [7.2.4b] The heap configuration's pool sensitivity, isolated at one cell.
+The heap configuration is sensitive to the same knob.
 The pool is a fixed slab the engine reserves at process start regardless of whether hash-map pages live in it (Section~\ref{sec:bg-nes}); growing it enlarges that up-front reservation and leaves less of the cap for the heap-resident window state, whose pages never enter the pool.
-At 512\,MB, r75, the pool is the only variable, and completion falls from 10 of 10 at a 16k-buffer pool through 6 of 10 at 32k to 0 of 10 at 64k; every failure is an OOM kill.
+At 512\,MB, s75, the pool is the only variable, and completion falls from 10 of 10 at a 16k-buffer pool through 6 of 10 at 32k to 0 of 10 at 64k; every failure is an OOM kill.
 Figure~\ref{fig:knife} isolates this sweep.
 
 \begin{figure}[ht]
 \centering
 \widefig{img/fig_knife.pdf}
-\caption[Pool-size sensitivity of the heap architecture]{Pool-size
-sensitivity of the heap architecture at the 512\,MB cap, workload r75
+\caption[Pool-size sensitivity of the heap configuration]{Pool-size
+sensitivity of the heap configuration at the 512\,MB cap, workload s75
 ($\rho \approx 0.64$). The pool is the only variable across the bars:
 completion falls from 10 of 10 at a 16k-buffer pool to 6 of 10 at 32k and
 0 of 10 at 64k, and every failure is an OOM kill.\methodsnote}
@@ -533,63 +539,58 @@ completion falls from 10 of 10 at a 16k-buffer pool to 6 of 10 at 32k and
 \subsection{Where Each Architecture Wins\label{sec:rq1-division}}
 
 % [7.2.5]
-At geometry-correct pools of roughly 40\% of the cap, the bounded architecture covers nearly the full default-architecture window at the larger caps.
+At geometry-correct pools of roughly 40\% of the cap, the pooled configuration covers nearly the full default-configuration window at the larger caps.
 It also adds cells that no heap variant completes.
-At 2048\,MB, the bounded architecture completes the r200 through r700 workloads, with r300 marginal at 5 of 8 runs, a bounded-only cell where both heap arms complete 0 of 8.
-At 1024\,MB, r150 and r300 complete 8 of 8.
+At 2048\,MB, the pooled configuration completes the s200 through b700 workloads, with s300 marginal at 5 of 8 runs, a bounded-only cell where both heap configurations complete 0 of 8.
+At 1024\,MB, s150 and s300 complete 8 of 8.
 At 512\,MB, the upper bound sits below the hot band of the beyond-memory workloads, so only fitting and throttled workloads complete.
 This small-cap limit is permanent and explained by the law above.
 
 % [7.2.5b]
-The two architectures divide the territory.
-The heap keeps the smallest cap, the fast-ingest cells, and the throughput edge at the heavy end; at those heavy cells the pooled arms lose their edge to allocation stalls on the shared pool, visible as backpressure idle time in Section~\ref{sec:rq4}.
-The bounded architecture keeps the footprint guarantee, the bounded-only cells, and graceful degradation.
-One workload marks the absolute edge: r1000 at 2048\,MB ($\rho \approx 1.01$) fails under every configuration tested.
+The two allocation types divide the territory.
+The heap keeps the smallest cap, the fast-ingest cells, and the throughput edge at the heavy end; at those heavy cells the pooled configurations lose their edge to allocation stalls on the shared pool, visible as backpressure idle time in Section~\ref{sec:rq4}.
+The pooled configuration keeps the footprint guarantee, the bounded-only cells, and graceful degradation.
+One workload marks the absolute edge: b1000 at 2048\,MB ($\rho \approx 1.01$) fails under every configuration tested.
 
 Table~\ref{tab:windows} summarizes the operating windows.
 
 \begin{table}[ht]
 \centering
 \small
-\begin{tabular}{|p{1.4cm}|p{2.5cm}|>{\raggedright\arraybackslash}p{3.2cm}|>{\raggedright\arraybackslash}p{4.3cm}|}
+\begin{tabular}{|p{1.5cm}|>{\raggedright\arraybackslash}p{5.1cm}|>{\raggedright\arraybackslash}p{5.1cm}|}
 \hline
-\textbf{Cap} & \textbf{Architecture} & \textbf{Demonstrated window} & \textbf{Headline evidence} \\
+\textbf{Cap} & \textbf{Heap (unbounded allocation)} & \textbf{Pooled (bounded allocation)} \\
 \hline
-512\,MB  & unbounded & $\rho \approx 1.2$--$2.2$ & r150: 8/10 vs 0/10, $p=3.6\times10^{-4}$ \\
+512\,MB  & $\rho \approx 1.2$--$2.2$ \newline (s150: 8/10 vs 0/10, $p=3.6\times10^{-4}$) & fits + throttled $\rho\approx2$ \newline (s200: 8/8 vs 0/10, $p=2.3\times10^{-5}$) \\
 \hline
-512\,MB  & bounded   & fits + throttled $\rho\approx2$ & r200: 8/8 vs 0/10, $p=2.3\times10^{-5}$ \\
+1024\,MB & up to $\rho = 1.54$, largest tested \newline (s300: 8/10 vs 0/10, $p=3.6\times10^{-4}$) & s150 and s300, 8/8 each \newline (48k-buffer pool) \\
 \hline
-1024\,MB & unbounded & up to $\rho = 1.54$ (largest tested) & r300: 8/10 vs 0/10, $p=3.6\times10^{-4}$ \\
-\hline
-1024\,MB & bounded   & r150, r300 & 8/8 each at 48k pool \\
-\hline
-2048\,MB & unbounded & below $\rho \approx 1$ & r500/r700 10/10 (capacity, no spill) \\
-\hline
-2048\,MB & bounded   & r200--r700 at 96k pool & r300 5/8 bounded-only (heap arms 0/8) \\
-\hline
-2048\,MB & both      & $\rho \geq 1.01$ undemonstrated & r1000 fails everywhere \\
+2048\,MB & below $\rho \approx 1$ \newline (b500/b700 10/10; no spill) & s200--b700 at the 96k pool \newline (s300 5/8, pooled-only; heap 0/8) \\
 \hline
 \end{tabular}
-\caption{Operating windows per cap and architecture (numbers per the data
-audit). Unbounded rows are the engine-default configuration (4096-byte
-buffers; all window state on the heap, Section~\ref{sec:integration});
-bounded rows are the corrected 8192-byte flag that engages pooling.}
+\caption{Demonstrated operating windows per cap and allocation type, with the
+headline evidence in parentheses. Heap columns are the engine-default
+configuration (4096-byte buffers; all window state on the heap,
+Section~\ref{sec:integration}); pooled columns are the corrected 8192-byte flag
+that engages pooling. Beyond the memory boundary at 2048\,MB nothing is
+demonstrated: b1000 ($\rho \approx 1.01$) fails under every configuration.}
 \label{tab:windows}
 \end{table}
 
 % [7.2.6c] Multi-cap completion headline (generalizes the 512\,MB flagship).
 Figure~\ref{fig:effectiveness} draws the headline of this table in two focused panels.
 Panel (a) isolates the baseline: no capped in-memory cell completes once state clearly exceeds memory.
-One cell needs care: r200 at 1024\,MB completes 10 of 10, yet its \emph{uncapped} $\rho$ is 1.01, one percent past the line.
-The gap is a measurement-boundary effect, not completion beyond memory: $\rho$ is taken from an uncapped run, which runs about ten percent fatter with no reclaim pressure, so a workload measured just over $\rho = 1$ can still fit once capped --- r200's capped peak is only 948\,MB, comfortably under 1024.
+One cell needs care: s200 at 1024\,MB completes 10 of 10, yet its \emph{uncapped} $\rho$ is 1.01, one percent past the line.
+The gap is a measurement-boundary effect, not completion beyond memory: $\rho$ is taken from an uncapped run, which runs about ten percent fatter with no reclaim pressure, so a workload measured just over $\rho = 1$ can still fit once capped --- s200's capped peak is only 948\,MB, comfortably under 1024.
+
 Panel (a) therefore plots this one baseline cell at its realized capped footprint ($\rho \approx 0.93$), where it fits, rather than at its uncapped 1.01.
-The contrast is r1000 at 2048\,MB, which has the same uncapped $\rho \approx 1.01$ but genuinely exceeds its cap and fails 0 of 10; away from this one-percent band the collapse is sharp.
-Panel (b) compares the two arms at and beyond the boundary; the lighter workloads, which both arms complete in full, are omitted there because Figures~\ref{fig:heatmap-512}--\ref{fig:heatmap-2048} already show the full grids.
-At 512 and 1024\,MB the best \ac{OOC} operating point, taken over pool sizes and both architectures, extends completion past the memory boundary.
-One cell in panel (b) breaks the left-to-right order of $\rho$: r500 at 1024\,MB ($\rho \approx 1.34$) fails on both arms, while r300 immediately to its right ($\rho \approx 1.54$, a \emph{larger} footprint) completes 8 of 8 \ac{OOC}.
+The contrast is b1000 at 2048\,MB, which has the same uncapped $\rho \approx 1.01$ but genuinely exceeds its cap and fails 0 of 10; away from this one-percent band the collapse is sharp.
+Panel (b) compares the two configurations at and beyond the boundary; the lighter workloads, which both configurations complete in full, are omitted there because Figures~\ref{fig:heatmap-512}--\ref{fig:heatmap-2048} already show the full grids.
+At 512 and 1024\,MB the best \ac{OOC} operating point, taken over pool sizes and both allocation types, extends completion past the memory boundary.
+One cell in panel (b) breaks the left-to-right order of $\rho$: b500 at 1024\,MB ($\rho \approx 1.34$) fails on both configurations, while s300 immediately to its right ($\rho \approx 1.54$, a \emph{larger} footprint) completes 8 of 8 \ac{OOC}.
 This is not a mislabeling but the central lesson of the \ac{OOC} window: completion is set by pool geometry, not by total footprint.
-r500's concurrently live state needs a 96k-buffer pool ($\approx 786$\,MB) that cannot fit under a 1024\,MB cap, so every r500 run there dies --- the heap arm by OOM kill, the bounded arm by pool-exhaustion abort --- whereas r300, despite its larger total state, completes through a 48k pool that does fit (Section~\ref{sec:rq1-windows}).
-At 2048\,MB the single beyond-memory workload, r1000 at $\rho \approx 1$, defeats every configuration; this cell is the edge of the demonstrated result and is marked as such.
+b500's concurrently live state needs a 96k-buffer pool ($\approx 786$\,MB) that cannot fit under a 1024\,MB cap, so every b500 run there dies --- the heap configuration by OOM kill, the bounded configuration by pool-exhaustion abort --- whereas s300, despite its larger total state, completes through a 48k pool that does fit (Section~\ref{sec:rq1-windows}).
+At 2048\,MB the single beyond-memory workload, b1000 at $\rho \approx 1$, defeats every configuration; this cell is the edge of the demonstrated result and is marked as such.
 
 \begin{figure}[ht]
 \centering
@@ -600,15 +601,15 @@ cap, one marker per workload cell at its state pressure $\rho$, labeled
 completed over attempted runs; filled green = all
 repetitions complete, orange = partial, open red = all fail. (b) Head-to-head
 at and beyond the boundary ($\rho \geq 0.75$ only; lighter workloads, which
-both arms complete in full, are omitted since
+both configurations complete in full, are omitted since
 Figures~\ref{fig:heatmap-512}--\ref{fig:heatmap-2048} show the full grids):
 bars compare the capped in-memory baseline with the best
 \ac{OOC} operating point (maximum completion over pool sizes and both
-architectures), labeled completed/attempted; shaded spans mark the
-beyond-memory pairs ($\rho > 1$). In panel (a), r200 at 1024\,MB completes
+allocation types), labeled completed/attempted; shaded spans mark the
+beyond-memory pairs ($\rho > 1$). In panel (a), s200 at 1024\,MB completes
 although its uncapped $\rho$ is 1.01; it is plotted at its capped footprint
 ($\rho \approx 0.93$), where it actually fits (Section~\ref{sec:rq1-windows}). In
-panel (b), r500 at 1024\,MB fails at a \emph{lower} $\rho$ than r300 beside it
+panel (b), b500 at 1024\,MB fails at a \emph{lower} $\rho$ than s300 beside it
 because \ac{OOC} completion is governed by pool geometry, not total footprint
 (Section~\ref{sec:rq1-geometry}). Section~\ref{sec:rq1-windows} reads completion cap by cap.\methodsnote}
 \label{fig:effectiveness}
@@ -620,16 +621,17 @@ because \ac{OOC} completion is governed by pool geometry, not total footprint
 % [7.2.6]
 State pressure alone does not decide completion.
 Recall that $\rho$ is the working-set state divided by the cap: at a 512\,MB cap, $\rho = 1$ means a working set of about 512\,MB.
-Under the heap architecture, a workload at $\rho \approx 0.77$ ingesting 2.8 million tuples per second fails (r300 at 2048\,MB, the row Figure~\ref{fig:heatmap-2048} leaves empty).
-A heavier workload at $\rho \approx 0.82$ ingesting 1.1 million tuples per second completes 10 of 10 (r700, the row above it).
+Under the heap configuration, a workload at $\rho \approx 0.77$ ingesting 2.8 million tuples per second fails (s300 at 2048\,MB, the row Figure~\ref{fig:heatmap-2048} leaves empty).
+A heavier workload at $\rho \approx 0.82$ ingesting 1.1 million tuples per second completes 10 of 10 (b700, the row above it).
 The lighter workload fails and the heavier one completes, so the footprint is not what decides the outcome.
 
 % [7.2.6b] C18: the non-monotone completion, both mechanisms + n=8 / CI caveat.
-Under the bounded architecture the same reversal appears within one cap.
+Under the pooled configuration the same reversal appears within one cap.
 At 512\,MB with a 16k-buffer pool, completion is non-monotone as $\rho$ rises: 8/8, then 2/8, then 1/8, then 8/8 (the middle column of Figure~\ref{fig:heatmap-512}, bottom panel).
 Two mechanisms produce this shape.
+
 The first is the fast-ingest valley.
-At the lower $\rho$ points the working set fits, so the workload free-runs above the drain ceiling of about 2.6 million tuples per second; ingest then outruns the drain even though the state fits, and the run fails.
+At the lower $\rho$ points the working set fits, so the workload free-runs above the storage-bandwidth ceiling of about 2.6 million tuples per second; ingest then outruns the drain even though the state fits, and the run fails.
 At the heaviest point ($\rho \approx 2$) the pool fills and backpressures the workload below the ceiling, so ingest slows to the drain rate and the run completes.
 The survivor ingests about 1.98 million tuples per second where the fast failures free-run at about 3.33 million.
 The second mechanism is small-sample variance.
@@ -648,16 +650,16 @@ This reframing drives the rest of the chapter.
 \widefig{img/fig_race.pdf}
 \caption[Completion as a race between ingest and drain]{Completion as a race
 between ingest and drain: one point per cell of both grids. Marker shape is the
-architecture (circle = heap, square = bounded); fill is the outcome (filled =
+allocation type (circle = heap, square = bounded); fill is the outcome (filled =
 completes, plotted at its realized throttled throughput; hollow = fails, plotted
 at the workload's free-running demand rate, since a dead run has no realized rate
 of its own). Two lines cut the plane: the horizontal $\rho = 1$ memory boundary,
-exact by definition, and the vertical drain ceiling near 2.6\,M tuples/s,
+exact by definition, and the vertical storage-bandwidth ceiling near 2.6\,M tuples/s,
 empirical (the highest throughput any surviving spilling cell realizes; no
 $\rho > 1$ cell whose demand exceeds about 2.7\,M tuples/s survives, 25 of 25
-fail). Past both lines ingest outruns the drain and the run fails --- the race.
+fail). Past both lines ingest outruns the drain and the run fails.
 The $\rho < 1$ failures carry two further markers, one per group across both
-architectures (triangle = slow demand, below the ceiling; cross = fast demand,
+allocation types (triangle = slow demand, below the ceiling; cross = fast demand,
 above it); both are pool-geometry failures that recover at the geometry-correct
 pool, as the text below sets out cell by cell. The dashed ring marks the
 $\rho > 1$ cells that die on pool geometry rather than the race --- their ingest
@@ -675,38 +677,41 @@ meaningful throughput of its own.
 Under this convention the $\rho < 1$ failures do not form one cluster but two,
 split by demand rate; but neither is a capacity failure, because both recover at
 the geometry-correct pool.
-The first group is the two heavy near-boundary workloads, r500 and r700 at the
+
+The first group is the two heavy near-boundary workloads, b500 and b700 at the
 2048\,MB cap, whose footprint still fits ($\rho \approx 0.67$ and $0.82$) and
 whose free-running demand sits below about 1.6 million tuples per second, well
-under the drain ceiling.
+under the storage-bandwidth ceiling.
 At the pools plotted they fail along the two bounds of the geometry law
 (Figures~\ref{fig:geometry-law-512}--\ref{fig:geometry-law-2048}): the bounded
-arms abort on pool exhaustion and the heap arms are OOM-killed at the largest
+configurations abort on pool exhaustion and the heap configurations are OOM-killed at the largest
 pool.
 But these are not capacity deaths: at the geometry-correct pool the same
-cap-and-workload coordinate completes on both arms --- r500 reaches 10 of 10 on
-the heap arm at a 32k--64k pool and 8 of 8 on the bounded arm at 96k, and r700
-likewise at 16k--32k on the heap arm and 96k on the bounded.
+cap-and-workload coordinate completes on both configurations --- b500 reaches 10 of 10 on
+the heap configuration at a 32k--64k pool and 8 of 8 on the bounded configuration at 96k, and b700
+likewise at 16k--32k on the heap configuration and 96k on the bounded.
 Their state fits; only the tested pool was wrong, and because their ingest stays
 below the drain rate a mis-sized pool is their sole stressor.
 This is the smaller group, 10 of the $\rho < 1$ fail-cells.
+
 The second and larger group, 23 cells, is the fast workloads whose free-running
-demand exceeds the drain ceiling while their state still fits under the cap
+demand exceeds the storage-bandwidth ceiling while their state still fits under the cap
 ($\rho < 1$).
 They too fail at a mis-sized pool, most by pool-exhaustion abort, and they too
 recover: at the geometry-correct pool, five of the group's six cap-and-workload
-coordinates complete 90 to 100 percent of their runs; the exception is r300 at
+coordinates complete 90 to 100 percent of their runs; the exception is s300 at
 2048\,MB, whose free-running demand of about 2.8 million tuples per second sits
-above the drain ceiling, and even the best pool recovers only 5 of 8 there, the
-heap arm none.
+above the storage-bandwidth ceiling, and even the best pool recovers only 5 of 8 there, the
+heap configuration none.
 The extra stressor on this second group is the fast-ingest valley: their ingest
 out-runs the drain even though the state fits.
+
 Calling either group a capacity death would therefore be wrong: both recover at
 the geometry-correct pool, so both are pool-geometry effects that
 Section~\ref{sec:rq3} resolves; they differ only in ingest rate, the heavy pair
-below the drain ceiling and the larger group above it.
+below the storage-bandwidth ceiling and the larger group above it.
 The race law governs the opposite edge: once $\rho > 1$, no cell whose demand
-exceeds the drain ceiling survives, because ingest outruns the drain.
+exceeds the storage-bandwidth ceiling survives, because ingest outruns the drain.
 
 \FloatBarrier
 \FloatBarrier
@@ -731,7 +736,7 @@ Every Nexmark figure in this chapter carries a short pointer back to this note i
 Each query runs across three state scenarios, A, B, and C, that grow the per-window state by widening the window: A is the smallest, C the largest.
 Each memory cap pairs one scenario the in-memory engine can hold with one that stresses it: A and B under the 512\,MB cap, B and C under the 1024\,MB cap.
 Only the largest scenario at the larger cap, C at 1024\,MB, drives the window state past what the in-memory engine can fit; that single cell is the beyond-memory point, the coordinate where only \ac{OOC} processing completes the workload.
-Each cell runs three arms at eight repetitions: the capped in-memory engine, the bounded pooled backend (B2: 15\% pool reserve, paced restore, soft and hard thresholds at one tenth and one fifth of the cap), and the heap \ac{OOC} backend (U8).
+Each cell runs three configurations at eight repetitions: the capped in-memory engine, the bounded pooled backend (B2: 15\% pool reserve, paced restore, soft and hard thresholds at one tenth and one fifth of the cap), and the heap \ac{OOC} backend (U8).
 The purpose is external validity.
 The synthetic grid is one stream shape, tuned with out-of-order jitter; a canonical benchmark with a different schema, hot-skewed auction popularity, and an in-order event stream tests whether the result holds beyond the conditions it was measured under.
 The bounded backend completes this workload where the capped in-memory engine cannot: 8 of 8 and 7 of 8 versus 0 of 8 ($p = 7.8 \times 10^{-5}$ and $7.0 \times 10^{-4}$).
@@ -747,25 +752,26 @@ across scenarios and caps for queries q3 and q7. Bars are completion fraction
 bounded \ac{OOC} backend, and the heap \ac{OOC} backend. The in-memory
 engine fits scenarios A and B and fails only at the beyond-memory point C at
 1024\,MB, where the bounded backend completes (8/8 and 7/8 versus 0/8). Where the
-state fits in memory, the fixed threshold can still force the \ac{OOC} arms to
+state fits in memory, the fixed threshold can still force the \ac{OOC} configurations to
 over-spill and fail; the starkest case is scenario B at 512\,MB for q7, where both
-arms complete 0/8.\nexmarknote}
+configurations complete 0/8.\nexmarknote}
 \label{fig:nexmark-sweep}
 \end{figure}
 
 % [7.2.8b] The fits-cell collapse, and why q7 tips fully over while q3 survives.
-The same figure shows the \ac{OOC} arms collapsing at a cell where the
+The same figure shows the \ac{OOC} configurations collapsing at a cell where the
 in-memory engine is comfortable, most starkly at scenario B under the 512\,MB
 cap for q7: the capped in-memory engine completes 8 of 8, yet both \ac{OOC}
-arms complete 0 of 8.
+configurations complete 0 of 8.
 This cell is a fits cell, not a beyond-memory one.
 Its state fits in 512\,MB, so the in-memory engine never struggles, but the
 fixed cap-derived spill threshold, soft at one tenth of the cap, forces the
-\ac{OOC} arms to spill anyway.
-At the tight 512\,MB cap that over-spilling drives each arm into a different
-wall: the pooled arm's small pool, about 125\,MB at this cap, exhausts and
-aborts (buffer-pool exhaustion, exit code 141), while the heap arm's unpooled
+\ac{OOC} configurations to spill anyway.
+At the tight 512\,MB cap that over-spilling drives each configuration into a different
+wall: the pooled configuration's small pool, about 125\,MB at this cap, exhausts and
+aborts (buffer-pool exhaustion, exit code 141), while the heap configuration's unpooled
 buffers break the cap and are OOM killed (exit code 137).
+
 On q3 the same cell sits on a knife edge rather than over it, a few repetitions
 surviving (bounded 5 of 8, heap 1 of 8); on q7 none do.
 The gap is not the aggregate function: a maximum and a sum each keep one
@@ -776,13 +782,13 @@ It does not touch the headline, which is the one true beyond-memory coordinate,
 C at 1024\,MB, where the in-memory engine genuinely cannot fit (0 of 8) and the
 bounded backend completes (q7 7 of 8, q3 8 of 8).
 
-% [7.2.8c] The two OOC arms are not interchangeable; the trade-off flips across the sweep.
-The two \ac{OOC} arms are not interchangeable, and the trade-off between them changes sign across the sweep.
-On the fitting cells that over-spill but keep memory headroom under the cap --- scenario A at 512\,MB and scenario B at 1024\,MB --- the heap arm rides the gratuitous spilling out and completes every run (8 of 8 on all four query--cell combinations), while the bounded arm is throttled by its own fixed pool (125\,MB at the 512\,MB cap, 375\,MB at 1024\,MB): the spill-and-restore churn saturates the pool and drops the arm to between 2 and 6 of 8, most sharply at q3 scenario B under 1024\,MB (2 of 8 against the heap arm's 8 of 8).
-Here the pool is a liability and heap allocation is the better architecture.
-At the one tight fitting cell, scenario B at 512\,MB, the same over-spilling turns fatal for both arms but through different walls, as above: the bounded pool exhausts and aborts (exit code 141) while the heap buffers break the cap and are OOM killed (exit code 137).
-The ordering then reverses at the one genuine beyond-memory coordinate, C at 1024\,MB, where the in-memory engine cannot fit (0 of 8) and spilling is no longer gratuitous but required: the bounded arm's backpressure and paced restore hold total memory under the cap and it completes most reliably (q3 8 of 8, q7 7 of 8), while the heap arm's unbounded restore intermittently crosses the cap and is OOM killed, completing only 6 of 8 and 3 of 8.
-This is the coordinate the backend exists for, and only the bounded architecture delivers it dependably.
+% [7.2.8c] The two OOC configurations are not interchangeable; the trade-off flips across the sweep.
+The two \ac{OOC} configurations are not interchangeable, and the trade-off between them changes sign across the sweep.
+On the fitting cells that over-spill but keep memory headroom under the cap --- scenario A at 512\,MB and scenario B at 1024\,MB --- the heap configuration rides the gratuitous spilling out and completes every run (8 of 8 on all four query--cell combinations), while the bounded configuration is throttled by its own fixed pool (125\,MB at the 512\,MB cap, 375\,MB at 1024\,MB): the spill-and-restore churn saturates the pool and drops the configuration to between 2 and 6 of 8, most sharply at q3 scenario B under 1024\,MB (2 of 8 against the heap configuration's 8 of 8).
+Here the pool is a liability and heap allocation is the better choice.
+At the one tight fitting cell, scenario B at 512\,MB, the same over-spilling turns fatal for both configurations but through different walls, as above: the bounded pool exhausts and aborts (exit code 141) while the heap buffers break the cap and are OOM killed (exit code 137).
+The ordering then reverses at the one genuine beyond-memory coordinate, C at 1024\,MB, where the in-memory engine cannot fit (0 of 8) and spilling is no longer gratuitous but required: the bounded configuration's backpressure and paced restore hold total memory under the cap and it completes most reliably (q3 8 of 8, q7 7 of 8), while the heap configuration's unbounded restore intermittently crosses the cap and is OOM killed, completing only 6 of 8 and 3 of 8.
+This is the coordinate the backend exists for, and only the pooled configuration delivers it dependably.
 
 % [7.2.9]
 The same run tests the failure model outside its training data.
@@ -795,17 +801,18 @@ The transfer has a real cost.
 In-order streams pay the full spill-and-restore round trip; the out-of-order jitter of the synthetic grid masked this cost, because hot slices never spilled there.
 With the pre-committed cap-derived threshold, fitting workloads over-spill and lose 42--61\% throughput for no benefit.
 The winning cell pays 50--63\% against the unlimited reference.
-The two arms price their spilling differently.
-On the repetitions they complete, the heap arm is the cheaper of the two at six of the seven cells where both produce a measurement, by 2 to 12 percentage points, because it skips the pool bookkeeping, backpressure, and paced restore that the bounded arm carries; the bounded arm is cheaper only at q3 scenario B under 1024\,MB.
-The bounded arm therefore pays a throughput premium for exactly the memory discipline that keeps it alive at the beyond-memory point, and there the heap arm's lower cost is partly survivor bias, measured over only the 6 and 3 heap repetitions that finished rather than the bounded arm's 8 and 7.
+The two configurations price their spilling differently.
+On the repetitions they complete, the heap configuration is the cheaper of the two at six of the seven cells where both produce a measurement, by 2 to 12 percentage points, because it skips the pool bookkeeping, backpressure, and paced restore that the bounded configuration carries; the bounded configuration is cheaper only at q3 scenario B under 1024\,MB.
+The bounded configuration therefore pays a throughput premium for exactly the memory discipline that keeps it alive at the beyond-memory point, and there the heap configuration's lower cost is partly survivor bias, measured over only the 6 and 3 heap repetitions that finished rather than the bounded configuration's 8 and 7.
 A state-aware spill threshold would remove the over-spilling; it is documented future work and was deliberately not tuned on the evaluation workloads.
+The cost also deserves its scale: at the beyond-memory point the backend retains roughly half the throughput of an engine with unlimited memory while spilling through a consumer SD card, and it does so on a workload the capped in-memory engine cannot finish at all.
 Figure~\ref{fig:nexmark-cost} quantifies the cost: every \ac{OOC} point runs below the uncapped reference, deepest on the fitting scenarios that over-spill under the fixed threshold.
 
 \begin{figure}[ht]
 \centering
 \widefig{img/fig_nexmark_cost.pdf}
 \caption[Nexmark throughput cost]{Nexmark throughput cost: median throughput of
-each \ac{OOC} arm (bounded B2, heap U8) relative to the uncapped reference
+each \ac{OOC} configuration (bounded B2, heap U8) relative to the uncapped reference
 for the same scenario, per query. In-order streams pay the full spill-and-restore
 round trip, and the fixed cap-derived spill threshold over-spills the fitting
 scenarios for no benefit; the winning beyond-memory cell (C at 1024\,MB) pays
@@ -815,14 +822,14 @@ scenarios for no benefit; the winning beyond-memory cell (C at 1024\,MB) pays
 
 % [7.2.11] --- answer to RQ1
 In answer to RQ1: the backend prevents the OOM failure the capped in-memory engine suffers, but within a characterized window rather than unconditionally.
-Which architecture holds that window depends on the memory budget --- the heap architecture reaches the highest state pressures, where a small pool suffices, while the bounded architecture holds the fitting and moderately beyond-memory workloads and keeps the footprint guarantee --- and the two-sided pool geometry and the ingest-drain race (Sections~\ref{sec:rq1-geometry} and~\ref{sec:rq1-race}) bound that window, which Table~\ref{tab:windows} states per cap.
+Which allocation type holds that window depends on the memory budget --- the heap configuration reaches the highest state pressures, where a small pool suffices, while the pooled configuration holds the fitting and moderately beyond-memory workloads and keeps the footprint guarantee --- and the two-sided pool geometry and the ingest-drain race (Sections~\ref{sec:rq1-geometry} and~\ref{sec:rq1-race}) bound that window, which Table~\ref{tab:windows} states per cap.
 The result transfers beyond the synthetic grid: on a realistic Nexmark bid stream at its one beyond-memory coordinate, the bounded backend completes where the in-memory engine cannot (Figure~\ref{fig:nexmark-sweep}).
 
 \section{Cost (RQ2)\label{sec:rq2}}
 
 RQ2 asks what the backend costs in throughput and tail latency, and what spilling and restoring state cost on their own.
-This section answers it in three moves: the throughput penalty where both architectures complete, the tail-latency penalty that the spill-restore round trip adds once state is evicted, and the resident footprint the bounded architecture trades for that cost.
-All headline comparisons use matched I/O granularity --- about 8{,}000-byte buffers in every variant, including the in-memory reference --- so that each contrast measures the architecture and not the buffer size; the granularity finding below justifies the choice.
+This section answers it in three moves: the throughput penalty where both allocation types complete, the tail-latency penalty that the spill-restore round trip adds once state is evicted, and the resident footprint the pooled configuration trades for that cost.
+All headline comparisons use matched I/O granularity --- about 8{,}000-byte buffers in every variant, including the in-memory reference --- so that each contrast measures the allocation choice and not the buffer size; the granularity finding below justifies the choice.
 
 % [7.3.1] + [7.3.2] --- throughput cost
 Throughput is the first cost (Figure~\ref{fig:cost}(a)).
@@ -831,7 +838,7 @@ At matched granularity, \ac{OOC} processing costs 11--15\% throughput where both
 % [7.3.4] + [7.3.3] + [7.3.7] --- tail-latency cost, confound separated
 Tail latency is the second cost (Figure~\ref{fig:cost}(b)), and it must be read with care, because a naive comparison overstates it.
 At matched granularity the \ac{OOC} 99th percentile is 1.1 to 1.6 times the in-memory engine, where earlier comparisons showed a 2--5$\times$ gap.
-That gap was the buffer granularity, not the architecture: per-task latency scales with buffer size in every variant, including the in-memory engine.
+That gap was the buffer granularity, not the allocation type: per-task latency scales with buffer size in every variant, including the in-memory engine.
 What remains once granularity is matched is the spill-restore round trip itself, and it surfaces in the tail.
 Under unbounded allocation, tail latency grows into milliseconds at ten-million-entry working sets; matched granularity cuts it sharply, so that at the heaviest workload the 99th-percentile latency falls from 2509 to 899 microseconds while throughput rises 36\%.
 Spill and restore latencies are distributions, not single numbers: their effect shows in the latency tail rather than in mean throughput, which is why the tables report both quantities.
@@ -844,8 +851,8 @@ The shipped default loses at every tested cell.
 This is an actionable finding for the engine itself, independent of \ac{OOC} processing.
 
 % [7.3.6]
-The bounded architecture's footprint advantage is confirmed at matched granularity (Figure~\ref{fig:cost}(c)).
-It uses 33\% less anonymous memory than the in-memory engine (924 versus 1388\,MB) at this cell (2048/r200).
+The pooled configuration's footprint advantage is confirmed at matched granularity (Figure~\ref{fig:cost}(c)).
+It uses 33\% less anonymous memory than the in-memory engine (924 versus 1388\,MB) at this cell (2048/s200).
 It uses 27\% less than heap-allocated \ac{OOC} at the same cell.
 This 33\% is the widest of several footprint margins over the in-memory engine, not a single global figure: the advantage is 14--22\% across identical completing workloads and 25\% at the throughput-parity cell where speed also matches (517 versus 685\,MB), both reported in Section~\ref{sec:rq3}, and it grows as the pool shrinks.
 
@@ -856,10 +863,10 @@ This 33\% is the widest of several footprint margins over the in-memory engine, 
 at matched I/O granularity ($\sim$8\,K buffers in every variant, same pool per
 coordinate; means over completing repetitions), in three panels: (a) throughput,
 (b) tail latency, (c) resident footprint, each relative to the in-memory
-reference. Panel (a): the heap $-28\%$ at 512/r075 is the stated outlier on
+reference. Panel (a): the heap $-28\%$ at 512/s75 is the stated outlier on
 3--4\,s cells and is reported as measured. Panel (c): the bounded
-architecture's footprint advantage, $-33\%$ versus the in-memory engine at
-2048/r200 (924 vs 1388\,MB).\methodsnote}
+configuration's footprint advantage, $-33\%$ versus the in-memory engine at
+2048/s200 (924 vs 1388\,MB).\methodsnote}
 \label{fig:cost}
 \end{figure}
 
@@ -877,9 +884,9 @@ Table~\ref{tab:cost} summarizes the bands.
 \hline
 Matched granularity ($\sim$8\,K all variants) & $-11$ to $-15\%$ & 1.1--1.6$\times$ & 3 coordinates \\
 \hline
-Default architecture (own 4096 baselines) & $-3$ to $-22\%$ & $\mu$s $\to$ ms at $10^7$ keys & 6 coordinates \\
+Default configuration (own 4096 baselines) & $-3$ to $-22\%$ & $\mu$s $\to$ ms at $10^7$ keys & 6 coordinates \\
 \hline
-Bounded vs in-memory, anonymous-memory footprint & $-33\%$ (924 vs 1388\,MB) & --- & 2048/r200 \\
+Bounded vs in-memory, anonymous-memory footprint & $-33\%$ (924 vs 1388\,MB) & --- & 2048/s200 \\
 \hline
 Nexmark transfer (in-order, supporting) & $-50$ to $-63\%$ & --- & Nexmark C@1024 \\
 \hline
@@ -891,8 +898,8 @@ no latency dimension, and the Nexmark transfer is a throughput contrast only.}
 \end{table}
 
 % [7.3.9] --- answer to RQ2
-In answer to RQ2: at matched granularity the backend costs 11--15\% throughput where both architectures complete, at a 99th-percentile task latency 1.1 to 1.6 times the in-memory engine.
-Spilling and restoring state cost almost nothing in mean throughput --- their price is paid in the tail, where the round trip drives the unbounded default into milliseconds at ten-million-entry sets --- and the bounded architecture buys back a 33\% smaller resident footprint against that cost.
+In answer to RQ2: at matched granularity the backend costs 11--15\% throughput where both allocation types complete, at a 99th-percentile task latency 1.1 to 1.6 times the in-memory engine.
+Spilling and restoring state cost almost nothing in mean throughput --- their price is paid in the tail, where the round trip drives the unbounded default into milliseconds at ten-million-entry sets --- and the pooled configuration buys back a 33\% smaller resident footprint against that cost.
 
 \section{Processor and Disk Utilization (RQ4)\label{sec:rq4}}
 
@@ -901,7 +908,7 @@ This section follows that evolution along the state-pressure axis --- from workl
 
 % [7.4.1] --- measurement basis and the in-memory baseline
 All utilization figures here are the mean over the whole run.
-The whole run includes the one-off Nautilus query-compilation phase at startup --- NebulaStream's \ac{JIT} query compiler (Section~\ref{sec:architecture}) --- which is single-threaded and pays a fixed cost regardless of the workload.
+The whole run includes the one-off query-compilation phase at startup, which is single-threaded and pays a fixed cost regardless of the workload.
 On short in-memory runs (two to fifteen seconds) that fixed cost holds mean utilization just below full, so the in-memory engine runs at 84--97\%, lowest on the shortest cells; on long runs it amortizes away and utilization reaches about 99.6\%.
 The in-memory engine has zero disk traffic.
 
@@ -913,7 +920,7 @@ Beyond the boundary the spilled state outgrows the page cache, and every spillin
 % [7.4.1c] --- two mechanisms pull the processor below full
 The lower figures in Figure~\ref{fig:cpu-io}(a) are genuine idle, not the compilation cost, and two mechanisms produce them.
 One is disk wait: the bottom of that range is the throttled regime --- demand exceeds the pool, but the cap throttles ingest instead of the run deadlocking (regime two of the three-regime feasibility law, Section~\ref{sec:rq3}) --- at 62\% utilization with heavy traffic in both directions (278\,MB read, 525\,MB written), the workload disk-bound.
-The other is pool backpressure, in the bounded arm: the largest probed pool at each cap yields the coolest cells of its panel --- 31\% for r75 at 512\,MB (24k buffers), 64\% for r100 at 1024\,MB (48k), 54\% for r700 at 2048\,MB (96k) --- with near-zero device reads and runtimes stretched up to threefold over smaller pools on the same workload, the up-front reservation squeezing the ingest headroom (the mechanism of Section~\ref{sec:rq1-windows}).
+The other is pool backpressure, in the bounded configuration: the largest probed pool at each cap yields the coolest cells of its panel --- 31\% for s75 at 512\,MB (24k buffers), 64\% for s100 at 1024\,MB (48k), 54\% for b700 at 2048\,MB (96k) --- with near-zero device reads and runtimes stretched up to threefold over smaller pools on the same workload, the up-front reservation squeezing the ingest headroom (the mechanism of Section~\ref{sec:rq1-windows}).
 
 % [7.4.2]
 Disk read and write volumes scale with the spilled state volume (Figure~\ref{fig:cpu-io}(b)).
@@ -932,7 +939,7 @@ cgroup CPU and I/O accounting, medians per cell). (a) CPU utilization; the
 plot itself annotates the one-off compilation-phase effect on short runs.
 Completing spilling cells beyond the memory boundary run at 62--87\% with
 write-dominated traffic; the low points (31--64\%) are genuine idle — disk wait
-in the throttled regime, pool backpressure in the bounded arm's largest-pool
+in the throttled regime, pool backpressure in the bounded configuration's largest-pool
 cells — not that compilation cost. (b) Disk read/write volume
 for spilling cells.\methodsnote}
 \label{fig:cpu-io}
@@ -966,7 +973,7 @@ Write amplification is measured at device level: disk bytes written divided by s
 This is a device-level proxy, not RocksDB's internal counter; the internal counter was not captured uniformly.
 
 % [7.5.4b] On-disk spill volume (panel b).
-The on-disk spill volume itself is a property of the workload and its compression, not of the architecture: where both architectures complete the same cell their spill directories are the same size, so the heap and bounded markers coincide in Figure~\ref{fig:composition}(b).
+The on-disk spill volume itself is a property of the workload and its compression, not of the allocation type: where both allocation types complete the same cell their spill directories are the same size, so the heap and bounded markers coincide in Figure~\ref{fig:composition}(b).
 Heap contributes fewer points there because the bounded campaign probed more pool and cap coordinates, and heap loses the high-pressure cells to the completion race of Section~\ref{sec:rq1-race}.
 
 % [7.5.5]
@@ -989,12 +996,12 @@ The efficiency reported here is therefore what the shipped layout already achiev
 \widefig{img/fig_composition.pdf}
 \caption[Composition of the state footprint]{Composition of the state
 footprint. (a) Stacked decomposition of hash-map state bytes from the per-map
-gauge census (r150 workload, $\approx$996 destructed maps, $\approx$25.9 million
+gauge census (s150 workload, $\approx$996 destructed maps, $\approx$25.9 million
 entries) into entry headers, payload, bucket directory, and page slack; the
 annotation on the bar marks the share recoverable by dropping the unused 8-byte
 vtable pointer from each header. (b) On-disk spill-directory size (lz4) of
 completing spilling cells against state pressure $\rho$, one marker per cell:
-squares for the bounded architecture, circles for heap (drawn on top with a white
+squares for the pooled configuration, circles for heap (drawn on top with a white
 edge for legibility). The composition shares, the recoverable overhead, and the
 heap/bounded agreement are interpreted in Section~\ref{sec:rq5}.\methodsnote}
 \label{fig:composition}
@@ -1003,7 +1010,7 @@ heap/bounded agreement are interpreted in Section~\ref{sec:rq5}.\methodsnote}
 \section{Memory Behavior and Stability (RQ3)\label{sec:rq3}}
 
 RQ3 asks how memory behaves as state grows past the cap, and why the remaining failures happen.
-This section is the investigation that answered both: it produced the architecture finding (C4) and the failure taxonomy (C5).
+This section is the investigation that answered both: it produced the allocation finding (C4) and the failure taxonomy (C5).
 It is told in investigation order, and every step was pre-registered before its runs.
 
 % [7.6a]
@@ -1032,21 +1039,21 @@ The pool the levers defended contained no window state.
 The floor conclusion was retracted.
 
 % [7.6e]
-One flag (buffer size 8192) engages the intended architecture.
+One flag (buffer size 8192) engages the intended memory configuration.
 The decisive cell then reads as a ladder.
 The baseline completes 0 of 10.
-(A further arm, matched granularity without pooling, recovers 3 of 8; it appears as the second rung of Figure~\ref{fig:ladder} and is treated in Section~\ref{sec:disambiguation}.)
+(A further configuration, matched granularity without pooling, recovers 3 of 8; it appears as the second rung of Figure~\ref{fig:ladder} and is treated in Section~\ref{sec:disambiguation}.)
 Levers without pooling complete 0 of 16.
 Pooling without levers completes 0 of 8.
 Pooling with the reserve lever (Lever 1a) completes 5 of 8.
 Pooling with the reserve lever and paced restore (Lever 1c) completes 7 of 8; within pooling, the levers carry the cell from 0 of 8 to 7 of 8 ($p = 7.0 \times 10^{-4}$).
-Taken together, the pooled lever arms complete 12 of 16 where levers without pooling complete 0 of 16 ($p = 8.1 \times 10^{-6}$).
+Taken together, the pooled lever configurations complete 12 of 16 where levers without pooling complete 0 of 16 ($p = 8.1 \times 10^{-6}$).
 
 \begin{figure}[ht]
 \centering
 \widefig{img/fig_ladder.pdf}
 \caption[The attribution ladder]{The attribution ladder at the decisive cell
-(1024\,MB / 32k pool / r150). Each arm changes exactly one factor:
+(1024\,MB / 32k pool / s150). Each configuration changes exactly one factor:
 buffer granularity alone --- 8128-byte buffers, just under the 8192-byte page,
 so map pages stay on the heap (Section~\ref{sec:disambiguation}) --- recovers 3/8;
 pooling without levers recovers
@@ -1062,8 +1069,8 @@ Its 99th-percentile latency is 2.2 times higher.
 
 % [7.6g]
 Pooling helps elsewhere independently of the levers.
-A blocked allocation throttles ingest to the drain rate at one cell, and every pooled arm tested there recovers it, lever-off and lever-on alike.
-Combining all three pooled arms (no levers, and the two lever configurations above) against the single heap-architecture baseline, the cell rises from 3 of 10 to 23 of 24 ($p = 1.6 \times 10^{-4}$).
+A blocked allocation throttles ingest to the drain rate at one cell, and every pooled configuration tested there recovers it, lever-off and lever-on alike.
+Combining all three pooled configurations (no levers, and the two lever configurations above) against the single heap baseline, the cell rises from 3 of 10 to 23 of 24 ($p = 1.6 \times 10^{-4}$).
 
 % [7.6h]
 Pooling rewrites the sizing rules.
@@ -1094,7 +1101,7 @@ The pool does not distinguish the workers that fill it from the ones that would 
 \centering
 \widefig{img/fig_gridlock.pdf}
 \caption[Anatomy of the allocation deadlock]{Anatomy of the allocation
-deadlock at a failing backpressure cell (1024\,MB / 32k pool / r200, all
+deadlock at a failing backpressure cell (1024\,MB / 32k pool / s200, all
 eight repetitions die by allocation abort). The deadlock is this: the emitted
 state pins the pool, and the workers that would drain it are all blocked
 allocating. (a) The 0.2-second memory sampler of one repetition: the working
@@ -1112,14 +1119,22 @@ The results compose into a three-regime feasibility law (Figure~\ref{fig:regimes
 Regime one: the demand fits the pool; the run completes at full speed.
 Regime two: the demand exceeds the pool, but the memory cap throttles ingest; the run completes at reduced speed.
 Regime three: the demand exceeds the pool and ingest is unconstrained; the run deadlocks.
-One workload shows the law directly: its three pooled-lever arms (above) combine to complete 23 of 24 at cap 512\,MB, while a single run of the baseline pooled campaign dies 0 of 8 at cap 1024\,MB with twice the pool.
+One workload shows the law directly: its three pooled-lever configurations (above) combine to complete 23 of 24 at cap 512\,MB, while a single run of the baseline pooled campaign dies 0 of 8 at cap 1024\,MB with twice the pool.
+
+% [7.6l-bis — mechanism hypothesis behind regime two; explicitly unmeasured (advisor note).]
+How regime two's throttling arises inside the engine is not directly measured, and the following is therefore a hypothesis, not a finding.
+The plausible chain runs through the source admission queue.
+When buffers stop returning fast enough, the admission queue fills; a source that finds it full is blocked, and its thread sleeps.
+Sleeping sources inject fewer tuples per unit of time, which is exactly the reduced ingest the throttled regime shows.
+Contention adds a second, non-linear component: memory pressure does not grow linearly with ingest, because input data keeps being loaded into memory while the spilled state waiting on disk is not yet read back.
+None of this per-thread scheduling is captured by the six probes, so the chain cannot be confirmed from the recorded data; measuring it would need scheduler-level instrumentation and is left as future work.
 
 \begin{figure}[ht]
 \centering
 \widefig{img/fig_regimes.pdf}
 \caption[The three-regime feasibility law]{The three-regime feasibility law.
-The same-workload contrast pair (stars) shows the law directly: r200's
-three pooled-lever arms combine to complete 23 of 24 under the tight
+The same-workload contrast pair (stars) shows the law directly: s200's
+three pooled-lever configurations combine to complete 23 of 24 under the tight
 512\,MB cap, whose backpressure throttles ingest to the drain rate, while a
 single run of the baseline pooled campaign dies 0 of 8 under the loose
 1024\,MB cap with twice the pool, where unconstrained ingest pins the
@@ -1136,7 +1151,7 @@ Its progress guard ships as diagnostic instrumentation.
 The full-grid confirmation run closes three loops.
 The soft threshold must stay cap-derived; the pool-derived rule loses 8 of 8 to 3 of 8 at the decisive cell.
 A memory-corruption crash cluster appears at high-churn cells, only in cells that fail anyway; its root cause follows below.
-The two architectures' windows are complementary, and the allocation deadlock is the proven reason the pooled window cannot widen.
+The two allocation types' windows are complementary, and the allocation deadlock is the proven reason the pooled window cannot widen.
 A pool that reserved buffers for the drain side, which the fill side could not consume, is the single mechanism that would merge the two windows.
 
 \FloatBarrier
@@ -1144,20 +1159,20 @@ A pool that reserved buffers for the drain side, which the fill side could not c
 
 % [7.6o]
 The one-flag correction changes two things at once: the allocation type and the I/O buffer granularity.
-A dedicated arm separates them.
+A dedicated configuration separates them.
 A buffer size of 8128 bytes is 99.2\% of the page size but still below it: since a page is pooled only when it fits inside the buffer (Section~\ref{sec:integration}), maps stay on the heap at matched granularity.
 
 % [7.6p]
-The arm confirms the attributions where it matters.
-The $\rho \approx 2$ win at 512\,MB (r200) is caused by the allocation type: pooled 8 of 8, matched-granularity heap 0 of 8 ($p = 7.8 \times 10^{-5}$).
-The regression at one 512\,MB cell (r150 at the 16k pool, $\rho \approx 1.44$) is pooling's cost: heap keeps 7 of 8, pooled drops to 1 of 8.
+The configuration confirms the attributions where it matters.
+The $\rho \approx 2$ win at 512\,MB (s200) is caused by the allocation type: pooled 8 of 8, matched-granularity heap 0 of 8 ($p = 7.8 \times 10^{-5}$).
+The regression at one 512\,MB cell (s150 at the 16k pool, $\rho \approx 1.44$) is pooling's cost: heap keeps 7 of 8, pooled drops to 1 of 8.
 The territory at the highest tested pressures therefore belongs to heap allocation.
 The lever effect stands unchanged within fixed granularity (0 of 8 to 7 of 8, $p = 7.0 \times 10^{-4}$).
 
 % [7.6q]
 One attribution remains mixed.
 At the decisive cell, granularity alone recovers 3 of 8 from 0 of 10 ($p = 0.069$).
-Pooling with levers reaches 11 of 16 in the confirmation runs (4 of 8 and 7 of 8); the original lever arms of Figure~\ref{fig:ladder} reach 12 of 16.
+Pooling with levers reaches 11 of 16 in the confirmation runs (4 of 8 and 7 of 8); the original lever configurations of Figure~\ref{fig:ladder} reach 12 of 16.
 The pairwise edge over matched-granularity heap is directionally positive but not separable at this sample size ($p = 0.15$).
 The five-point ladder is reported in full: 0/10, 3/8, 0/8, 5/8, 7/8.
 
@@ -1167,7 +1182,7 @@ The five-point ladder is reported in full: 0/10, 3/8, 0/8, 5/8, 7/8.
 % [7.6r]
 The initial all-zero bounded column at 2048\,MB was pool geometry, not the deadlock.
 The tested pools bracketed the working range and missed it.
-The untested point at 39\% of the cap completes r200 through r700.
+The untested point at 39\% of the cap completes s200 through b700.
 
 % [7.6s]
 The geometry rule transplants across caps until the base footprint forbids it.
@@ -1179,7 +1194,7 @@ This is the two-sided law in its final form.
 The fast-ingest valley recurs at every cap and pool.
 Survivors complete below roughly 2.5 million tuples per second of ingest.
 Sprinters above roughly 2.7 million die.
-The race model's signature appears nine times across three caps and both architectures.
+The race model's signature appears nine times across three caps and both allocation types.
 
 % [7.6u]
 The crash cluster is root-caused with sanitizer instrumentation.
@@ -1251,25 +1266,25 @@ It is a single-variable contrast: the write buffer and block cache move together
 The hypotheses were pre-registered before the runs: the larger configuration wins at 1024 and 2048\,MB (H1), loses at the 512\,MB floor (H2), and does so by writing about a third fewer bytes to the device (H3).
 The contrast spans 1{,}938 paired cells.
 
-% [RB32-2] The effect is architecture-gated, not cap-gated.
+% [RB32-2] The effect follows the allocation choice, not the cap.
 The result refutes the pre-registration in an informative way.
-The effect is gated by the memory architecture of Section~\ref{sec:rq3}, not by the cap alone.
+The effect follows the allocation choice of Section~\ref{sec:rq3}, not the cap alone.
 At the tight 512\,MB cap the sign of the effect follows where the window-map pages live (Figure~\ref{fig:rb32-arch}).
 Where they live in the buffer pool, the larger configuration helps: the pooled grid W\_ gains 15 percentage points and the pooled lever grid N\_ gains 33 (McNemar $p = 0.002$ and $p < 0.001$).
 Where they live on the heap, it hurts: the matched-granularity heap control U\_ loses 38 points ($p < 0.001$).
-H2 is therefore refuted for the pooled store it was meant to describe and holds only for the heap arms, where the larger buffer is pure fixed overhead.
+H2 is therefore refuted for the pooled store it was meant to describe and holds only for the heap configurations, where the larger buffer is pure fixed overhead.
 
 \begin{figure}[ht]
 \centering
 \includegraphics[width=0.6\textwidth]{img/fig_rb32_architecture.pdf}
-\caption[Backend-size effect on completion, by architecture]{The backend-size
-effect on completion, split by memory architecture, shown at the tight 512\,MB cap. Change in
+\caption[Backend-size effect on completion, by allocation type]{The backend-size
+effect on completion, split by memory configuration, shown at the tight 512\,MB cap. Change in
 completion when the RocksDB write buffer and block cache move from 16/8 to
 32/32, per campaign, paired by cell. The pooled grids, W\_ (the baseline pooled
-architecture) and N\_ (the pooled architecture with pool-pressure levers
-enabled), gain; the heap arms, U\_ (the matched-granularity heap control) and
-L\_ (the default-granularity heap arm), do not. Because both 32/32 arms ran in
-one session and both 16/8 arms in another, the sign flip is a difference of
+allocation) and N\_ (the pooled configuration with pool-pressure levers
+enabled), gain; the heap configurations, U\_ (the matched-granularity heap control) and
+L\_ (the default-granularity heap configuration), do not. Because both 32/32 configurations ran in
+one session and both 16/8 configurations in another, the sign flip is a difference of
 differences, so the between-session drift that confounds the absolute numbers
 cancels in the contrast. Full per-campaign, per-cap numbers are in
 \hyperref[app:rocksdb-tables]{Appendix~E.6}.}
@@ -1280,14 +1295,14 @@ cancels in the contrast. Full per-campaign, per-cap numbers are in
 With headroom the larger configuration is a wash.
 In the pooled grid it gains 4 points at 1024\,MB and 0 at 2048\,MB, neither significant, so H1 is not supported.
 The 512\,MB pooled advantage needs a caveat of its own.
-Its two arms ran eleven days apart in separate sessions, and between-session throughput drift is a known confound (Section~\ref{sec:threats}).
+Its two configurations ran eleven days apart in separate sessions, and between-session throughput drift is a known confound (Section~\ref{sec:threats}).
 A same-session control re-ran the 512\,MB pooled grid with both configurations interleaved on one freshly formatted card ($n = 80$).
 It places 32/32 at 40\% completion against 32\% for 16/8: the same direction as the cross-session figure, but not individually significant (McNemar $p = 0.21$).
 The cross-session $+15\%$ is therefore reported as a consistent directional trend, not a significant single-cap win.
 
 % [RB32-4] What survives the drift: the contrast itself and the footprint mechanism.
 Two findings are robust to the drift.
-The architecture sign-flip is a difference of differences, so the session drift cancels in the pooled-versus-heap contrast.
+The allocation sign-flip is a difference of differences, so the session drift cancels in the pooled-versus-heap contrast.
 And the memory footprint is stable across sessions: median peak anonymous memory shifts by under one percent while only throughput drifts.
 Figure~\ref{fig:rb32-compartments} decomposes that footprint into the pool floor, the unpooled bucket directories, the RocksDB resident set, and the base --- the residual holding everything else resident, the engine and runtime baseline plus the working set the gauges do not attribute (emission and in-flight buffers, slice-store bookkeeping, allocator retention).
 The RocksDB compartment is small at every cap; the pool floor and the base dominate the budget, the base being the largest compartment in the completing runs.
@@ -1308,7 +1323,7 @@ UINT64 schema, so it contributes nothing here. The \emph{RocksDB} compartment
 is the backend's own resident set; the \emph{base} is the residual, the peak
 resident anonymous memory left once the pool floor, the unpooled directories, and
 the RocksDB set are subtracted. It is not a fixed floor: it holds the engine and
-runtime baseline (resident code, thread stacks, the Nautilus and query-operator
+runtime baseline (resident code, thread stacks, the compiler and query-operator
 scaffolding, tens of MB on a release build) together with all resident working
 memory the three gauges do not attribute --- the emission pipeline and in-flight
 buffers, per-window slice-store bookkeeping, RocksDB working memory beyond its
@@ -1328,23 +1343,23 @@ A byte-level gain measured on \texttt{db\_bench} in isolation does not predict t
 
 % [RB32-6] Method and error policy.
 The analysis is paired throughout.
-Each 32/32 cell is matched to its 16/8 twin on cap, pool, state pressure, and arm, and completion is compared with McNemar's test on the discordant pairs; the unpaired Fisher's test of the pre-registration is underpowered at this pairing.
+Each 32/32 cell is matched to its 16/8 twin on cap, pool, state pressure, and configuration, and completion is compared with McNemar's test on the discordant pairs; the unpaired Fisher's test of the pre-registration is underpowered at this pairing.
 Cells that die by pool exhaustion or OOM kill are counted as failures, not dropped, so the completion fractions carry no survivorship bias.
-The full per-arm tables are in \hyperref[app:rocksdb-tables]{Appendix~E}.
+The full per-configuration tables are in \hyperref[app:rocksdb-tables]{Appendix~E}.
 
 % [7.6-answer] --- answer to RQ3
 In answer to RQ3: past the cap, memory behaves along a two-sided feasibility law --- the pool must hold the hot band or the run aborts, and the pool plus its overhead plus the base footprint must stay under the cap or the run is OOM-killed --- with completion additionally gated by the ingest-drain race once the pool is sized right.
 The remaining failures are therefore of three kinds: OOM kills where the footprint exceeds the cap, pool-exhaustion aborts where the pool is too small for the hot band, and a rare restore-path crash confined to cells already failing for a memory reason (Table~\ref{tab:outcomes}).
-The bounded architecture is the one that makes this corridor navigable, holding the footprint under the cap by recycling pages through the pool, and the backend-sizing contrast confirms the finding is robust to the RocksDB configuration (Section~\ref{sec:rb32}).
+The pooled configuration is the one that makes this corridor navigable, holding the footprint under the cap by recycling pages through the pool, and the backend-sizing contrast confirms the finding is robust to the RocksDB configuration (Section~\ref{sec:rb32}).
 
 \section{Summary of Results\label{sec:eval-summary}}
 
 % [7.7.1] Written-out summary, one short narrative per RQ, around the table.
 Every research question is answered.
-RQ0 asks how an \ac{OOC} backend can integrate into the push-based execution model, and it does, by construction: the spillable slice store sits behind the unchanged store interface and ran through about 3,100 measured runs without touching the \ac{JIT} pipeline.
+RQ0 asks how an \ac{OOC} backend can integrate into the push-based execution model, and it does, by construction: the spillable slice store sits behind the unchanged store interface and ran through about 3,100 measured runs without touching the query-compilation pipeline.
 RQ1 asks whether the backend prevents OOM failures beyond the budget, and it does inside a characterized window: at 512\,MB it completes 14 of 24 runs where the capped in-memory engine completes 0 of 18, and the output checksums match while spilling is active.
 RQ2 asks the cost, which is 11 to 15 percent throughput at matched granularity, with a 99th-percentile latency 1.1 to 1.6 times the in-memory engine.
-RQ3 asks how memory behaves as state grows and why failures happen, and its investigation is the deepest of the thesis: the attribution ladder carries the decisive cell from 0 of 10 to 7 of 8, pooled lever arms beat unpooled levers 12 of 16 against 0 of 16, and the residual failure is a diagnosed allocation deadlock, seen as no returned buffer in 118 of 138 stalls.
+RQ3 asks how memory behaves as state grows and why failures happen, and its investigation is the deepest of the thesis: the attribution ladder carries the decisive cell from 0 of 10 to 7 of 8, pooled lever configurations beat unpooled levers 12 of 16 against 0 of 16, and the residual failure is a diagnosed allocation deadlock, seen as no returned buffer in 118 of 138 stalls.
 RQ4 asks how processor and disk use evolve, and the throttled regime shows the signature clearly: 62 percent utilization, disk-bound.
 RQ5 asks how efficiently storage is used, and the state is header-heavy (51 percent) with a device-level write amplification of 1.0 to 1.8.
 Table~\ref{tab:verdicts} compresses these answers into one row per research question.
@@ -1384,8 +1399,8 @@ What is expected to transfer is the direction of the contrasts between configura
 The primary workloads are synthetic; this is in scope by design, and the Nexmark-style stream provides the transfer test.
 Between measurement sessions, throughput drifts 4--17\%; all key contrasts are therefore within-session.
 $\rho$ for the largest workloads is derived from in-memory footprints at 2048\,MB.
-Checksum coverage is partial: two workload points per architecture.
-The allocation-type versus granularity confound existed in early comparisons; the dedicated disambiguation arm resolved it (Section~\ref{sec:disambiguation}).
+Checksum coverage is partial: two workload points per allocation type.
+The allocation-type versus granularity confound existed in early comparisons; the dedicated disambiguation configuration resolved it (Section~\ref{sec:disambiguation}).
 Roughly a dozen corrupted cells are confined to already-failing regions and are root-caused (Section~\ref{sec:geometry-valley}).
 
 % [8.2]

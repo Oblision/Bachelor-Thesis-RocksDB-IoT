@@ -51,7 +51,7 @@ def main() -> None:
             ha="center", va="top", fontsize=8.6)
     ax.scatter([1.13], [0.60], c=style.GREEN, marker="*", s=190,
                edgecolors="black", linewidths=0.7, zorder=5)
-    ax.text(1.20, 0.60, "r200, cap 512 MB / 16k pool: 23/24 complete",
+    ax.text(1.20, 0.60, "s200, cap 512 MB / 16k pool: 23/24 complete",
             ha="left", va="center", fontsize=8.2)
 
     # ---- Regime 3 (bottom right) ----

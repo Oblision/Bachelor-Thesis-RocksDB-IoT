@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from matplotlib.colors import to_rgb
 
+import data
 import style
 
 CAPS = (512, 1024, 2048)
@@ -91,7 +92,7 @@ def dress_axes(ax, cols, ws, rho_mb, cap: int) -> None:
     ax.set_ylim(-0.5, len(ws) - 0.5)
     ax.set_xticks(range(len(cols)), cols, fontsize=7.5)
     ax.set_yticks(range(len(ws)),
-                  [f"$\\rho$ {rho_mb[int(w)] / cap:.2f}  (r{int(w)})" for w in ws],
+                  [f"$\\rho$ {rho_mb[int(w)] / cap:.2f}  ({data.wlabel(w)})" for w in ws],
                   fontsize=7.5)
     ax.set_title(f"cap {cap} MB")
     ax.grid(False)

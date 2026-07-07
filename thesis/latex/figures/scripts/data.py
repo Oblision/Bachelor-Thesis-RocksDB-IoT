@@ -137,3 +137,11 @@ def fisher_one_sided(ok_a: int, n_a: int, ok_b: int, n_b: int) -> float:
         p += (math.comb(successes, k) * math.comb(total - successes, draws - k)
               / math.comb(total, draws))
     return p
+
+
+def wlabel(w) -> str:
+    """Display name of a workload: s-family (sized against the 512 MB cap)
+    vs b-family (later big-state batch, own scale). Repository run labels
+    keep the original r prefix (s75 = r075)."""
+    n = int(w)
+    return f"{'s' if n <= 300 else 'b'}{n}"

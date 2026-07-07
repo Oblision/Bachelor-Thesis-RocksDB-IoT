@@ -202,7 +202,7 @@ def main() -> None:
     # its hot band needs a 96k pool too big for 1024 MB) is discussed in the text
     # and flagged as a short caption note, not annotated on the plot.
 
-    ax_b.set_xticks(x, [f"r{w}\n$\\rho$ {rho:.2f}" for _c, w, rho in coords],
+    ax_b.set_xticks(x, [f"{data.wlabel(w)}\n$\\rho$ {rho:.2f}" for _c, w, rho in coords],
                     fontsize=7.5)
     ax_b.set_ylim(0, 1.32)
     ax_b.set_yticks((0, 0.5, 1.0))

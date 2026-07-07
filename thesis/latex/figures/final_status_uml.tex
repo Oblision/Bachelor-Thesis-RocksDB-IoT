@@ -61,7 +61,7 @@
 \node[existing] (bufmgr) at (\cC,0)
   {BufferManager\\\footnotesize + \textcolor{blue!50!black}{availability query $\cdot$ pressure}\\\footnotesize \textcolor{blue!50!black}{listeners $\cdot$ recycle counter}};
 \node[hook] (chained) at (\cC,-3)
-  {ChainedHashMap pooling boundary\\\footnotesize\itshape pooled iff page size $\leq$ buffer size;\\\footnotesize\itshape 8192-flag = bounded architecture};
+  {ChainedHashMap pooling boundary\\\footnotesize\itshape pooled iff page size $\leq$ buffer size;\\\footnotesize\itshape 8192-flag = pooled configuration};
 \node[existing] (cache) at (\cC,-6.2)
   {Per-worker slice cache\\\footnotesize\itshape raw map pointers ---\\\footnotesize\itshape bypasses every spill fence};
 \node[newcomp] (gauges) at (\cC,-9.6)
@@ -100,7 +100,7 @@
       text width=19.6cm, inner sep=8pt, align=left,
       font=\sffamily\footnotesize] (future) at (\cB,-18.6)
   {\textbf{\textcolor{red!70!black}{Potential further improvements (Section~\ref{sec:future}, in order of precision)}}\\[3pt]
-   \textbf{F1} role-aware allocation: a drain-side reserve that build-path allocations cannot consume --- merges the two architectures' operating windows\\
+   \textbf{F1} role-aware allocation: a drain-side reserve that build-path allocations cannot consume --- merges the two allocation types' operating windows\\
    \textbf{F2} closed-loop ingest admission keyed to pool headroom --- replaces accidental throttling by the cap with a deliberate mechanism\\
    \textbf{F3} entry-header refactor: remove the unused virtual-dispatch pointer ($-$20\,\% state) and fix directory sizing on all map-creation paths\\
    \textbf{F4} exception-safe restore path in the spillable slice\\
@@ -124,7 +124,7 @@ Final status of the out-of-core subsystem with all mechanisms in place, and
 where the potential further improvements attach. Grey components are unchanged
 NebulaStream code; blue components were built in this thesis; the yellow box is
 the one-comparison pooling boundary whose engine default silently disabled the
-bounded architecture (Section~\ref{sec:rq3}). Dashed red badges F1--F6 pin the
+pooled configuration (Section~\ref{sec:rq3}). Dashed red badges F1--F6 pin the
 future-work items of Section~\ref{sec:future} to the component they would
 modify; F7 concerns the evaluation scope only. The dashed red edge marks the
 diagnosed corruption mechanism: the per-worker slice cache hands compiled code

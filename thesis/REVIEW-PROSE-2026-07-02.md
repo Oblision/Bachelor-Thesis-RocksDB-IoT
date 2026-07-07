@@ -134,6 +134,21 @@ Open / author's call: Ch. 1 + Ch. 3 "1:1 an der Vorgabe" — template skeleton p
 - **Heatmap completeness verified properly**: pooled gap-fill cells old vs. new = 103 vs. 103 — nothing missing (an earlier token-count comparison was flawed; split labels like "12 ok / 4 OOM" have no "16"/"20" token). The only cells absent vs. the fdbddcc PDF: 3 checksum/reference rerun cells (excluded on purpose — their rc141 teardown would fake pool-aborts in a failure-reason figure) and the N_ lever-campaign extra-pool coordinates (64k@1024 ×2, 128k@2048 ×1). **Open author decision:** re-adding the N_ cells would pool a different campaign into the "bounded" row; current selection keeps the rows single-campaign (L/W) as the caption states.
 - **Figure 7 (fig_effectiveness) split into two focused panels** per the density complaint (and the meeting note's subfigure suggestion): (a) capped in-memory baseline completion vs. ρ, all caps in one axis — the ρ=1 collapse isolated, with the one below-boundary exception (r700@2048, 10/20) visible; (b) in-memory vs. best out-of-core only at coordinates with ρ ≥ 0.75, grouped by cap, beyond-memory pairs shaded — the ~10 pairs that carry the message; trivially-complete fits-pairs dropped (full grid remains in the heatmap). Caption + §5.3 [7.2.6c] updated.
 
+## Round 5 (2026-07-07): letzte Meeting-Notizen — Punkt-für-Punkt
+
+- **JIT komplett entfernt** (7 Stellen + Akronymliste): überall "query-compilation pipeline" / "compiled query pipelines"; Fig. 3 (ooc-integration) sagt weiterhin klar "force-unspill before the probe runs", Caption entschlackt (keine Wiederholung des Fließtexts).
+- **Listing 1**: Caption erklärt die `${…}`-Platzhalter — `${FILECSV}` = die pro Experiment variierte Variable (eine Datei pro Workload), `${WINDOW}` fix 50 000 ms.
+- **Workload-Namen**: zwei Buchstaben-Familien statt doppeltem "r" — `s75…s300` (small-state, gegen 512 MB skaliert) und `b500…b1000` (big-state, eigene Skala); Begründung im Text: die 512-MB-Referenz für die b-Familie ist wegen des Memory Caps nicht möglich. tab:workloads nennt Footprint-MB + ρ je Cap; **Beispielrechnung** (s150: 736 MB ÷ 512 ≈ 1.44; ÷ 1024 ≈ 0.72) eingefügt. Repo-Mapping dokumentiert (s75 = r075). Alle 81 Textstellen + Figuren-Labels (gridcells-Helper `data.wlabel`) umgestellt.
+- **5.1.1 aufgelöst**: Methods Note als normaler Fließtext-Absatz am Ende von §5.1 (keine graue Subsection mehr).
+- **fig_race**: "drain ceiling" → "storage-bandwidth ceiling" (Figur + 9 Textstellen + Ch. 7); Region-Tag "the race" ersetzt durch "ingest exceeds storage bandwidth"; Dreieck/Plus-Legende erklärt beide ρ<1-Populationen (slow unter / fast über der Bandbreiten-Decke).
+- **Admission-Queue-Hypothese** als explizit ungemessene Spekulation hinter Regime 2 (§5.7): volle Queue → Sources blocken → Threads schlafen → weniger Ingest; Memory-Pressure nicht linear; Messung = Future Work.
+- **SD-Einordnung**: Satz an den Nexmark-Kosten — ~halber Durchsatz einer unlimitierten Engine beim Spillen über eine Consumer-SD-Karte, auf einem Workload, den die gecappte In-Memory-Engine gar nicht beendet.
+- **Terminologie**: "arm" → "configuration" (68 Stellen, inkl. Annex); "heap/bounded/pooled/default architecture" → configuration bzw. allocation type; "architecture-gated" → "follows the allocation choice" (rb32); Systemarchitektur-Sinn (Fig.-3-Titel) bewusst belassen.
+- **Appendix A** raus: ersetzt durch Repo-Verweis (Tabellen via gen_tables.py versioniert).
+- **Table 5 (tab:windows)**: von 7 auf 3 Zeilen kompaktiert (Cap × zwei Allocation-Typen, Evidenz in Klammern, b1000-Grenze in der Caption).
+- **Absätze**: die längsten Ch.-5-Blöcke (bis 38 Zeilen) auf 5–10-Zeilen-Absätze gesplittet (Workload-Beschreibung, Effectiveness-Randfall, Non-Monotonie, Zwei-Populationen, Nexmark-Kollaps).
+- **Nutzerseitig offen**: Grammarly-Pass (technical/scientific); Abgabe-Logistik — Sekretariat (Markl/Böhm) wegen digitaler Abgabe fragen; E-Mail vor 24:00 am 17.07. ans Prüfungsamt, CC Sekretariat + Juan + Leonhard; Angaben exakt wie in der Anmeldung.
+
 ## AI-usage / declaration updates
 
 - Session archive entry: `nebulastream-…/docs/ai-usage/08-revising-thesis/2026-07-02-advisor-review-figures-pass.md` (verbatim prompts; transcript export to attach on sync).
