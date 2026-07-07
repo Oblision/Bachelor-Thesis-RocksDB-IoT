@@ -15,9 +15,9 @@ import data
 import style
 
 COORDS = [  # (display, in-mem cell, heap-ooc cell, bounded cell)
-    ("512 MB\n$\\rho$ 0.64 (s75)", "I8_c512_p16k_r075", "U_c512_p16k_r075", "W_c512_p16k_r075"),
-    ("1024 MB\n$\\rho$ 0.45 (s100)", "I8_c1024_p32k_r100", "U_c1024_p32k_r100", "W_c1024_p32k_r100"),
-    ("2048 MB\n$\\rho$ 0.50 (s200)", "I8_c2048_p64k_r200", "U_c2048_p64k_r200", "W_c2048_p64k_r200"),
+    ("512 MB\n$\\rho$ 0.64 (s327)", "I8_c512_p16k_r075", "U_c512_p16k_r075", "W_c512_p16k_r075"),
+    ("1024 MB\n$\\rho$ 0.45 (s458)", "I8_c1024_p32k_r100", "U_c1024_p32k_r100", "W_c1024_p32k_r100"),
+    ("2048 MB\n$\\rho$ 0.50 (s1034)", "I8_c2048_p64k_r200", "U_c2048_p64k_r200", "W_c2048_p64k_r200"),
 ]
 ARMS = [("heap OOC", style.ORANGE, 2), ("bounded OOC", style.BLUE, 3)]
 

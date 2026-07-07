@@ -1,7 +1,7 @@
-"""fig:knife — pool-size sensitivity of the heap allocation type at 512 MB, s75.
+"""fig:knife — pool-size sensitivity of the heap allocation type at 512 MB, s327.
 
 One workload, one cap, one knob: completion against pool size for the
-L_ heap grid at 512 MB, s75, 16/8 RocksDB configuration only (matching
+L_ heap grid at 512 MB, s327, 16/8 RocksDB configuration only (matching
 fig_heatmap and fig_geometry_law; the paired 32/32 backend-size contrast is
 analysed separately in Section~sec:rb32 / Appendix E.6). The pool is the
 only variable across the three bars; enlarging it alone moves the cell from
@@ -54,7 +54,7 @@ def main() -> None:
     ax.set_xlabel("pool size (buffers)")
     ax.set_ylabel("completion fraction")
     fig.suptitle("Pool-size sensitivity of the heap allocation "
-                 "(512 MB cap, workload s75)",
+                 "(512 MB cap, workload s327)",
                  fontsize=11, fontweight="bold")
     style.caption(fig, extra="bars = completed/attempted; "
                              "$\\rho \\approx 0.64$; the pool is the only variable")

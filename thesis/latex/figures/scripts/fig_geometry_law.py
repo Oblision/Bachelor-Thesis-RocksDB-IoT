@@ -19,7 +19,7 @@ describe all three at once: 512 MB shows the textbook two-sided law (abort
 on the left, OOM on the right, a working band in between); 1024 MB is a
 mixed picture with a corruption-crash cell; 2048 MB is abort-dominated
 across almost the whole probed grid, since the heavier workloads tested at
-this cap (s200-b1000) demand more pool than any tested size supplies except
+this cap (s1034-b2078) demand more pool than any tested size supplies except
 at the largest pool or lowest pressure.
 """
 from __future__ import annotations

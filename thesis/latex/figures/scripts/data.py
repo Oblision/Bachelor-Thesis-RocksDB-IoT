@@ -139,9 +139,14 @@ def fisher_one_sided(ok_a: int, n_a: int, ok_b: int, n_b: int) -> float:
     return p
 
 
+# Display names: the number IS the measured uncapped steady footprint in MB
+# (median, per tab:workloads); the letter marks the generation family
+# (s = small-state series, b = later big-state series). Repository run labels
+# keep the original r ids (s327 = r075, b1374 = r500, ...).
+_WLABEL = {75: "s327", 100: "s458", 150: "s736", 200: "s1034", 300: "s1582",
+           500: "b1374", 700: "b1676", 1000: "b2078"}
+
+
 def wlabel(w) -> str:
-    """Display name of a workload: s-family (sized against the 512 MB cap)
-    vs b-family (later big-state batch, own scale). Repository run labels
-    keep the original r prefix (s75 = r075)."""
-    n = int(w)
-    return f"{'s' if n <= 300 else 'b'}{n}"
+    """Display name of a workload: family letter + measured footprint in MB."""
+    return _WLABEL.get(int(w), f"r{int(w)}")
