@@ -74,9 +74,9 @@ This thesis makes seven contributions.
     It shows that completion is a race between data arrival and the rate at which state drains to storage, not dictated by a fixed state-size threshold.
   \item \textbf{C4 — A load-bearing allocation finding.}
     The engine's default buffer size silently kept all window state outside the engine's buffer pool in every configuration.
-    One flag corrects this.
-    The corrected configuration, plus the new pool-pressure levers, reaches near-parity with the in-memory engine's throughput at lower memory cost (Section~\ref{sec:rq3}).
-    The same pooled-versus-heap distinction also decides how the RocksDB backend should be sized (Section~\ref{sec:rb32}).
+    One flag engages the intended pooling.
+    The pooled configuration, plus the new pool-pressure levers, reaches near-parity with the in-memory engine's throughput at lower memory cost (Section~\ref{sec:rq3}).
+    The same pooled-versus-heap distinction also decides how the RocksDB backend should be sized (\hyperref[app:rb32]{Appendix~E.6}).
   \item \textbf{C5 — A failure taxonomy with a diagnosed root cause.}
     Failures follow a three-regime feasibility law.
     The residual failure is an allocation deadlock, demonstrated by direct instrumentation.

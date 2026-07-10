@@ -70,7 +70,7 @@ def main() -> None:
 
         axes[0].set_ylabel("unbounded (heap)\nengine default, 4096 B buffers\n"
                            "$\\rho$ at cap  (workload id)", fontsize=8.0)
-        axes[1].set_ylabel("bounded (pooled)\ncorrected flag, 8192 B buffers\n"
+        axes[1].set_ylabel("bounded (pooled)\npooling flag, 8192 B buffers\n"
                            "$\\rho$ at cap  (workload id)", fontsize=8.0)
         axes[1].set_xlabel("pool size (buffers)", fontsize=9)
 
