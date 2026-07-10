@@ -55,6 +55,7 @@ It runs on a single node.
 It changes neither the query compiler nor the compiled query pipelines.
 It excludes fault tolerance, durability guarantees, sliding windows, state migration, and automatic parameter tuning.
 Cross-system comparisons are out of scope.
+The evaluation probes a deliberately fixed subset of the configuration space, varying only the memory budget, the workload state, the pool size, and the allocation type; its answers to the research questions are conditional on that subset.
 
 The backend succeeds if it completes workloads whose state exceeds physical memory, without OOM failures.
 Its results must match those of the in-memory engine given sufficient memory.

@@ -269,7 +269,7 @@ L\_unc\_r700 & none & 10 & 10 & -- & 1.17 & 2339 & 2119 \\
 \end{longtable}
 
 \subsection*{Campaign N (34 cells)}
-\textit{Attribution-ladder arms at the decisive cell: B0 pooling without levers, B1 +reserve, B2 +paced restore (corrected 8192-byte flag).}\par\smallskip
+\textit{Attribution-ladder arms at the decisive cell: B0 pooling without levers, B1 +reserve, B2 +paced restore (8192-byte pooling flag).}\par\smallskip
 \begin{longtable}{|l|r|r|r|r|r|r|r|}
 \hline
 \textbf{Cell} & \textbf{Cap} & \textbf{Reps} & \textbf{OK} & \textbf{rc} & \textbf{tps (M)} & \textbf{p99 ($\mu$s)} & \textbf{anon (MB)} \\
@@ -442,7 +442,7 @@ P\_W\_mb4k\_c512\_p24k\_r150 & 512 & 8 & 8 & -- & 1.44 & 305 & 492 \\
 \end{longtable}
 
 \subsection*{Campaign U (15 cells)}
-\textit{Matched-granularity heap control (8128-byte buffers: granularity corrected, allocation still heap) --- the disambiguation arm.}\par\smallskip
+\textit{Matched-granularity heap control (8128-byte buffers: granularity matched, allocation still heap) --- the disambiguation arm.}\par\smallskip
 \begin{longtable}{|l|r|r|r|r|r|r|r|}
 \hline
 \textbf{Cell} & \textbf{Cap} & \textbf{Reps} & \textbf{OK} & \textbf{rc} & \textbf{tps (M)} & \textbf{p99 ($\mu$s)} & \textbf{anon (MB)} \\
@@ -481,7 +481,7 @@ U\_smoke\_c512\_p16k\_r075 & 512 & 1 & 1 & -- & 1.99 & 455 & 421 \\
 \end{longtable}
 
 \subsection*{Campaign W (48 cells)}
-\textit{Bounded final grid: corrected configuration (8192-byte flag engages pooling) with reserve and paced-restore levers.}\par\smallskip
+\textit{Bounded final grid: pooled configuration (8192-byte flag engages pooling) with reserve and paced-restore levers.}\par\smallskip
 \begin{longtable}{|l|r|r|r|r|r|r|r|}
 \hline
 \textbf{Cell} & \textbf{Cap} & \textbf{Reps} & \textbf{OK} & \textbf{rc} & \textbf{tps (M)} & \textbf{p99 ($\mu$s)} & \textbf{anon (MB)} \\

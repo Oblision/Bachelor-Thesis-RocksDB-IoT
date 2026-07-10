@@ -6,7 +6,8 @@ This chapter concludes the thesis. It summarizes the contributions, states their
 \section{Summary\label{sec:summary}}
 
 This thesis asks whether NebulaStream can process window state larger than memory on edge-class devices.
-It builds a spillable slice store with RocksDB as the storage engine, evaluates it under hard memory caps across roughly 3{,}100 measured runs, and investigates every failure until its cause is known.
+Within the evaluated scope, the answer is yes: under hard memory caps the spillable backend completes workloads whose state exceeds the memory budget, workloads the unmodified engine cannot finish, with matching output checksums and at a bounded throughput cost.
+The thesis builds this backend as a spillable slice store with RocksDB as the storage engine, evaluates it under hard memory caps across roughly 3{,}100 measured runs, and investigates every failure until its cause is known.
 
 % [9.1 — one conclusion per contribution]
 The seven contributions hold as follows.
@@ -35,7 +36,20 @@ This is the same conclusion the three-regime law reaches from the other side (Se
 
 \section{Limitations and Generalizability\label{sec:generalizability}}
 
-% [8.3]
+% [8.3] Three kinds of limits: parameter-space scope, statistical certainty, system specificity.
+Three kinds of limits bound these conclusions, and each conclusion above should be read under them.
+
+The first limit is scope.
+The evaluation covers a deliberately fixed subset of the design space: only the memory cap, the workload state, the pool size, and the allocation type were varied, while the window length, lateness bound, page size, compression, RocksDB configuration, partition count, core count, host, storage device, and query shape were each held at a single value (Section~\ref{sec:threats}).
+This targeting is what made the memory question answerable, but it means the conclusions describe the tested subset, not the solution space: other parameter choices may shift the operating windows, the cost bands, and the failure boundaries.
+What the evaluation demonstrates independently of those choices is the core capability: the backend processes state larger than memory by spilling to and restoring from storage, with correct output.
+The exact positions of the boundaries reported in Chapter~\ref{cha:evaluation} are conditional on the configuration and should not be transplanted to other setups as fixed values.
+
+The second limit is statistical.
+Each cell carries only 8 to 10 repetitions, so per-cell completion fractions carry wide confidence intervals and are estimates, not fixed values.
+The claims this thesis relies on are therefore the headline contrasts, which clear $p < 10^{-3}$; individual cell fractions, and the between-session absolute magnitudes affected by the 4--17\% throughput drift, carry correspondingly less certainty.
+
+The third limit is system specificity.
 The effectiveness claim holds inside the characterized windows, not universally.
 The specific thresholds, the pooling boundary, and the slice cache are NebulaStream-specific.
 The three-regime feasibility law and the deadlock pattern are stated in terms of one fixed shared buffer pool.
@@ -44,7 +58,7 @@ Any engine with this property plausibly shows the same regimes; verifying this i
 \section{Practical Guidance\label{sec:guidance}}
 
 % [8.4]
-For an edge deployment of NebulaStream, the evaluation supports one recipe.
+For an edge deployment of NebulaStream, the evaluation supports one recipe, within the scope stated above.
 Enable page pooling by raising the operator buffer size to the page size.
 Choose a lean pool near the sizing rule of Section~\ref{sec:rq5}.
 Derive the soft threshold from the memory cap, not the pool (Section~\ref{sec:rq3}).

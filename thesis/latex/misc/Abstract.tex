@@ -5,9 +5,9 @@ This thesis builds and evaluates an out-of-core state backend for NebulaStream, 
 RocksDB serves as the embedded key-value store. Spills are triggered under soft and hard memory thresholds, and state is restored for result emission.
 
 The evaluation comprises about 3{,}100 measured runs under hard memory caps of 512 to 2048\,MB with pre-registered hypotheses.
-The backend completes workloads whose state exceeds memory where the in-memory engine always fails (14/24 versus 0/18 at 512\,MB, Fisher $p = 4.1 \times 10^{-5}$), with results verified by checksum against an unconstrained baseline with sufficient memory.
+Within a characterized operating window, the backend completes workloads whose state exceeds memory where the in-memory engine always fails (14/24 versus 0/18 at 512\,MB, Fisher $p = 4.1 \times 10^{-5}$), with results verified by checksum against an unconstrained baseline with sufficient memory.
 Against the in-memory engine, on workloads that both complete, the throughput cost is 11--15\%.
 The evaluation also uncovers an engine default that silently kept all window state outside the buffer pool.
-Correcting it with one flag, plus new pool-pressure levers, recovers most of the failing workloads and matches the in-memory engine's throughput at 25\% less anonymous memory.
+One flag engages the intended pooling; together with new pool-pressure levers it recovers most of the failing workloads and matches the in-memory engine's throughput at 25\% less anonymous memory.
 The same pooled-versus-heap distinction also governs how the storage backend should be sized.
 The remaining failures follow a three-regime feasibility law and end in a precisely diagnosed allocation deadlock, whose fix is specified as future work.

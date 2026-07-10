@@ -5,9 +5,9 @@ Diese Arbeit entwickelt und evaluiert ein Out-of-Core-Zustands-Backend f\"ur Neb
 Fensterzustand wird unter weichen und harten Speicher-Schwellenwerten in RocksDB ausgelagert, einen eingebetteten Key-Value-Speicher, und f\"ur die Ergebnisausgabe zur\"uckgeladen.
 
 Die Evaluation umfasst rund 3{.}100 gemessene Durchl\"aufe unter harten Speichergrenzen von 512 bis 2048\,MB mit vorregistrierten Hypothesen.
-Das Backend verarbeitet Arbeitslasten, deren Zustand den Speicher \"ubersteigt, dort, wo die In-Memory-Engine stets scheitert (14/24 gegen\"uber 0/18 bei 512\,MB, Fisher $p = 4{,}1 \times 10^{-5}$); die Ergebnisse sind per Pr\"ufsumme gegen eine unbeschr\"ankte, ausreichend dimensionierte Baseline verifiziert.
+Innerhalb eines charakterisierten Betriebsfensters verarbeitet das Backend Arbeitslasten, deren Zustand den Speicher \"ubersteigt, dort, wo die In-Memory-Engine stets scheitert (14/24 gegen\"uber 0/18 bei 512\,MB, Fisher $p = 4{,}1 \times 10^{-5}$); die Ergebnisse sind per Pr\"ufsumme gegen eine unbeschr\"ankte, ausreichend dimensionierte Baseline verifiziert.
 Gegen\"uber der In-Memory-Engine betragen die Durchsatzkosten auf gemeinsam bew\"altigten Arbeitslasten 11--15\,\%.
 Die Evaluation deckt zudem eine Engine-Voreinstellung auf, die s\"amtlichen Fensterzustand am Pufferpool vorbeileitete.
-Ihre Korrektur durch ein einziges Flag stellt zusammen mit neuen Pool-Druck-Hebeln die meisten fehlgeschlagenen Arbeitslasten wieder her und erreicht den Durchsatz der In-Memory-Engine bei 25\,\% weniger anonymem Speicher.
+Ein einziges Flag aktiviert das vorgesehene Pooling; zusammen mit neuen Pool-Druck-Hebeln stellt es die meisten fehlgeschlagenen Arbeitslasten wieder her und erreicht den Durchsatz der In-Memory-Engine bei 25\,\% weniger anonymem Speicher.
 Dieselbe Unterscheidung zwischen Pufferpool und Heap bestimmt auch, wie das Speicher-Backend zu dimensionieren ist.
 Die verbleibenden Fehler folgen einem Drei-Regime-Machbarkeitsgesetz und enden in einer pr\"azise diagnostizierten Allokations-Verklemmung, deren Behebung als zuk\"unftige Arbeit spezifiziert ist.
