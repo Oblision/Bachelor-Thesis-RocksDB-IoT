@@ -37,13 +37,13 @@ def arrow(ax, p0, p1, color="#333333", lw=1.7, rad=0.0, ls="-"):
 
 def main() -> None:
     style.use_style()
-    fig, ax = plt.subplots(figsize=(7.3, 3.05))
+    fig, ax = plt.subplots(figsize=(7.3, 3.35))
     ax.set_xlim(0, 12)
-    ax.set_ylim(0, 5)
+    ax.set_ylim(0, 5.7)
     ax.axis("off")
 
     blue = "#EAF2F8"
-    y = 3.15
+    y = 3.05
     W, H = 2.5, 0.98
     xs = [1.45, 4.35, 7.25, 10.25]
     box(ax, xs[0], y, W, H, "Sources", blue, style.BLUE)
@@ -53,25 +53,26 @@ def main() -> None:
         style.ORANGE)
 
     yd = 1.15
-    box(ax, 7.25, yd, W, 0.92, "SD card\n(RocksDB)", "#F0F0F0", style.GREY)
+    box(ax, 7.0, yd, W, 0.92, "SD card\n(RocksDB)", "#F0F0F0", style.GREY)
     box(ax, 10.25, yd, 2.6, 0.92, "Spiller", "#E8F6F1", style.GREEN)
 
-    # forward pipeline
+    # forward pipeline: labels sit ABOVE the box row, clear of the box borders
     def lbl(x, yy, t, c="#333333", fs=7.9, va="bottom"):
         ax.text(x, yy, t, ha="center", va=va, fontsize=fs, color=c)
-    arrow(ax, (xs[0] + W / 2, y), (xs[1] - W / 2, y)); lbl((xs[0]+xs[1])/2, y+0.12, "ingest")
-    arrow(ax, (xs[1] + W / 2, y), (xs[2] - W / 2, y)); lbl((xs[1]+xs[2])/2, y+0.12, "tasks")
-    arrow(ax, (xs[2] + W / 2, y), (xs[3] - 1.3, y)); lbl((xs[2]+xs[3])/2, y+0.12, "rent buffer")
-    # drain path: pool -> spiller -> card
+    ytop = y + H / 2 + 0.07
+    arrow(ax, (xs[0] + W / 2, y), (xs[1] - W / 2, y)); lbl((xs[0]+xs[1])/2, ytop, "ingest")
+    arrow(ax, (xs[1] + W / 2, y), (xs[2] - W / 2, y)); lbl((xs[1]+xs[2])/2, ytop, "tasks")
+    arrow(ax, (xs[2] + W / 2, y), (xs[3] - 1.3, y)); lbl((xs[2]+xs[3])/2 - 0.05, ytop, "rent buffer")
+    # drain path: pool -> spiller -> card; label above the gap, clear of boxes
     arrow(ax, (xs[3], y - H / 2), (10.25, yd + 0.46), color=style.GREEN)
     lbl(10.7, (y - H / 2 + yd) / 2, "spill", c=style.GREEN, va="center")
-    arrow(ax, (10.25 - 1.3, yd), (7.25 + W / 2, yd), color=style.GREY)
-    lbl(8.75, yd + 0.1, "drain @ device rate", c=style.GREY)
+    arrow(ax, (10.25 - 1.3, yd), (7.0 + W / 2, yd), color=style.GREY)
+    lbl(8.6, yd + 0.55, "drain @\ndevice rate", c=style.GREY, fs=7.6)
 
-    # the pacing loop, closed along the top (buffer pool -> sources)
-    arrow(ax, (xs[3], y + H / 2), (xs[0], y + H / 2), color=style.RED, lw=1.9,
-          rad=-0.42)
-    ax.text(6.0, 4.62,
+    # the pacing loop, closed as an arc ABOVE the row (buffer pool -> sources)
+    arrow(ax, (xs[3] - 0.4, y + H / 2), (xs[0] + 0.4, y + H / 2),
+          color=style.RED, lw=1.9, rad=0.30)
+    ax.text(6.0, 5.38,
             "buffers free only at the drain rate $\\Rightarrow$ operator slows "
             "$\\Rightarrow$ queue fills $\\Rightarrow$ sources sleep until a slot frees",
             ha="center", va="center", fontsize=8.5, color=style.RED)

@@ -579,6 +579,7 @@ Knife-edge cells throughout this chapter carry $n = 8$ and correspondingly wide 
 % [7.2.6c] The three valley figures: the curve, the mechanism, the run-time view.
 Figures~\ref{fig:valley} and~\ref{fig:throttle-trace} make this concrete at the 512\,MB cap and 16k pool.
 Figure~\ref{fig:valley} plots the completion valley against the naive expectation that completion simply tapers with size, and marks each failing cell by its cause; Figure~\ref{fig:throttle-trace} follows the same runs over their lifetime, the paced heaviest fitting workload holding a bounded working set through a long run while the lighter loads abort early.
+The trace also separates the two memory quantities the outcome depends on: the total charged memory, page cache included, rides at the cap in every spilling run and kills nothing, the reclaim steady state of a spilling run under a hard limit (Section~\ref{sec:bg-metrics}); the OOM kill follows the anonymous set alone, firing when it grows past what reclaim can free.
 The throttle is the engine's bounded admission queue (Figure~\ref{fig:pacing-loop}): the operator drains the queue only as fast as the spiller frees buffers, so once the pool is full the queue backs up and the sources sleep until a slot frees, pacing ingest down to the drain rate.
 The valley also displays both failure types of the sizing law (Section~\ref{sec:rq1-geometry}): the lighter middle workloads pool-abort because the fixed pool cannot hold their concurrently live band, while the heaviest workload is OOM killed because its resident state leaves no headroom under the cap for the rest of the engine.
 Pacing recovers completion only in the band between these two edges, so a pool too small to hold the live band aborts, and state too large to leave headroom is OOM killed however slowly the sources are fed.
@@ -621,15 +622,25 @@ outruns the drain and the pool aborts first.}
 \centering
 \includegraphics[width=0.82\textwidth]{img/fig_throttle_trace.pdf}
 \caption[The throttle over one run's lifetime]{The valley mechanism in time:
-anonymous working set for one run each of the five workloads at the 512\,MB cap
-and 16k pool, each end marker showing the run's outcome. The small \texttt{s327}
+anonymous working set (solid) and total charged cgroup memory (thin dashed,
+anonymous set plus page cache) for one run each of the five workloads at the
+512\,MB cap and 16k pool, each end marker showing the run's outcome. The
+dashed totals genuinely saturate at the cap: \texttt{s736}, \texttt{s1034},
+and \texttt{s1582} hold \texttt{memory.current} at 512\,MB for about half
+their runtime and \texttt{s458} touches 511\,MB, because the page cache
+expands into whatever memory is free and the kernel reclaims it under
+pressure (Section~\ref{sec:bg-metrics}); a full total alone therefore kills
+nothing, and the completing
+\texttt{s1034} and the OOM-killed \texttt{s1582} are indistinguishable by
+their totals. The small \texttt{s327}
 fits and completes quickly; the lighter \texttt{s458} and \texttt{s736} climb
 and abort on pool exhaustion early; the heaviest fitting load \texttt{s1034} is
-paced, holds a bounded working set through a long run, and completes. Crucially
-\texttt{s1582} is paced just as long, yet its resident state still exceeds the
-cap and it is OOM killed, so the recovery is a bounded window rather than a
-general cure. Heavier state completes where lighter state fails (the valley of
-Figure~\ref{fig:valley} seen over time).\methodsnote}
+paced, holds a bounded anonymous set through a long run, and completes.
+Crucially \texttt{s1582} is paced just as long, yet its anonymous set keeps
+growing until reclaim can free nothing more, and the OOM killer fires (the
+final spike at its red cross), so the recovery is a bounded window rather than
+a general cure. Heavier state completes where lighter state fails (the valley
+of Figure~\ref{fig:valley} seen over time).\methodsnote}
 \label{fig:throttle-trace}
 \end{figure}
 

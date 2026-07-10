@@ -179,18 +179,23 @@ The last section of this chapter defines them.
 % [2.17]
 Linux can place a group of processes under a hard memory limit.
 The mechanism is called a \ac{cgroup}.
-A process group that exceeds its limit triggers the kernel's OOM killer.
-The OOM killer terminates the process.
+When the group reaches its limit, the kernel does not kill it at once.
+It first reclaims memory: it drops or writes back the pages it is allowed to take away, to make room.
+Only when this reclaim cannot free enough does the kernel's OOM killer terminate the process.
 This thesis writes OOM for out of memory.
 In the evaluation this cgroup is the one Docker creates for the container, so its hard limit is set by a Docker flag (Section~\ref{sec:reproducibility}); the bare term ``cgroup'' below always refers to that Docker-imposed control group.
 
 % [2.17b] — how memory is measured, and why the distinction is load-bearing.
 The kernel accounts a cgroup's memory in two kinds.
-Anonymous memory holds the working data of the processes; the kernel cannot reclaim it, and it is the quantity that triggers the OOM killer.
+Anonymous memory holds the working data of the processes.
+With swap disabled, as it is throughout this evaluation (Section~\ref{sec:reproducibility}), the kernel has nowhere to move an anonymous page, so it cannot reclaim it; anonymous memory is therefore the quantity that drives the OOM killer.
 File-backed memory is the page cache for file reads and writes; the kernel reclaims it under pressure, so it never kills a run.
-This distinction is load-bearing for measuring a spilling backend.
-A backend that spills to storage inflates the page cache as a by-product of working correctly: every spilled and restored byte passes through it.
-A naive total, such as the resident set size or the cgroup's current consumption, therefore charges the backend for its own spill traffic and overstates its footprint in proportion to how much it spills.
+This distinction is load-bearing for measuring a spilling backend, in two ways.
+First, a backend that spills to storage inflates the page cache as a by-product of working correctly: every spilled and restored byte passes through it.
+The kernel keeps these cached pages until something else needs the memory, because a clean cached page costs nothing to hold and may save a future device read.
+Under a hard limit, a spilling run therefore settles into a reclaim steady state: the page cache grows until anonymous memory and cache together fill the cap, and every further allocation is served by reclaiming cache.
+A total consumption pinned at the cap is thus the normal operating state of a spilling run, not a sign of imminent failure; the run dies only when the anonymous set has grown so large that the remaining cache cannot yield enough.
+Second, a naive total, such as the resident set size or the cgroup's current consumption, charges the backend for its own spill traffic and overstates its footprint in proportion to how much it spills.
 Every memory footprint reported in this thesis is anonymous memory, read from the cgroup's memory statistics; the page cache is recorded separately and never counted as pressure.
 
 % [2.18]
