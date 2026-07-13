@@ -15,10 +15,13 @@ The seven contributions hold as follows.
 C1: the backend integrates behind the unchanged store interface and operated across the full evaluation without changes to the compilation pipeline.
 C2: the harness reproduces every result from one binary, with pre-registered hypotheses and six memory probes; the evaluation data and analysis documents are versioned with the code.
 C3: the backend prevents OOM failures inside characterized operating windows per memory budget (Table~\ref{tab:windows}), and completion depends on the race between ingest and drain rather than on a state-size threshold.
-C4: a single engine default kept all window state outside the buffer pool in every configuration; the one-flag pooled configuration with pool-pressure levers reaches, at the decisive cell, the in-memory engine's throughput at 25\% less anonymous memory (517 versus 685\,MB, Section~\ref{sec:rq3}); and the same allocation distinction determines how to size the RocksDB backend (\hyperref[app:rb32]{Appendix~E.6}).
+C4: a single engine default kept all window state outside the buffer pool in every configuration.
+The one-flag pooled configuration with pool-pressure levers reaches, at the decisive cell, the in-memory engine's throughput at 25\% less anonymous memory (517 versus 685\,MB, Section~\ref{sec:rq3}).
+The same allocation distinction determines how to size the RocksDB backend (\hyperref[app:rb32]{Appendix~E.6}).
+
 C5: the failures follow a three-regime feasibility law, and the residual failure is an allocation deadlock in which emitted state pins the buffer pool while the workers that would drain it are all blocked allocating, demonstrated by direct instrumentation (Figure~\ref{fig:gridlock}).
 C6: all mechanisms ship configuration-gated in an open branch; with gates closed the engine is byte-identical to the baseline.
-C7: the growth signal makes intra-slice growth visible on the production path once the slice cache is bypassed, and the page-release extension cuts steady anonymous memory by a further 55\% on draining workloads; neither converts the residual deadlock, which stays bound by the un-spillable hot slice and the resident floor.
+C7: the growth signal makes intra-slice growth visible on the production path once the slice cache is bypassed, and the page-release extension cuts steady anonymous memory by a further 55\% on draining workloads; neither converts the residual deadlock, which stays bound by the un-spillable hot slice and the minimum resident memory.
 
 % [negative IoT finding — advisor note 2]
 The evaluation also yields one negative finding that no engine-side mechanism can remove.
@@ -66,7 +69,7 @@ The same pattern holds in the two other workloads checked.
 s736 runs 16\% slower uncapped than at its 1024\,MB cap (2.90 versus 3.43\,M tuples/s, no overlap across repetitions), and s1582 runs 10\% slower uncapped than at its 2048\,MB cap (2.48 versus 2.77\,M tuples/s, likewise no overlap); lower throughput and higher peak memory move together in both, well away from the boundary cell that motivated the check.
 
 The likely mechanism is memory-allocator behavior.
-An allocator under no pressure to reuse freed memory lets a process's live data spread across more pages, which costs both memory and locality, while a hard cap forces tighter reuse.
+An allocator under no pressure to reuse freed memory lets a process's live data spread across more pages, which increases memory use and reduces locality, while a hard cap forces tighter reuse.
 This account fits the data but is not independently confirmed; no allocator- or engine-level instrumentation was collected to isolate the exact mechanism, so it stands as the best-supported explanation rather than a demonstrated one.
 The consequence is that $\rho$, computed from the uncapped reference, mildly overstates true pressure at a given cap.
 The qualitative boundary this thesis reports (workloads clearly below $\rho = 1$ complete, workloads clearly above fail) is unaffected, but near that boundary $\rho$ should be read as approximate rather than exact, because the state actually resident differs between the uncapped and the capped execution modes the metric compares.
@@ -112,7 +115,8 @@ Two device- and resource-sensitivity experiments follow from the limitations abo
 The first experiment varies the core count.
 Every run in this thesis used a fixed two-core budget (Section~\ref{sec:reproducibility}).
 Raising the number of pinned cores beyond two would show how the contention and the allocation deadlock scale with available parallelism.
-The deadlock does not distinguish build-path from drain-path allocations (C5), so more cores may shift the point at which the two collide rather than remove it; the experiment would settle this.
+The deadlock does not distinguish build-path from drain-path allocations (C5), so more cores may shift the point at which the two collide rather than remove it; the experiment would answer this question.
+
 The second experiment studies the storage device directly.
 This thesis ran on one SD card and treated its write bandwidth as a fixed bound (Section~\ref{sec:rq4}).
 Profiling the SD card's read and write throughput directly, and re-running the best configurations on faster storage such as an \ac{SSD}, would separate the device limit from the engine limit.

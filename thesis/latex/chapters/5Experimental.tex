@@ -187,9 +187,7 @@ Crash & 139, 11 & A segmentation fault on the restore path (the slice-cache corr
 of these categories from its process exit status; a signalled death reports as
 128 plus the signal number ($137 = 128 + \texttt{SIGKILL}$,
 $134 = 128 + \texttt{SIGABRT}$, $139 = 128 + \texttt{SIGSEGV}$), while 141 is the
-engine's own pool-exhaustion abort and 124 the harness wall-clock timeout. An OOM kill and a pool abort are distinct
-failures with opposite cures (a smaller pool versus a larger one), which is
-why they are separated rather than pooled into a single ``failed'' count.}
+engine's own pool-exhaustion abort and 124 the harness wall-clock timeout.}
 \label{tab:outcomes}
 \end{table}
 
@@ -201,7 +199,7 @@ The RocksDB values follow the experimental analysis of Section~\ref{sec:rocksdb-
 % [7.1.5b] The evaluation covers a fixed, targeted subset of the design space.
 This fixed configuration makes the evaluation a targeted subset of the design space rather than a sweep of it.
 Only four variables move, the memory cap, the workload state, the pool size, and the allocation type; every other parameter above is held at one value.
-The design isolates the question the thesis asks, how the backend behaves as state grows against a shrinking memory budget, at the cost of generality.
+The design isolates the question the thesis asks, how the backend behaves as state grows against a shrinking memory budget; it does not test generality.
 The findings are conditional on the fixed values, and other choices of window length, lateness, page size, compression, or backend configuration may shift the reported boundaries.
 Section~\ref{sec:threats} restates this scope with the other threats to validity.
 
@@ -219,6 +217,7 @@ The results rest on two kinds of measurement, and each kind uses its own statist
 The first is completion.
 A cell runs its repetitions under two configurations and each repetition either completes or fails, which forms a two-by-two table of completed and failed runs across the two configurations.
 Completion is compared with Fisher's exact test on that table.
+
 The second is a mean, such as throughput or 99th-percentile latency.
 Means are compared with Welch's t-test, which does not assume the two configurations share a variance~\cite{welch1947}.
 Where a Welch comparison is quoted, its statistic is given with it.
@@ -237,7 +236,7 @@ This section analyzes the RocksDB backend on its own and fixes the configuration
 The store spills slices into RocksDB (Section~\ref{sec:architecture}).
 RocksDB exposes many tuning knobs, and prior work shows that three of them determine its behavior under a tight memory budget, the compression algorithm, the write buffer size, and the block cache size.
 
-Compression trades processor time for fewer bytes written to disk~\cite{jin2022}.
+Compression reduces the bytes written to disk and increases processor time~\cite{jin2022}.
 The write buffer is the in-memory region RocksDB fills before flushing to disk; a larger buffer flushes less often but commits more memory that then competes with the window state~\cite{rocksdb-memory}.
 The block cache holds recently read blocks in memory and speeds up reads at the same memory cost~\cite{rocksdb-memory}.
 Based on these findings, the analysis varies exactly these three knobs and fixes one configuration rather than searching the space per experiment.
@@ -301,7 +300,7 @@ Write buffer & larger flushes less often but commits memory that competes with t
 Block cache & speeds up reads at the same memory cost; the spill duty cycle is write-heavy~\cite{rocksdb-memory} & 8\,MB \\
 \hline
 \end{tabular}
-\caption{The three RocksDB knobs that govern behavior under a tight memory
+\caption{The three RocksDB knobs that determine behavior under a tight memory
 budget, and the value chosen for each. The values are small so that the backend
 leaves the most memory for window state at the tightest 512\,MB cap; the sweep
 of Table~\ref{tab:rocksdb-char} produced them. \hyperref[app:rb32]{Appendix~E.6}
@@ -310,8 +309,8 @@ examines a larger backend configuration as additional information.}
 \end{table}
 
 Holding the backend fixed across all memory caps is a design choice.
-With the backend pinned at the 512\,MB fit point, the memory cap and the workload state remain the moving variables of the evaluation, at the cost of covering a single point of the backend's own parameter space.
-What a larger write buffer and block cache would change once the cap grows is examined separately, as additional information; \hyperref[app:rb32]{Appendix~E.6} reports a single-variable contrast that reran parts of the grid at 32/32 with every other knob held fixed.
+With the backend pinned at the 512\,MB fit point, the memory cap and the workload state remain the moving variables of the evaluation, and the evaluation covers only a single point of the backend's own parameter space.
+\hyperref[app:rb32]{Appendix~E.6} examines separately, as additional information, what a larger write buffer and block cache would change once the cap grows; it reports a single-variable contrast that reran parts of the grid at 32/32 with every other knob held fixed.
 Its outcome does not alter the configuration used here; every figure and count in this chapter uses the 16/8 configuration.
 With the backend fixed, the next section tests whether the backend prevents the OOM failures a fixed cap forces.
 
@@ -332,7 +331,7 @@ All figures and statistics in this section use the 16/8 RocksDB configuration fi
 \subsection{Headline Contrasts\label{sec:rq1-headline}}
 
 % [7.2.1] State the anchor contrast, then outline how the section develops it.
-The central contrast, called the \emph{flagship} contrast throughout this chapter, is that at the tightest cap the heap configuration completes where the capped in-memory engine cannot.
+The \emph{primary finding} of this chapter, named as such in every figure that references it, is that at the tightest cap the heap configuration completes where the capped in-memory engine cannot.
 At 512\,MB it completes 14 of 24 runs across the three beyond-memory pressures, against 0 of 18 for the in-memory engine (Figure~\ref{fig:flagship}; Fisher's exact test $p = 4.1 \times 10^{-5}$).
 
 The subsections that follow establish what bounds this result.
@@ -349,8 +348,8 @@ While spilling is active, output checksums match the uncapped in-memory referenc
 \begin{figure}[htbp]
 \centering
 \widefig{img/fig_flagship.pdf}
-\caption[Completion at the flagship cell (512\,MB)]{Completion at the flagship
-cell. \ac{OOC} under the heap configuration (8 repetitions per workload) versus
+\caption[The primary finding (512\,MB)]{The primary finding at the 512\,MB
+cap. \ac{OOC} under the heap configuration (8 repetitions per workload) versus
 the capped in-memory engine (6 repetitions) at the three beyond-memory state
 pressures of the 512\,MB cap. Only the heap configuration is shown here; the
 pooled configuration at this cap is mapped in Section~\ref{sec:rq1-windows}.
@@ -443,7 +442,7 @@ The two bounds therefore separate the two failure modes; a pool below the lower 
 Each cell in Figures~\ref{fig:geometry-law-512}--\ref{fig:geometry-law-2048} reports how many runs completed and how the rest failed.
 Pool-exhaustion aborts (exit code 141) occur at the small-pool edge, where the pool cannot hold the hot band of slices.
 Memory-pressure failures (exit code 137 OOM kill, or exit code 134 allocator abort under the cap, counted together) occur at the large-pool edge, where the pool plus the unpooled directory bytes of each resident slice exceeds the cap.
-The corruption segfaults of Section~\ref{sec:geometry-valley} are counted separately as ``crash'' and appear only inside cells that fail regardless; cells whose repetitions mix failure modes are hatched, colored by the dominant mode, and write the split out.
+The corruption segfaults of Section~\ref{sec:geometry-valley} are counted separately as ``crash'' and appear only inside cells that fail regardless; cells whose repetitions mix failure modes are hatched and colored by the dominant mode, and the split is written on the cell.
 The three caps show the two bounds in complementary partial views.
 
 At 512\,MB both edges of the law are visible (Figure~\ref{fig:geometry-law-512}).
@@ -546,8 +545,7 @@ demonstrated: b2078 ($\rho \approx 1.01$) fails under every configuration.}
 % [7.2.6c] Multi-cap completion headline (generalizes the 512\,MB flagship).
 Figure~\ref{fig:effectiveness} shows the headline of this table in two panels.
 Panel (a) isolates the baseline; no capped in-memory cell completes once state clearly exceeds memory.
-One baseline cell needs an explanation.
-s1034 at 1024\,MB completes 10 of 10 although its uncapped $\rho$ is 1.01, because the uncapped reference run, under no \ac{reclaim} pressure, uses about ten percent more memory than the same workload under the cap; the capped peak is 948\,MB and fits under 1024\,MB.
+One baseline cell, s1034 at 1024\,MB, completes 10 of 10 although its uncapped $\rho$ is 1.01, because the uncapped reference run, under no \ac{reclaim} pressure, uses about ten percent more memory than the same workload under the cap; the capped peak is 948\,MB and fits under 1024\,MB.
 Panel (a) therefore plots this cell at its realized capped pressure ($\rho \approx 0.93$).
 The contrast is b2078 at 2048\,MB, which has the same uncapped $\rho \approx 1.01$ but exceeds its cap in capped execution as well and fails 0 of 10.
 
@@ -589,8 +587,8 @@ At 512\,MB with a 16k-buffer pool, completion is non-monotone as $\rho$ rises, 8
 Two mechanisms produce this shape.
 
 The first mechanism is the fast-ingest valley, and it explains why the heaviest load completes again after the lighter ones fail.
-At the lower $\rho$ points the working set fits, so the pool fills late or never.
-Nothing slows the sources down, the workload runs unthrottled above the storage-bandwidth ceiling of about 2.6 million tuples per second, the spiller falls further behind with every window, and the run fails.
+At the lower $\rho$ points the working set fits, so the pool fills late or never and the sources are not throttled.
+The workload runs unthrottled above the storage-bandwidth ceiling of about 2.6 million tuples per second, the spiller falls further behind with every window, and the run fails.
 At the heaviest point ($\rho \approx 2$) the per-window state is large enough that the pool is full early in the run.
 From then on every allocation waits for a freed buffer, and buffers are freed at the rate the spiller writes to the device, so ingest is forced down to the storage-bandwidth rate; the run finishes slowly instead of failing fast.
 More state pressure therefore restores completion, because it engages this throttling from the start, while the middle workloads run unthrottled past the ceiling.
@@ -617,7 +615,7 @@ Pacing recovers completion only in the band between these two edges; a pool too 
 tapering expectation (dashed, qualitative rather than a fitted model), and ingest
 rate (bottom) against the storage-drain ceiling, both ordered by state
 pressure $\rho$. Failing cells are plotted at their unthrottled demand, since
-a dead run has no realized rate of its own.\methodsnote}
+a failed run has no realized rate of its own.\methodsnote}
 \label{fig:valley}
 \end{figure}
 
@@ -628,9 +626,9 @@ The operator drains the queue only as fast as the spiller frees buffers, so once
 \centering
 \includegraphics[width=0.8\textwidth]{img/fig_backpressure_loop.pdf}
 \caption[The source-pacing loop]{The pacing loop behind the valley (conceptual
-diagram, no measured data). This is the engine's intrinsic queue pacing, not
-the separately tested and refuted allocation-backpressure lever of
-Section~\ref{sec:backpressure}.}
+diagram, no measured data). The diagram shows the engine's intrinsic queue
+pacing rather than the allocation-backpressure lever of
+Section~\ref{sec:backpressure}, which was tested separately and refuted.}
 \label{fig:pacing-loop}
 \end{figure}
 
@@ -747,7 +745,7 @@ At the one tight fitting cell, scenario B at 512\,MB, the same over-spilling fai
 
 The ordering reverses at the one beyond-memory coordinate, C at 1024\,MB, where the in-memory engine cannot fit the state (0 of 8) and spilling is required.
 There the bounded configuration's pool bound and paced restore hold total memory under the cap and it completes most reliably (q3 8 of 8, q7 7 of 8), while the heap configuration's unbounded restore intermittently exceeds the cap and is OOM killed, completing 6 of 8 and 3 of 8.
-The backend exists for this coordinate, and only the pooled configuration completes it reliably.
+This coordinate is the deployment case that motivates the backend, and only the pooled configuration completes it reliably.
 
 % [7.2.9]
 The same runs test the failure model on data it was not built from.
@@ -791,8 +789,8 @@ The next section measures what this completion costs.
 \section{Cost (RQ2)\label{sec:rq2}}
 
 RQ2 asks what the backend costs in throughput and tail latency, and what spilling and restoring state cost on their own.
-At matched buffer size the answer is a throughput cost of 11 to 15 percent, a 99th-percentile latency of 1.1 to 1.6 times the in-memory engine, and, in exchange, a resident footprint up to 33 percent smaller under the pooled configuration.
-All headline comparisons use a matched \ac{IO} buffer size, about 8{,}000 bytes in every variant including the in-memory reference, so that each contrast measures the allocation choice and not the buffer size; the buffer-size finding below justifies the choice.
+At matched buffer size the answer is a throughput cost of 11 to 15 percent, a 99th-percentile latency of 1.1 to 1.6 times the in-memory engine, and a resident footprint up to 33 percent smaller under the pooled configuration.
+All headline comparisons use a matched \ac{IO} buffer size, about 8{,}000 bytes in every variant including the in-memory reference, so that each contrast measures the allocation choice rather than the buffer size; the buffer-size finding below justifies the choice.
 
 % [7.3.1] + [7.3.2] --- throughput cost
 Throughput is the first cost (Figure~\ref{fig:cost}(a)).
@@ -859,7 +857,7 @@ no baseline of its own.}
 % [7.3.9] --- answer to RQ2
 In answer to RQ2, at matched buffer size the backend costs 11--15\% throughput where both allocation types complete, at a 99th-percentile task latency 1.1 to 1.6 times the in-memory engine.
 Spilling and restoring state cost little in mean throughput; their cost appears in the latency tail, where the round trip raises the unbounded default into milliseconds at ten-million-entry sets.
-In exchange, the pooled configuration reduces the resident footprint by up to 33\%.
+The pooled configuration reduces the resident footprint by up to 33\%.
 Section~\ref{sec:eval-summary} interprets why this cost is a factor rather than the order of magnitude the device speeds would suggest, once the mechanisms behind it have been measured.
 The next section examines the processor and disk activity behind these costs.
 
@@ -974,15 +972,16 @@ edge for legibility).\methodsnote}
 \section{Memory Behavior and Stability (RQ3)\label{sec:rq3}}
 
 RQ3 asks how memory behaves as state grows past the cap, and why the remaining failures happen.
-This section is the investigation that answered both; it produced the allocation finding (C4) and the failure taxonomy (C5).
-It is told in investigation order because the sequence of refuted hypotheses is itself the evidence for the final attribution; every step was pre-registered before its runs.
+This section reports the allocation finding (C4) and the failure taxonomy (C5).
+The steps appear in the order the experiments ran, because the sequence of refuted hypotheses is the evidence for the final attribution; every hypothesis was pre-registered before its runs.
 
 % [7.6a]
 Failures follow two independent constraints.
 If peak pool demand exceeds the pool size, the run fails by allocation abort.
 If the pool floor plus unpooled bytes plus the base footprint exceeds the cap, the run fails by OOM kill.
 Together the two constraints form a feasibility corridor per cap and workload.
-The corridor has a tipping point; at one cell, pools of 16k and 32k buffers complete (10 of 10 and 6 of 10) while 64k fails 0 of 10.
+The corridor is narrow.
+At one cell, pools of 16k and 32k buffers complete (10 of 10 and 6 of 10) while 64k fails 0 of 10.
 
 % [7.6b]
 Where the backend completes, it uses 14--22\% less anonymous memory than the in-memory engine on identical workloads.
@@ -991,12 +990,12 @@ The advantage grows as the pool shrinks.
 
 % [7.6c]
 The four pool-pressure levers (Section~\ref{sec:levers}) worked mechanically and converted no failing cell.
-The initial conclusion was an un-spillable memory floor.
+The initial conclusion was a minimum resident memory that cannot be spilled.
 
 % [7.6d]
 This conclusion was wrong, because the levers never acted on window state.
 The engine's 4096-byte default buffer size (Section~\ref{sec:integration}) kept every map page out of the pool in every prior experiment, so the pool contained no window state.
-The floor conclusion was retracted.
+The conclusion was retracted.
 
 % [7.6e]
 One flag (buffer size 8192) engages the intended memory configuration.
@@ -1037,7 +1036,7 @@ Pooling changes the sizing rules.
 The engine allocates the full pool at process start, so the pool size sets the minimum anonymous memory of a run.
 A run with a large pool is therefore OOM killed by its own up-front reservation.
 A smaller pool lowers the footprint and at the same time raises completion, as long as it still holds the hot band.
-Choosing the pool size therefore no longer trades footprint against survival; the smaller pool is better on both counts.
+Choosing the pool size therefore no longer forces a choice between footprint and completion; the smaller pool improves both.
 
 % [7.6i]
 Three alternative explanations for the remaining failures were pre-registered and refuted.
@@ -1060,7 +1059,7 @@ The pool has no separation between fill-side and drain-side allocations, so fill
 \begin{figure}[htbp]
 \centering
 \widefig{img/fig_gridlock.pdf}
-\caption[Anatomy of the allocation deadlock]{Anatomy of the allocation
+\caption[The allocation deadlock]{The allocation
 deadlock at a failing allocation-backpressure cell (1024\,MB / 32k pool /
 s1034, all eight repetitions fail by allocation abort). (a) The 0.2-second
 memory sampler of one repetition; the working set rises until no worker can
@@ -1074,7 +1073,8 @@ The results compose into a three-regime feasibility law (Figure~\ref{fig:regimes
 In regime one the demand fits the pool, and the run completes at full speed.
 In regime two the demand exceeds the pool, but the memory cap throttles ingest, and the run completes at reduced speed.
 In regime three the demand exceeds the pool, ingest is unconstrained, and the run deadlocks.
-One workload shows the law directly; its three pooled-lever configurations (above) combine to complete 23 of 24 at cap 512\,MB, while a single run of the baseline pooled campaign fails 0 of 8 at cap 1024\,MB with twice the pool.
+One workload shows the law directly.
+Its three pooled-lever configurations (above) combine to complete 23 of 24 at the 512\,MB cap, while a single run of the baseline pooled campaign fails 0 of 8 at the 1024\,MB cap with twice the pool.
 
 % [7.6l-bis — mechanism behind regime two; queue mechanism verified in code, its
 % quantitative role in the observed throttling is the (unmeasured) hypothesis.]
@@ -1100,13 +1100,13 @@ Starred points mark the same-workload contrast pair discussed in the text
 
 % [7.6m]
 The recommended operating configuration is pooling with reserve and paced restore, allocation backpressure off.
-The allocation-backpressure lever costs 10\% throughput near the edge and converts nothing.
+The allocation-backpressure lever reduces throughput by 10\% near the edge of the operating window and converts nothing.
 Its progress guard ships as diagnostic instrumentation.
 
 % [7.6n]
-The full-grid confirmation run settles three open points.
+The full-grid confirmation run answers three open questions.
 The soft threshold must stay cap-derived; the pool-derived rule completes 3 of 8 against 8 of 8 at the decisive cell.
-A memory-corruption crash cluster appears at high-churn cells, only in cells that fail anyway; its root cause follows below.
+A memory-corruption crash cluster appears at high-churn cells, only in cells that fail anyway; Section~\ref{sec:geometry-valley} gives its root cause.
 The two allocation types' windows are complementary, and the allocation deadlock is the demonstrated reason the pooled window cannot widen.
 A pool that reserved buffers for the drain side, which the fill side could not consume, is the single mechanism that would merge the two windows.
 
@@ -1121,7 +1121,7 @@ A buffer size of 8128 bytes is 99.2\% of the page size but still below it; becau
 % [7.6p]
 The configuration confirms the attributions where it matters.
 The $\rho \approx 2$ completion at 512\,MB (s1034) is caused by the allocation type; pooled completes 8 of 8 and the matched-buffer-size heap 0 of 8 ($p = 7.8 \times 10^{-5}$).
-The regression at one 512\,MB cell (s736 at the 16k pool, $\rho \approx 1.44$) is a cost of pooling; heap completes 7 of 8 there and pooled 1 of 8.
+At one 512\,MB cell (s736 at the 16k pool, $\rho \approx 1.44$) pooling regresses; heap completes 7 of 8 there and pooled 1 of 8.
 At the highest tested pressures, only heap allocation completes.
 The lever effect stands unchanged at fixed buffer size (0 of 8 to 7 of 8, $p = 7.0 \times 10^{-4}$).
 
@@ -1142,8 +1142,8 @@ The initially untested point at 39\% of the cap completes s1034 through b1676.
 
 % [7.6s]
 The geometry rule carries over across caps until the base footprint no longer fits beside the pool.
-At 1024\,MB, the transplanted pool completes two additional workloads.
-At 512\,MB, the transplanted pool is OOM killed, because the directory overhead the pool induces exceeds the cap.
+At 1024\,MB, the same relative pool size completes two additional workloads.
+At 512\,MB, the same relative pool size is OOM killed, because the directory overhead the pool induces exceeds the cap.
 Together the two outcomes state the two-sided law in its final form.
 
 % [7.6t]
@@ -1182,7 +1182,7 @@ Counting only the segmentation fault as corruption confines the crash cluster to
 The architectural conclusion is general.
 Unmediated pointers into evictable state require an invalidation protocol.
 Flink's backend mediates every state access; NebulaStream's slice cache does not.
-The precise upstream fix is an epoch-stamped cache entry that is invalidated on spill, at the cost of one comparison per cache hit.
+The precise upstream fix is an epoch-stamped cache entry that is invalidated on spill and adds one comparison per cache hit.
 
 \FloatBarrier
 \subsection{The Growth Signal and Page Release in Operation\label{sec:growth-release-results}}
@@ -1203,14 +1203,15 @@ The existing check runs only when a slice is created at a window boundary, so it
 Evicting the growing slice when the signal fires holds it below the threshold and keeps the pool from filling, but converts no failing run.
 The failure changes form instead of disappearing, to an OOM kill where resident memory is the limit, or to an allocation stall caused by the synchronous eviction itself, which blocks the thread that ingests.
 A softer variant that only wakes the background spiller performs worse, because it removes the throttling the synchronous eviction provided, and the pool fills at full ingest speed.
-The signal is necessary to observe intra-slice growth and insufficient to survive it; the binding limits remain the un-spillable hot slice and the resident floor.
+The signal is necessary to observe intra-slice growth and insufficient to survive it; the binding limits remain the un-spillable hot slice and the minimum resident memory.
 
 % [7.6aa]
-Page release addresses the resident floor.
+Page release addresses the minimum resident memory.
 On a draining workload it cuts steady anonymous memory by 55 percent and peak by 38 percent, at a 6-to-8 percent throughput cost, completing every repetition.
-Its effect is correctly specific; on the single-hot-slice workload it reclaims the cold band but cannot reclaim the live growing slice, and that run still fails.
+Its effect is specific; on the single-hot-slice workload it reclaims the cold band but cannot reclaim the live growing slice, and that run still fails.
 This result also clarifies the recycling advantage reported earlier.
-Recycling bounds the pool to what is concurrently live, reusing freed buffers instead of growing the pool; page release acts on the resident side, returning freed pages to the operating system so that anonymous memory falls back with the working set instead of staying at the peak it once reached.
+Recycling bounds the pool to what is concurrently live and reuses freed buffers instead of growing the pool.
+Page release returns freed pages to the operating system, so anonymous memory falls back with the working set instead of staying at its peak.
 
 % [7.6-answer] --- answer to RQ3
 In answer to RQ3, past the cap memory behaves along a two-sided feasibility law.
@@ -1226,7 +1227,9 @@ RQ0 asks how an \ac{OOC} backend can integrate into the push-based execution mod
 RQ1 asks whether the backend prevents OOM failures beyond the budget, and it does inside a characterized window; at 512\,MB it completes 14 of 24 runs where the capped in-memory engine completes 0 of 18, and the output checksums match while spilling is active.
 RQ2 asks the cost, which is 11 to 15 percent throughput at matched buffer size, with a 99th-percentile latency 1.1 to 1.6 times the in-memory engine.
 
-RQ3 asks how memory behaves as state grows and why failures happen, and its investigation is the deepest of the thesis; the attribution ladder raises the decisive cell from 0 of 10 to 7 of 8, pooled lever configurations complete 12 of 16 against 0 of 16 for unpooled levers, and the residual failure is a diagnosed allocation deadlock, observed as no returned buffer in 118 of 138 stalls.
+RQ3 asks how memory behaves as state grows and why failures happen.
+The attribution ladder raises the decisive cell from 0 of 10 to 7 of 8, and pooled lever configurations complete 12 of 16 against 0 of 16 for unpooled levers.
+The residual failure is a diagnosed allocation deadlock, observed as no returned buffer in 118 of 138 stalls.
 RQ4 asks how processor and disk use evolve, and the throttled regime shows the answer, 62 percent utilization and a disk-bound workload.
 RQ5 asks how efficiently storage is used, and the state consists of 51 percent headers with a device-level write amplification of 1.0 to 1.8.
 Table~\ref{tab:verdicts} compresses these answers into one row per research question.
@@ -1244,7 +1247,7 @@ RQ1 & Met inside a characterized window & 14/24 vs 0/18 at 512\,MB, $p = 4.1 \ti
 \hline
 RQ2 & Met & $-11$ to $-15\%$ throughput at matched buffer size; p99 1.1--1.6$\times$ \\
 \hline
-RQ3 & Met; the central investigation & attribution ladder 0/10 $\to$ 7/8; pooled vs.\ unpooled levers 12/16 vs 0/16, $p = 8.1 \times 10^{-6}$; deadlock shown in 118/138 stalls \\
+RQ3 & Met & attribution ladder 0/10 $\to$ 7/8; pooled vs.\ unpooled levers 12/16 vs 0/16, $p = 8.1 \times 10^{-6}$; deadlock shown in 118/138 stalls \\
 \hline
 RQ4 & Met & throttled regime at 62\% CPU, I/O-bound \\
 \hline
@@ -1260,23 +1263,24 @@ RQ5 & Met with a stated proxy & headers 51\% of state; write amplification 1.0--
 Figure~\ref{fig:pvalues} collects the chapter's headline completion contrasts in a single view, each a two-configuration comparison of completed against attempted runs with its Fisher's exact $p$-value.
 Every row was developed earlier in the chapter; here they stand side by side.
 
-The \emph{flagship} (spilling versus its absence, Section~\ref{sec:rq1-headline}) has $p = 4.1 \times 10^{-5}$.
+The \emph{primary finding} (spilling versus its absence, Section~\ref{sec:rq1-headline}) has $p = 4.1 \times 10^{-5}$.
 The \emph{attribution ladder}, completion at the decisive cell as pooling and its levers are switched on one factor at a time, rises from 0/8 to 7/8 at $p = 7.0 \times 10^{-4}$ (Section~\ref{sec:rq3}).
 The \emph{pooled lever configurations} set the pool-pressure levers with pooling engaged against the same levers without it, 12/16 versus 0/16, at $p = 8.1 \times 10^{-6}$ (Section~\ref{sec:rq3}).
 The \emph{allocation-type} contrast at 512\,MB holds two spilling configurations at equal buffer size so that only heap-versus-pool allocation differs (s1034: pooled 8/8 versus matched-buffer-size heap 0/8) at $p = 7.8 \times 10^{-5}$ (Section~\ref{sec:disambiguation}).
 The \emph{intrinsic queue-pacing} cell, where the bounded pool's own throttling of ingest to the drain rate recovers a stall the heap does not, reads 23/24 versus 3/10 at $p = 1.6 \times 10^{-4}$ (Section~\ref{sec:rq3}).
 Every headline contrast has $p < 10^{-3}$.
 
-% [7.7.3] Resolve the apparent tension between the flagship and allocation rows.
-Three of these rows involve the heap configuration, and read side by side they appear to conflict; at the same workload and cap, the heap completes the flagship contrast yet fails the allocation-type contrast.
+% [7.7.3] Resolve the apparent tension between the primary-finding and allocation rows.
+Three of these rows involve the heap configuration, and read side by side they appear to conflict; at the same workload and cap, the heap completes the primary-finding contrast yet fails the allocation-type contrast.
 The two rows measure different things.
-The flagship sets the heap configuration against the capped in-memory engine, which cannot spill at all, so its axis is spilling versus its absence, and the heap completes out-of-core (14/24 versus 0/18).
-The allocation-type row sets two configurations that both spill and holds the I/O buffer size fixed so that only the allocation type differs; its heap side is therefore the matched-buffer-size control of Section~\ref{sec:disambiguation} rather than the engine-default heap of the flagship.
-At s1034 and 512\,MB that control's unbounded per-slice growth raises resident memory to 496 of 512\,MB and it is OOM killed 0 of 8, whereas the bounded pool holds the same working set at 390\,MB and completes 8 of 8; the flagship's default heap, with its smaller buffers, fits at 411\,MB and completes 8 of 8.
+The primary-finding row sets the heap configuration against the capped in-memory engine, which cannot spill at all, so its axis is spilling versus its absence, and the heap completes out-of-core (14/24 versus 0/18).
+The allocation-type row sets two configurations that both spill and holds the I/O buffer size fixed so that only the allocation type differs; its heap side is therefore the matched-buffer-size control of Section~\ref{sec:disambiguation} rather than the engine-default heap of the primary finding.
+At s1034 and 512\,MB the control's unbounded per-slice growth raises resident memory to 496 of 512\,MB, and it is OOM killed 0 of 8.
+The bounded pool holds the same working set at 390\,MB and completes 8 of 8.
+The primary finding's default heap, with its smaller buffers, fits at 411\,MB and completes 8 of 8.
 The heap configuration thus completes more than not spilling and less than bounded spilling at the tightest cell; the rows differ in baseline and configuration and do not contradict each other.
 
 % [7.7.4] Interpreting the cost: a factor where the device gap suggests an order of magnitude.
-One verdict deserves interpretation beyond its number.
 DRAM and a consumer SD card differ by orders of magnitude in bandwidth and access latency, so a backend that moves window state between them could be expected to lose an order of magnitude of throughput.
 The measured loss is 11 to 15 percent where both allocation types complete, and 50 to 63 percent at the beyond-memory Nexmark point.
 

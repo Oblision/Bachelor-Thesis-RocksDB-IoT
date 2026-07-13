@@ -4,7 +4,7 @@ One row per decisive completion-proportion contrast in the evaluation. Each row
 shows the point estimate of the completion-proportion DIFFERENCE (arm A minus arm
 B), its 95% confidence interval (Newcombe's method, built from Wilson score
 intervals via scipy), and the reported Fisher's-exact p-value (one-sided for
-every contrast except the flagship, which the prose reports two-sided). A dashed
+every contrast except the primary finding, which the prose reports two-sided). A dashed
 reference marks p = 0.05 in the p-value column; every contrast clears it by orders
 of magnitude.
 
@@ -25,7 +25,7 @@ import style
 # row uses the matched-granularity heap control). This is what keeps the heap's
 # flagship win and its allocation-row loss from reading as a contradiction.
 CONTRASTS = [
-    ("flagship: spill vs no spill\n(heap OOC vs capped in-memory)", 14, 24, 0, 18, 4.1e-5),
+    ("primary finding: spill vs no spill\n(heap OOC vs capped in-memory)", 14, 24, 0, 18, 4.1e-5),
     ("attribution ladder\n(levers on vs off)", 7, 8, 0, 8, 7.0e-4),
     ("pooled lever arms\n(pooled vs unpooled)", 12, 16, 0, 16, 8.1e-6),
     ("allocation type (s1034, 512 MB)\n(pooled vs matched-gran. heap)", 8, 8, 0, 8, 7.8e-5),
@@ -105,7 +105,7 @@ def main() -> None:
     fig.suptitle("Headline completion contrasts: effect size and significance",
                  fontsize=11, fontweight="bold")
     style.caption(fig, extra="(a) Newcombe 95% CI for the completion-proportion difference; "
-                             "(b) reported Fisher's-exact p (one-sided; flagship two-sided), dashed line at p = 0.05")
+                             "(b) reported Fisher's-exact p (one-sided; primary finding two-sided), dashed line at p = 0.05")
     style.save(fig, "fig_pvalues")
 
 

@@ -60,7 +60,7 @@ The OOC backend completes workloads whose state exceeds the memory budget and wh
 **Answer first:** At 512 and 1024 MB the backend completes workloads beyond the budget that the capped engine never finishes; at 2048 MB completion beyond the memory boundary is not demonstrated. Completion holds only inside the operating window this section maps.
 
 ### 5.3.1 Headline
-- Flagship contrast: 512 MB, heap 14/24 vs. in-memory 0/18, p = 4.1e-5.
+- Primary finding (renamed from "flagship"): 512 MB, heap 14/24 vs. in-memory 0/18, p = 4.1e-5.
 - Checksums match while spilling → every completion is a correct run.
 
 ### 5.3.2 Operating windows
