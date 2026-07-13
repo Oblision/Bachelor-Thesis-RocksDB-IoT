@@ -2,7 +2,7 @@
 
 Per cap and architecture: completion per (workload, pool) cell, with the failure
 MODE distinguished — allocation abort (pool too small for the demand) vs OOM kill
-(pool + induced overhead + base footprint breaks the cap). The knife-edge cell
+(pool + induced overhead + base footprint breaks the cap). The tipping-point cell
 (512 MB heap, r75: 10/10 at 16k, 6/10 at 32k, 0/10 at 64k) is annotated.
 Replaces the outdated img/geometry-feasibility.png.
 """
@@ -97,7 +97,7 @@ def main() -> None:
     for row in axes:
         row[0].set_ylabel("workload ($\\rho$ at cap)", fontsize=9)
 
-    # Knife edge (512 MB heap r75: 10/10 at 16k -> 6/10 at 32k -> 0/10 at 64k) is
+    # Tipping point (512 MB heap r75: 10/10 at 16k -> 6/10 at 32k -> 0/10 at 64k) is
     # described in the caption rather than annotated in-panel: the heap/512 grid is
     # fully populated, so any in-axes callout would occlude real data markers.
 

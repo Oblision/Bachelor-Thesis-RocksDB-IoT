@@ -1,4 +1,4 @@
-"""fig:knife — pool-size sensitivity of the heap allocation type at 512 MB, s327.
+"""fig:tipping-point — pool-size sensitivity of the heap allocation type at 512 MB, s327.
 
 One workload, one cap, one knob: completion against pool size for the
 L_ heap grid at 512 MB, s327, 16/8 RocksDB configuration only (matching
@@ -47,7 +47,7 @@ def main() -> None:
             color = gc.blend(style.RED, 0.75)
         ax.bar(k, frac, 0.62, color=color, edgecolor="black", linewidth=0.5)
         ax.text(k, frac + 0.03, f"{n_ok}/{reps}", ha="center", fontsize=8)
-        print(f"knife: pool {gc.pool_label(p)} -> {n_ok}/{reps}")
+        print(f"tipping-point: pool {gc.pool_label(p)} -> {n_ok}/{reps}")
     ax.set_xticks(range(len(pools)), [gc.pool_label(p) for p in pools])
     ax.set_ylim(0, 1.14)
     ax.set_yticks((0, 0.5, 1.0))
@@ -58,7 +58,7 @@ def main() -> None:
                  fontsize=11, fontweight="bold")
     style.caption(fig, extra="bars = completed/attempted; "
                              "$\\rho \\approx 0.64$; the pool is the only variable")
-    style.save(fig, "fig_knife")
+    style.save(fig, "fig_tipping_point")
 
 
 if __name__ == "__main__":

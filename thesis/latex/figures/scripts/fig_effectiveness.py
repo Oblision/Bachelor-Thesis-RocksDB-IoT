@@ -12,7 +12,7 @@ everything, are omitted; the full grid is in fig:heatmap.
 
 Source: L_/W_ matrices + the L_ in-memory baselines. 16/8 RocksDB
 configuration only: the 32/32 backend-size twin runs (*_b32_*) are excluded,
-matching fig_heatmap / fig_geometry_law / fig_knife; that contrast is
+matching fig_heatmap / fig_geometry_law / fig_tipping_point; that contrast is
 analysed separately in Section~sec:rb32.
 """
 from __future__ import annotations
@@ -151,9 +151,16 @@ def main() -> None:
             ooc_l.append("")
         else:
             r = o["n_ok"] / o["reps"]
-            best = o.loc[r.idxmax()]
+            # Ties (all-fail cells: every tested pool/arm gives 0 of reps) are
+            # broken toward the largest pool_buffers, so the label always names
+            # the most generous configuration tried rather than an arbitrary
+            # first row — matching the "even the largest pool still fails"
+            # framing used in the body text and the geometry-law captions.
+            tied = o[r == r.max()]
+            best = tied.loc[tied["pool_buffers"].idxmax()]
             ooc_f.append(best["n_ok"] / best["reps"])
-            ooc_l.append(f"{int(best['n_ok'])}/{int(best['reps'])}")
+            tag = f"{gc.pool_label(best['pool_buffers'])} {best['arm'][0].upper()}"
+            ooc_l.append(f"{tag}\n{int(best['n_ok'])}/{int(best['reps'])}")
 
     bi = ax_b.bar(x - width / 2, np.nan_to_num(inm_f), width, color=style.ORANGE)
     bo = ax_b.bar(x + width / 2, np.nan_to_num(ooc_f), width, color=style.BLUE)
@@ -200,7 +207,9 @@ def main() -> None:
 
     # The r500@1024 pool-geometry counterexample (lower rho than r300, yet 0/10:
     # its hot band needs a 96k pool too big for 1024 MB) is discussed in the text
-    # and flagged as a short caption note, not annotated on the plot.
+    # and flagged as a short caption note; the pool size/arm tag above each
+    # out-of-core bar (see ooc_l above) now also names the tested configuration
+    # directly on the plot, so a reader can see which pool that 0/10 reflects.
 
     ax_b.set_xticks(x, [f"{data.wlabel(w)}\n$\\rho$ {rho:.2f}" for _c, w, rho in coords],
                     fontsize=7.5)

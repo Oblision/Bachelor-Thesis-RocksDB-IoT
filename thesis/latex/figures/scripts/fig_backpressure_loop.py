@@ -69,13 +69,27 @@ def main() -> None:
     arrow(ax, (10.25 - 1.3, yd), (7.0 + W / 2, yd), color=style.GREY)
     lbl(8.6, yd + 0.55, "drain @\ndevice rate", c=style.GREY, fs=7.6)
 
-    # the pacing loop, closed as an arc ABOVE the row (buffer pool -> sources)
-    arrow(ax, (xs[3] - 0.4, y + H / 2), (xs[0] + 0.4, y + H / 2),
+    # the pacing loop, closed as an arc ABOVE the row: the arc runs Admission
+    # queue -> Sources, the last and most direct link in the chain — the queue
+    # is what's blocked (full), and that is what stalls the source thread
+    # trying to push into it. The earlier links (pool empty -> operator slows
+    # -> queue fills) are stated as the explanatory line above instead of drawn,
+    # since they are not where the concrete stall happens. A short action label
+    # sits on the arc, matching the terse one-to-three-word style of every
+    # other edge label ("rent buffer", "spill", "drain @ device rate").
+    arrow(ax, (xs[1] - 0.4, y + H / 2), (xs[0] + 0.15, y + H / 2),
           color=style.RED, lw=1.9, rad=0.30)
+    ax.text((xs[1] + xs[0]) / 2 + 0.15, 4.05, "queue full,\nblocks & retries",
+            ha="center", va="center", fontsize=8.3, color=style.RED,
+            fontweight="bold")
     ax.text(6.0, 5.38,
             "buffers free only at the drain rate $\\Rightarrow$ operator slows "
             "$\\Rightarrow$ queue fills $\\Rightarrow$ sources sleep until a slot frees",
             ha="center", va="center", fontsize=8.5, color=style.RED)
+    ax.text(xs[0], y - H / 2 - 0.22,
+            "addAdmissionTaskBlocking(): the source thread stalls here",
+            ha="center", va="top", fontsize=7.2, color=style.RED,
+            style="italic", family="monospace")
 
     ax.text(6.0, 0.12,
             "Sleeping on the full queue paces ingest to the drain rate and the "

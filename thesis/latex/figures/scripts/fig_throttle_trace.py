@@ -121,10 +121,10 @@ def main() -> None:
                 ha="left")
 
     ax.set_xlabel("time since run start (s)")
-    ax.set_ylabel("memory (MB); solid: anonymous set")
+    ax.set_ylabel("memory (MB); solid: anonymous set (incl. pool)")
     ax.set_ylim(0, CAP + 40)
     ax.set_xlim(left=0)
-    ax.set_title("One run each at cap 512 MB, 16k bounded pool")
+    ax.set_title("Pacing lets the heaviest load complete; lighter loads abort or OOM")
     fig.legend(handles=handles, loc="outside lower center", ncol=3,
                fontsize=8.0)
     style.save(fig, "fig_throttle_trace")

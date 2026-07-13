@@ -7,11 +7,13 @@ cells, the workload's unthrottled demand (median tps of its completing in-memory
 / uncapped reference runs; a dead run has no realized rate of its own). y =
 state pressure rho.
 
-Encoding: colour = outcome / failure reason, shape = architecture.
-  green  = completes
-  orange = pool-exhaustion abort (the pool is too small for the hot band)
-  red    = OOM kill (the pool plus its overhead breaks the cap)
-  circle = heap architecture, square = bounded architecture
+Encoding: colour AND shape both carry outcome (redundant, so outcome reads
+at a glance without checking colour); fill carries architecture.
+  green circle    = completes
+  orange square   = pool-exhaustion abort (the pool is too small for the hot band)
+  red X           = OOM kill (the pool plus its overhead breaks the cap)
+  filled          = heap architecture
+  hollow (white fill, coloured edge) = bounded architecture
 
 The plane reads as three bands, split by the rho=1 memory boundary and the
 storage-drain ceiling (~2.6 M/s):
@@ -121,18 +123,24 @@ def main() -> None:
     ax.axhline(1.0, color="#666666", lw=0.9, ls="--", zorder=2)         # rho=1, exact
     ax.axvline(drain_ceiling, color="#3a3a3a", lw=1.1, ls=(0, (4, 2)), zorder=2)
 
-    # Markers: shape = architecture, colour = outcome / failure reason.
-    SHAPE = {"heap": "o", "bounded": "s"}
-    REASON = {"POOL": style.ORANGE, "OOM": "#D62728"}
-    for cat in ("POOL", "OOM"):
+    # Markers: shape = outcome (circle/square/X), redundant with colour so the
+    # outcome reads without checking colour; fill = architecture (filled =
+    # heap, hollow white fill + coloured edge = bounded). Shape previously
+    # doubled for architecture, which collided with "circle" also meaning
+    # heap architecture elsewhere in this figure family; fill now carries
+    # architecture instead, freeing shape for outcome alone.
+    SHAPE = {"ok": "o", "POOL": "s", "OOM": "X"}
+    REASON = {"ok": style.GREEN, "POOL": style.ORANGE, "OOM": "#D62728"}
+    for cat in ("POOL", "OOM", "ok"):
         for arm in ("heap", "bounded"):
             xs, ys = pts[(arm, cat)]
-            ax.scatter(xs, ys, marker=SHAPE[arm], facecolors=REASON[cat],
-                       edgecolors="black", s=48, linewidths=0.5, zorder=3, alpha=0.92)
-    for arm in ("heap", "bounded"):
-        xs, ys = pts[(arm, "ok")]
-        ax.scatter(xs, ys, marker=SHAPE[arm], c=style.GREEN, s=42, alpha=0.92,
-                   edgecolors="black", linewidths=0.4, zorder=4)
+            hollow = arm == "bounded"
+            size = 42 if cat == "ok" else 48
+            ax.scatter(xs, ys, marker=SHAPE[cat],
+                       facecolors=("white" if hollow else REASON[cat]),
+                       edgecolors=(REASON[cat] if hollow else "black"),
+                       s=size, linewidths=(1.1 if hollow else 0.5),
+                       zorder=(4 if cat == "ok" else 3), alpha=0.92)
 
     # Reference-line labels.
     ax.text(drain_ceiling, 3.16,
@@ -155,17 +163,18 @@ def main() -> None:
     ax.set_xlabel("ingest rate (million tuples/s)")
     ax.set_ylabel("state pressure $\\rho$")
 
-    # Legend: colour = reason, shape = architecture.
+    # Legend: shape = outcome (redundant with colour), fill = architecture.
     # Single legend so constrained_layout reserves its space (two stacked
     # legends do not, and collide with the title). Column-major fill order lays
-    # the three colours across the top row and the two shapes on the bottom row.
-    G, O, R, S = style.GREEN, style.ORANGE, "#D62728", "#bbbbbb"
+    # the three outcomes across the top row and the two architectures on the
+    # bottom row.
+    G, O, R, S = style.GREEN, style.ORANGE, "#D62728", "#888888"
     handles = [
         Line2D([], [], marker="o", ls="", mfc=G, mec="black", label="completes"),
-        Line2D([], [], marker="o", ls="", mfc=S, mec="black", label="heap architecture"),
-        Line2D([], [], marker="o", ls="", mfc=O, mec="black", label="pool abort (pool too small)"),
-        Line2D([], [], marker="s", ls="", mfc=S, mec="black", label="bounded architecture"),
-        Line2D([], [], marker="o", ls="", mfc=R, mec="black", label="OOM (pool + overhead $>$ cap)"),
+        Line2D([], [], marker="o", ls="", mfc=S, mec="black", label="heap (filled)"),
+        Line2D([], [], marker="s", ls="", mfc=O, mec="black", label="pool abort (pool too small)"),
+        Line2D([], [], marker="o", ls="", mfc="white", mec=S, mew=1.4, label="bounded (hollow)"),
+        Line2D([], [], marker="X", ls="", mfc=R, mec="black", label="OOM (pool + overhead $>$ cap)"),
     ]
     ax.legend(handles=handles, loc="lower left", bbox_to_anchor=(0.0, 1.015),
               fontsize=7.9, framealpha=1.0, ncol=3, borderpad=0.4,

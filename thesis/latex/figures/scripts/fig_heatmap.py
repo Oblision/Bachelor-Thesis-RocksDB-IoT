@@ -8,7 +8,7 @@ matrix incl. in-memory baselines) and bounded (pooled, W_ grid) architectures.
 analysed on its own in Section~sec:rb32 / Appendix E.6, not pooled in here.
 This figure carries ONE message: where each architecture completes. The
 failure-reason breakdown lives in fig_geometry_law (bounded two-sided law)
-and the s327 pool sweep in fig_knife; both were split out of this figure to
+and the s327 pool sweep in fig_tipping_point; both were split out of this figure to
 keep it readable. Every cell in the probed 16/8 grid has data (no untested
 cells occur here), so there is no "not tested" marker.
 

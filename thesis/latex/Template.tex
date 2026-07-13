@@ -9,7 +9,8 @@
 
 \usepackage[ngerman, english]{babel}
 \usepackage[utf8]{inputenc}
-\usepackage{graphicx} 
+\usepackage{graphicx}
+\usepackage{float}
 \usepackage{url}           	 
 \usepackage{hyperref} 	
 \usepackage{listings, color}	% for source code
@@ -58,7 +59,7 @@
 % Placeholder box for figures that are not yet produced.
 % Usage: \figplaceholder{description of the planned figure}{caption}{fig:label}
 \newcommand{\figplaceholder}[3]{%
-  \begin{figure}[ht]
+  \begin{figure}[H]
     \centering
     \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering
       \textbf{[Figure placeholder]}\\[0.6em]\small #1}}
@@ -79,23 +80,23 @@
 % only \methodsnote or \nexmarknote, a short pointer back to it, so the full
 % paragraph is not repeated under every plot. A future campaign with its own
 % setup can add another \dots notefull / \dots note pair the same way.
-\newcommand{\methodsnotefull}{{\footnotesize\color{black!55}%
+\newcommand{\methodsnotefull}{{\footnotesize%
 Synthetic Zipfian sensor stream ($s\approx1.0$, 1.5\,M-key universe, top-10
 $\approx20\%$ of traffic); tumbling window 50{,}000\,ms of event time, emit lag
 4\,M\,ms ($N_w=80$ retained windows); 2 pinned cores, hard cgroup cap, lz4 spill to SD card.
 $n=8$ to 10 repetitions per cell unless labelled otherwise. Source:
 lag-validation campaign (3{,}133 runs, 457 cells), debug build, single host; full
 setup in Section~\ref{sec:setup}, device profile in Table~\ref{tab:edge-profile}.}}
-\newcommand{\nexmarknotefull}{{\footnotesize\color{black!55}%
+\newcommand{\nexmarknotefull}{{\footnotesize%
 Nexmark bid stream: canonical bid schema, hot-skewed auction popularity (Zipf
 head), in-order event time. Two tumbling-window aggregations, \texttt{q3} (sum
 per auction) and \texttt{q7}, the \emph{Highest Bid} (maximum per auction).
 Arms: capped in-memory engine, bounded pooled backend (B2), heap backend (U8);
 $n=8$ repetitions per cell. Source: Nexmark V2 campaign (210 cells), single host;
 setup in Section~\ref{sec:nexmark}, device profile in Table~\ref{tab:edge-profile}.}}
-\newcommand{\methodsnote}{\par\smallskip{\footnotesize\color{black!55}%
+\newcommand{\methodsnote}{\par\smallskip{\footnotesize%
 Synthetic grid campaign; full setup in Section~\ref{sec:methods-grid}.}}
-\newcommand{\nexmarknote}{\par\smallskip{\footnotesize\color{black!55}%
+\newcommand{\nexmarknote}{\par\smallskip{\footnotesize%
 Nexmark campaign; full setup in Section~\ref{sec:methods-nexmark}.}}
 
 % Float placement: keep section-5 figures near their references instead of
@@ -216,6 +217,7 @@ Nexmark campaign; full setup in Section~\ref{sec:methods-nexmark}.}}
  \acro{OOC}{out-of-core}
  \acro{OOM}{out of memory}
  \acro{RAM}{random access memory}
+ \acro{reclaim}{page reclaim}
  \acro{CSV}{comma-separated values}
  \acro{RQ}{research question}
  \acro{SD}{Secure Digital Memory Card}

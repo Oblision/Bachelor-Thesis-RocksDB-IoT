@@ -28,8 +28,8 @@ CONTRASTS = [
     ("flagship: spill vs no spill\n(heap OOC vs capped in-memory)", 14, 24, 0, 18, 4.1e-5),
     ("attribution ladder\n(levers on vs off)", 7, 8, 0, 8, 7.0e-4),
     ("pooled lever arms\n(pooled vs unpooled)", 12, 16, 0, 16, 8.1e-6),
-    ("allocation type (r200, 512 MB)\n(pooled vs matched-gran. heap)", 8, 8, 0, 8, 7.8e-5),
-    ("intrinsic queue pacing (r200)\n(bounded vs heap)", 23, 24, 3, 10, 1.6e-4),
+    ("allocation type (s1034, 512 MB)\n(pooled vs matched-gran. heap)", 8, 8, 0, 8, 7.8e-5),
+    ("intrinsic queue pacing (s1034)\n(bounded vs heap)", 23, 24, 3, 10, 1.6e-4),
 ]
 
 

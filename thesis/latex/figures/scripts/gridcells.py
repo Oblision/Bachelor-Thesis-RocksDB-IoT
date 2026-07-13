@@ -1,5 +1,5 @@
 """Shared helpers for the operating-window figure family
-(fig_heatmap, fig_geometry_law, fig_knife).
+(fig_heatmap, fig_geometry_law, fig_tipping_point).
 
 Failure-categorisation policy (mirrors the thesis accounting in
 Sec. "Geometry, the Valley, and the Crash Cluster"):

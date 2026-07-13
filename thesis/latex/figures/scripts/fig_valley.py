@@ -139,8 +139,7 @@ def main() -> None:
     ax0.set_ylabel("completion fraction")
     ax0.set_ylim(-0.08, 1.16)
     ax0.set_yticks([0, 0.25, 0.5, 0.75, 1.0])
-    ax0.set_title(f"Completion at cap {CAP} MB, 16k bounded pool "
-                  "(middle column of the 512 MB grid)")
+    ax0.set_title("(a) completion fraction: the valley and its recovery")
     ax0.legend(loc="lower left", fontsize=8.3)
 
     # ---- panel (b): ingest rate vs drain ceiling ----
@@ -171,6 +170,7 @@ def main() -> None:
     ax1.set_xlim(-0.5, len(rows) - 1 + 0.78)
     ax1.set_xticks(x, labels, fontsize=8.5)
     ax1.set_xlabel("workload (ordered by state pressure $\\rho$)")
+    ax1.set_title("(b) ingest rate against the drain ceiling")
 
     handles = [
         Line2D([], [], marker="o", ls="", mfc=style.GREEN, mec=style.GREEN,
@@ -183,6 +183,9 @@ def main() -> None:
     ax1.legend(handles=handles, loc="lower left", fontsize=8.0,
                title="failing cells at unthrottled demand", title_fontsize=7.6)
 
+    fig.suptitle("Completion dips, then recovers, as pacing engages "
+                 f"({CAP} MB, {POOL // 1000}k pool)",
+                 fontsize=11, fontweight="bold")
     style.save(fig, "fig_valley")
 
 
