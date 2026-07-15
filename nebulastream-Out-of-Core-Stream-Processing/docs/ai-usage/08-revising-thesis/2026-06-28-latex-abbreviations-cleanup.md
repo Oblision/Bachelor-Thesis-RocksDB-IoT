@@ -17,6 +17,7 @@ artifacts:
   - misc/Annex.tex (Appendix B longtable columns rebalanced, gauge names no longer overflow)
   - thesis/experiments/rb32-config-contrast/fig_rb32.py (ylim padding so value labels clear the frame)
   - thesis/latex/figures/scripts/fig_race.py (legend entries shortened, "the race" tag removed)
+  - transcript: ../transcripts/claude-code/2026-06-28-find-any-out-of-memory-mention-and-replace-it-with.md (Claude Code session log)
 ---
 
 > **Reconstruction, not transcript.** This entry records the verbatim user
@@ -31,6 +32,12 @@ artifacts:
 > position in the session list. A later session revisited
 > abbreviation/consistency items before submission; see
 > `2026-07-15-abbreviation-consistency-figures-overleaf-export.md`.
+> Honesty note: the OOM-acronym commit used above to anchor this entry's
+> date (1f26e6d) was in fact made by a concurrent Claude Code session on
+> 2026-06-28, which performed five \ac{OOM} replacements in chapters 3, 5,
+> and 7 in an isolated `oom-acronym` worktree precisely because this
+> desktop session held uncommitted edits on the chapter files; that
+> session's full verbatim transcript is now attached under artifacts.
 
 ## Goal
 

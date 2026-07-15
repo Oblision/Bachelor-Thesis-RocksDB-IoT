@@ -14,12 +14,20 @@ artifacts:
   - nebulastream-Out-of-Core-Stream-Processing/nes-physical-operators/src/SliceStore/SpillableTimeBasedSliceStore.cpp (sampled growth-path re-check, largestResidentSlice(), GROWTHMAP trace, growth_spills counter)
   - HANDOFF_growth-spill-signal.md (repo root; later preserved in commit d5fdafb)
   - branch ooc-growth-spill-signal, commit 5ce6155 (committed and pushed by the author after the session, following the session's path-limited commit recipe)
+  - transcript: ../transcripts/claude-code/2026-06-28-find-any-out-of-memory-mention-and-replace-it-with.md (Claude Code session log; the preceding session containing the interrupt-driven wake-up analysis)
+  - transcript: ../transcripts/claude-code/2026-06-28-user-answered-claude-s-questions-given-the-rqs-act.md (Claude Code session log; the follow-up session that executed the handoff's git recipe)
 ---
 
 > **Reconstruction, not transcript.** This entry records the verbatim user
 > prompts and the session's outcomes. The assistant's responses are not
 > reproduced here; the exported desktop-app transcript is the primary record
 > and is attached to this folder on the next sync to the public fork.
+> Honesty note: both neighbouring Claude Code sessions are now attached
+> verbatim under artifacts, and the follow-up transcript shows that commit
+> 5ce6155 and the GitHub publication of `ooc-growth-spill-signal` were
+> performed inside that Claude Code session at the author's direction (the
+> pasted handoff plus git/REST-API steps), not typed by hand as "executed
+> the recipe" above may suggest.
 
 ## Goal
 

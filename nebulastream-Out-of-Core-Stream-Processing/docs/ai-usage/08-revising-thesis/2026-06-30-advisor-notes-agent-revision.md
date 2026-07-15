@@ -21,6 +21,12 @@ artifacts:
 > prompts and the session's outcomes. The assistant's responses are not
 > reproduced here; the exported desktop-app transcript is the primary record
 > and is attached to this folder on the next sync to the public fork.
+> Honesty note: the merge/fast-forward of `main` that prompt 1 describes as
+> the author's own step was performed earlier the same day in a Claude Code
+> session at the author's direction; its verbatim transcript is at
+> `../transcripts/claude-code/2026-06-30-we-need-to-make-a-lot-of-changes-before-we-d-e87ee8.md`
+> and it is documented in
+> `2026-06-30-rb32-reconciliation-and-main-fastforward.md`.
 
 ## Goal
 

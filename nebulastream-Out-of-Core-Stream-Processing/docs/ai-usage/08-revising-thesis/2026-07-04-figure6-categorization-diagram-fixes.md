@@ -25,6 +25,13 @@ artifacts:
 > from the transcript tail. Per its title, the session opened with the
 > categorization of Figure 6's outcomes and its missing data (the reachable
 > tail documents the follow-up figure passes only).
+> Honesty note: a concurrent Claude Code session (2026-07-04 to 2026-07-07)
+> worked the same Figure 6 run-count/missing-data question on 2026-07-05
+> among much else; its full verbatim transcript is at
+> `../transcripts/claude-code/2026-07-04-locate-the-two-passages-where-the-repo-is-placed-a.md`
+> and it has its own entry,
+> `2026-07-04-repo-passages-reference-map-ch5-clarity.md`, so overlapping
+> Figure 6 work in that window may belong to either session.
 
 ## Goal
 
