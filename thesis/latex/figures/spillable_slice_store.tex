@@ -168,9 +168,10 @@ spiller, the \texttt{SpillBackend} interface with its RocksDB implementation,
 \texttt{BufferManager} extensions: an availability query and the pool-pressure
 hooks of Section~\ref{sec:levers}. \texttt{SpillableAggregationSlice} subclasses
 \texttt{HashMapSlice} rather than wrapping it, so the build path keeps
-using \texttt{getHashMapPtr(WorkerId)} unchanged; only the probe path must
-force-unspill first, so that the state is back in memory before the probe runs.
-A slice becomes spill-eligible once its end timestamp falls below the
-watermark and it has left \texttt{WINDOW\_FILLING}.}
+using \texttt{getHashMapPtrOrCreate(WorkerThreadId)} unchanged; only the probe
+path must force-unspill first, so that the state is back in memory before the
+probe runs. A slice becomes spill-eligible once its end timestamp falls below
+the watermark but before the window is triggered for emission, the gap opened
+by the emit lag (Section~\ref{sec:architecture}).}
 \label{fig:ooc-integration}
 \end{figure}

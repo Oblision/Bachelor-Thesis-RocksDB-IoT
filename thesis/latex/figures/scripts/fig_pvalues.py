@@ -1,6 +1,6 @@
 """fig:pvalues — forest plot of the headline Fisher's-exact contrasts.
 
-One row per decisive completion-proportion contrast in the evaluation. Each row
+One row per headline completion-proportion contrast in the evaluation. Each row
 shows the point estimate of the completion-proportion DIFFERENCE (arm A minus arm
 B), its 95% confidence interval (Newcombe's method, built from Wilson score
 intervals via scipy), and the reported Fisher's-exact p-value (one-sided for
@@ -21,15 +21,14 @@ import style
 
 # (label, ok_A, n_A, ok_B, n_B, p_value) — completions and p verbatim from prose.
 # Each label names the ISOLATED axis and, where the heap arm appears, WHICH heap
-# configuration (the flagship uses the engine-default heap; the allocation-type
-# row uses the matched-granularity heap control). This is what keeps the heap's
+# configuration (the primary finding uses the engine-default heap; the allocation-type
+# row uses the matched-buffer-size heap control). This is what keeps the heap's
 # flagship win and its allocation-row loss from reading as a contradiction.
 CONTRASTS = [
-    ("primary finding: spill vs no spill\n(heap OOC vs capped in-memory)", 14, 24, 0, 18, 4.1e-5),
-    ("attribution ladder\n(levers on vs off)", 7, 8, 0, 8, 7.0e-4),
-    ("pooled lever arms\n(pooled vs unpooled)", 12, 16, 0, 16, 8.1e-6),
-    ("allocation type (s1034, 512 MB)\n(pooled vs matched-gran. heap)", 8, 8, 0, 8, 7.8e-5),
-    ("intrinsic queue pacing (s1034)\n(bounded vs heap)", 23, 24, 3, 10, 1.6e-4),
+    ("heap OOC vs capped in-memory\n512 MB cap; s736, s1034, s1582", 14, 24, 0, 18, 4.1e-5),
+    ("pooling with reserve + paced\nrestore vs pooling alone\n1024 MB / 32k / s736", 7, 8, 0, 8, 7.0e-4),
+    ("levers (reserve, reserve + paced\nrestore), with vs without pooling\n1024 MB / 32k / s736", 12, 16, 0, 16, 8.1e-6),
+    ("pooled vs\nmatched-buffer-size heap\n512 MB / 16k / s1034", 8, 8, 0, 8, 7.8e-5),
 ]
 
 
@@ -77,7 +76,7 @@ def main() -> None:
     axf.set_xlim(-0.15, 1.15)
     axf.set_yticks(ys, [c[0] for c in CONTRASTS], fontsize=8.2)
     axf.set_ylim(-0.6, len(CONTRASTS) - 0.4)
-    axf.set_xlabel("completion-proportion difference (arm A $-$ arm B), 95% CI")
+    axf.set_xlabel("completion-proportion difference, 95% confidence interval")
     axf.set_title("(a) effect size", fontsize=9.5)
     axf.grid(True, axis="x", alpha=0.25)
 
@@ -104,7 +103,7 @@ def main() -> None:
 
     fig.suptitle("Headline completion contrasts: effect size and significance",
                  fontsize=11, fontweight="bold")
-    style.caption(fig, extra="(a) Newcombe 95% CI for the completion-proportion difference; "
+    style.caption(fig, extra="(a) Newcombe 95% CI for the completion-proportion difference (first named configuration minus second); "
                              "(b) reported Fisher's-exact p (one-sided; primary finding two-sided), dashed line at p = 0.05")
     style.save(fig, "fig_pvalues")
 

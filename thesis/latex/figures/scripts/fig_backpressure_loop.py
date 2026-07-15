@@ -78,8 +78,8 @@ def main() -> None:
     # sits on the arc, matching the terse one-to-three-word style of every
     # other edge label ("rent buffer", "spill", "drain @ device rate").
     arrow(ax, (xs[1] - 0.4, y + H / 2), (xs[0] + 0.15, y + H / 2),
-          color=style.RED, lw=1.9, rad=0.30)
-    ax.text((xs[1] + xs[0]) / 2 + 0.15, 4.05, "queue full,\nblocks & retries",
+          color=style.RED, lw=1.9, rad=0.42)
+    ax.text((xs[1] + xs[0]) / 2 + 0.15, 4.35, "queue full,\nblocks & retries",
             ha="center", va="center", fontsize=8.3, color=style.RED,
             fontweight="bold")
     ax.text(6.0, 5.38,
@@ -97,6 +97,8 @@ def main() -> None:
             "the drain and the pool aborts first.",
             ha="center", va="bottom", fontsize=8.3, color="#333333")
 
+    fig.suptitle("The source-pacing loop: a full admission queue throttles "
+                 "ingest to the drain rate", fontsize=11, fontweight="bold")
     style.save(fig, "fig_backpressure_loop")
 
 

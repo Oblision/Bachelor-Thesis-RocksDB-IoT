@@ -38,6 +38,8 @@ def _load_trace(rep: int) -> np.ndarray:
 def main() -> None:
     style.use_style()
     df = data.load_runs()
+    rho_mb = data.rho_table(df)
+    rho200 = rho_mb[200] / CAP_MB
     runs = df[(df["cell"] == CELL)].sort_values("label")
     elapsed = runs["elapsed_s"].median()
     print(f"{CELL}: {int(runs['ok'].sum())}/{len(runs)} ok, modal rc",
@@ -100,7 +102,8 @@ def main() -> None:
                  transform=axes[0].transAxes, ha="center", va="bottom",
                  fontsize=8.2, style="italic", color="#444444")
 
-    fig.suptitle("Anatomy of the allocation deadlock (1024 MB / 32k pool / r200)",
+    fig.suptitle("Anatomy of the allocation deadlock "
+                 f"(1024 MB / 32k pool / {data.wlabel(200)}, $\\rho$ {rho200:.2f})",
                  fontsize=11, fontweight="bold")
     style.caption(fig, extra="cgroup 0.2 s sampler · all 8 reps of the cell fail (rc 141)")
     style.save(fig, "fig_gridlock")

@@ -186,7 +186,11 @@ Nexmark campaign; full setup in Section~\ref{sec:methods-nexmark}.}}
 \blfootnote{Chapters~3--5 form the core of this thesis: Chapter~3 states the research problem and questions, Chapter~4 presents the spillable slice store and its implementation, and Chapter~5 reports the experimental evaluation. Chapters~1, 2, 6, and~7 provide the motivation, background, related work, and conclusion. The principal contributions are in Chapters~4 and~5.} 
 
 %list of figures
-\listoffigures
+% Local no-op on \addvspace: \chapter unconditionally writes an \addvspace{10pt}
+% into the .lof at every chapter boundary, even for chapters with no figures.
+% With 30 figures across 5 chapters + appendix those accumulate into uneven,
+% oversized gaps and push the list onto a second page. Scoped to this list only.
+{\renewcommand{\addvspace}[1]{}\listoffigures}
 
 %list of tables
 \listoftables

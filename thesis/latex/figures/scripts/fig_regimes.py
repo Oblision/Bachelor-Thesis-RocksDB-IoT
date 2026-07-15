@@ -37,7 +37,7 @@ def main() -> None:
     ax.text(0.48, 0.78, "peak pool demand $\\leq$ pool", ha="center", va="top",
             fontsize=9)
     ax.text(0.48, 0.52,
-            "completes at full speed\n\nexample: r500/r700 at 2048 MB\n"
+            "completes at full speed\n\nexample: b1374/b1676 at 2048 MB\n"
             "10/10, zero slices spilled\nCPU 89–97%", ha="center", va="center",
             fontsize=8.8)
 
@@ -51,7 +51,7 @@ def main() -> None:
             ha="center", va="top", fontsize=8.6)
     ax.scatter([1.13], [0.60], c=style.GREEN, marker="*", s=190,
                edgecolors="black", linewidths=0.7, zorder=5)
-    ax.text(1.20, 0.60, "s1034, cap 512 MB / 16k pool: 23/24 complete",
+    ax.text(1.20, 0.60, "s1034 at 512 MB / 16k pool: completes throttled",
             ha="left", va="center", fontsize=8.2)
 
     # ---- Regime 3 (bottom right) ----
@@ -64,7 +64,7 @@ def main() -> None:
             ha="center", va="top", fontsize=8.6)
     ax.scatter([1.13], [0.075], c=style.RED, marker="*", s=190,
                edgecolors="black", linewidths=0.7, zorder=5)
-    ax.text(1.20, 0.075, "same workload, cap 1024 MB, 2$\\times$ pool: 0/8 (rc 141)",
+    ax.text(1.20, 0.075, "same workload at 1024 MB, 2$\\times$ pool: deadlocks",
             ha="left", va="center", fontsize=8.2)
 
     # ---- axes ----

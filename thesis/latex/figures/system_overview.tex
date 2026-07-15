@@ -102,18 +102,9 @@
 
 \end{tikzpicture}%
 }
-\caption[System overview: the path of window state through the components]{%
-System overview: the path window state takes through the components. Worker
-threads write arriving tuples into the hot slice of the current window; its
-state lives in hash maps whose pages come from the global buffer pool (bounded
-allocation) or, under the engine's 4096-byte default, from the process heap.
-Once the watermark passes, the completed window becomes a cold slice and is
-held for the emit lag $L$. The spiller thread watches the live slice bytes
-against the soft and hard thresholds and evicts cold slices into RocksDB,
-which flushes them to the SD card. Before emission, spilled slices are read
-back and restored by a plain byte copy into pages, and the results leave the
-engine. Everything above the SD card runs in one process under the hard memory
-cap; if its anonymous memory exceeds the cap, the kernel kills the process.
-Figure~\ref{fig:ooc-integration} shows the same components at the class level.}
+\caption[System overview of the window-state path]{%
+System overview: the path window state takes through the components, from
+ingest to emission. Figure~\ref{fig:ooc-integration} shows the same
+components at the class level.}
 \label{fig:system-overview}
 \end{figure}

@@ -7,28 +7,28 @@ This chapter concludes the thesis. It summarizes the contributions, states their
 
 This thesis asks whether NebulaStream can process window state larger than memory on edge-class devices.
 Within the evaluated scope, the answer is yes.
-Under hard memory caps the spillable backend completes workloads whose state exceeds the memory budget and which the unmodified engine cannot finish, with matching output checksums and at a bounded throughput cost.
+Under hard memory caps, the spillable backend completes workloads whose state exceeds the memory budget and which the unmodified engine cannot finish, with matching output checksums and at a bounded throughput cost.
 The thesis builds this backend as a spillable slice store with RocksDB as the storage engine, evaluates it under hard memory caps across roughly 3{,}100 measured runs, and investigates every failure until its cause is known.
 
 % [9.1 — one conclusion per contribution]
 The seven contributions hold as follows.
-C1: the backend integrates behind the unchanged store interface and operated across the full evaluation without changes to the compilation pipeline.
-C2: the harness reproduces every result from one binary, with pre-registered hypotheses and six memory probes; the evaluation data and analysis documents are versioned with the code.
+C1: the backend integrates behind the unchanged store interface and operates across the full evaluation without changes to the compilation pipeline.
+C2: the harness reproduces every result from a single binary, with pre-registered hypotheses and six memory probes; the evaluation data and analysis documents are versioned alongside the code.
 C3: the backend prevents OOM failures inside characterized operating windows per memory budget (Table~\ref{tab:windows}), and completion depends on the race between ingest and drain rather than on a state-size threshold.
 C4: a single engine default kept all window state outside the buffer pool in every configuration.
-The one-flag pooled configuration with pool-pressure levers reaches, at the decisive cell, the in-memory engine's throughput at 25\% less anonymous memory (517 versus 685\,MB, Section~\ref{sec:rq3}).
+The one-flag pooled configuration with pool-pressure levers reaches, at one measured cell (1024\,MB cap, 32k pool, s736), 98\% of the in-memory engine's throughput at 25\% less anonymous memory (517 versus 685\, MB, Section~\ref{sec:rq3}).
 The same allocation distinction determines how to size the RocksDB backend (\hyperref[app:rb32]{Appendix~E.6}).
 
-C5: the failures follow a three-regime feasibility law, and the residual failure is an allocation deadlock in which emitted state pins the buffer pool while the workers that would drain it are all blocked allocating, demonstrated by direct instrumentation (Figure~\ref{fig:gridlock}).
-C6: all mechanisms ship configuration-gated in an open branch; with gates closed the engine is byte-identical to the baseline.
-C7: the growth signal makes intra-slice growth visible on the production path once the slice cache is bypassed, and the page-release extension cuts steady anonymous memory by a further 55\% on draining workloads; neither converts the residual deadlock, which stays bound by the un-spillable hot slice and the minimum resident memory.
+C5: the failures follow a three-regime feasibility law, and the residual failure is an allocation deadlock in which emitted state pins the buffer pool while the workers that would drain it are all blocked on allocation, as demonstrated by direct instrumentation (Figure~\ref{fig:gridlock}).
+C6: all mechanisms ship configuration-gated in an open branch; with gates closed, the engine is byte-identical to the baseline.
+C7: the growth signal makes intra-slice growth visible on the production path once the slice cache is bypassed, and the page-release extension cuts steady anonymous memory on draining workloads by 55\% below what pooling alone retains after a drain; neither resolves the residual deadlock, which remains bound by the un-spillable hot slice and the minimum resident memory.
 
 % [negative IoT finding — advisor note 2]
-The evaluation also yields one negative finding that no engine-side mechanism can remove.
+The evaluation also yields one negative finding: once the storage device's write bandwidth is the bottleneck, no engine-side mechanism can remove that limit.
 In the \ac{IoT}, the ingestion rate and the storage device are not fixed.
-A deployment must assume that both vary widely from node to node.
+A deployment must assume that both vary widely across nodes.
 The ingestion rate is set by the sensors and the network rather than by the engine.
-The storage device is whatever SD card the node carries, and SD-card write bandwidth differs by an order of magnitude across cards.
+The storage device is the SD card the node carries, and SD card write bandwidth varies by an order of magnitude across cards.
 
 This matters because completion depends on the race between ingest and drain (C3).
 The spiller can only drain state to disk as fast as the card accepts writes.
@@ -36,20 +36,20 @@ The SD card's write bandwidth therefore bounds the drain rate (Section~\ref{sec:
 When the card is slow, the storage-bandwidth ceiling drops, and the band of ingest rates the engine can sustain shrinks with it.
 The moderate throughput cost reported for RQ2 depends on the same margin; it is a property of the tested card as much as of the backend, and the mechanisms that keep it moderate (Section~\ref{sec:eval-summary}) assume the device keeps up with the compacted spill stream.
 
-The practical consequence is that once storage is the bottleneck, the I/O path sets the limit, because no engine mechanism increases the write bandwidth of the storage device.
-The deployment must instead address the I/O path directly, by choosing a faster device, reducing the bytes written per window, or throttling ingest to stay under the storage-bandwidth ceiling.
-The three-regime law reaches the same conclusion from the other side (Section~\ref{sec:rq3}); in the disk-bound regime the run survives only by holding ingest below the rate the device can drain.
+The practical consequence is that once storage is the bottleneck, the I/O path sets the limit, as no engine mechanism can increase the storage device's write bandwidth.
+The deployment must instead address the I/O path directly by choosing a faster device, reducing the number of bytes written per window, or throttling ingest to stay under the storage-bandwidth ceiling.
+The three-regime law reaches the same conclusion from the other side (Section~\ref{sec:rq3}); in the disk-bound regime, the run survives only by holding ingest below the rate the device can drain.
 
 \section{Limitations and Generalizability\label{sec:generalizability}}
 
 % [8.3] Four kinds of limits: parameter-space scope, statistical certainty, system specificity, the rho metric.
-Four kinds of limits bound these conclusions, and each conclusion above should be read under them.
+Four kinds of limits bound these conclusions, and each conclusion above should be read in light of them.
 
 The first limit is scope.
 The evaluation covers a deliberately fixed subset of the design space; only the memory cap, the workload state, the pool size, and the allocation type were varied, while the window length, lateness bound, page size, compression, RocksDB configuration, partition count, core count, host, storage device, and query shape were each held at a single value (Section~\ref{sec:threats}).
 This targeting made the memory question answerable, but the conclusions therefore describe the tested subset rather than the solution space; other parameter choices may shift the operating windows, the cost bands, and the failure boundaries.
 The evaluation demonstrates the core capability independently of those choices; the backend processes state larger than memory by spilling to and restoring from storage, with correct output.
-The exact positions of the boundaries reported in Chapter~\ref{cha:evaluation} are conditional on the configuration and should not be carried over to other setups as fixed values.
+The exact boundary positions reported in Chapter~\ref{cha:evaluation} depend on the configuration and should not be carried over to other setups as fixed values.
 
 The second limit is statistical.
 Each cell carries only 8 to 10 repetitions, so per-cell completion fractions carry wide confidence intervals and are estimates rather than fixed values.
@@ -59,17 +59,17 @@ The third limit is system specificity.
 The effectiveness claim holds inside the characterized windows rather than universally.
 The specific thresholds, the pooling boundary, and the slice cache are NebulaStream-specific.
 The three-regime feasibility law and the deadlock pattern are stated in terms of one fixed shared buffer pool.
-Any engine with this property plausibly shows the same regimes; verifying this is future work.
+Any engine with this property is plausibly expected to exhibit the same regimes; verifying this is future work.
 
 The fourth limit is the $\rho$ metric itself.
-$\rho$ is defined as an uncapped workload's steady-state anonymous footprint divided by the cap (Section~\ref{sec:bg-metrics}) and is used throughout as if it were a fixed property of the workload, independent of the cap it is tested against.
+$\rho$ is defined as the uncapped workload's steady-state anonymous footprint divided by the cap (Section~\ref{sec:bg-metrics}) and is used throughout as if it were a fixed property of the workload, independent of the cap against which it is tested.
 It is not fully independent.
-At the one cell checked closely, s1034 at 1024\,MB ($\rho \approx 1.01$, Figure~\ref{fig:effectiveness}), the uncapped reference run is measurably a different execution than the same workload run under the real cap, about 14\% slower and correspondingly heavier in peak anonymous memory, with no overlap across repetitions.
+At the one cell checked closely, s1034 at 1024\, MB ($\rho \approx 1.01$, Figure~\ref{fig:effectiveness}), the uncapped reference run is measurably a different execution than the same workload run under the real cap, about 14\% slower and correspondingly heavier in peak anonymous memory, with no overlap across repetitions.
 The same pattern holds in the two other workloads checked.
-s736 runs 16\% slower uncapped than at its 1024\,MB cap (2.90 versus 3.43\,M tuples/s, no overlap across repetitions), and s1582 runs 10\% slower uncapped than at its 2048\,MB cap (2.48 versus 2.77\,M tuples/s, likewise no overlap); lower throughput and higher peak memory move together in both, well away from the boundary cell that motivated the check.
+s736 runs 16\% slower uncapped than at its 1024\, MB cap (2.90 versus 3.43\, M tuples/s, no overlap across repetitions), and s1582 runs 10\% slower uncapped than at its 2048\, MB cap (2.48 versus 2.77\, M tuples/s, likewise no overlap); lower throughput and higher peak memory move together in both, well away from the boundary cell that motivated the check.
 
 The likely mechanism is memory-allocator behavior.
-An allocator under no pressure to reuse freed memory lets a process's live data spread across more pages, which increases memory use and reduces locality, while a hard cap forces tighter reuse.
+An allocator under no pressure to reuse freed memory allows a process's live data to spread across more pages, increasing memory usage and reducing locality, whereas a hard cap forces tighter reuse.
 This account fits the data but is not independently confirmed; no allocator- or engine-level instrumentation was collected to isolate the exact mechanism, so it stands as the best-supported explanation rather than a demonstrated one.
 The consequence is that $\rho$, computed from the uncapped reference, mildly overstates true pressure at a given cap.
 The qualitative boundary this thesis reports (workloads clearly below $\rho = 1$ complete, workloads clearly above fail) is unaffected, but near that boundary $\rho$ should be read as approximate rather than exact, because the state actually resident differs between the uncapped and the capped execution modes the metric compares.
@@ -79,7 +79,7 @@ The qualitative boundary this thesis reports (workloads clearly below $\rho = 1$
 % [8.4]
 For an edge deployment of NebulaStream, the evaluation supports one recipe, within the scope stated above.
 Enable page pooling by raising the operator buffer size to the page size.
-Size the pool by the rule of Section~\ref{sec:rq5}, so that it holds the hot band and, together with its overhead and the base footprint, stays below 90\% of the cap.
+Size the pool according to the rule in Section~\ref{sec:rq5} so that it holds the hot band and, together with its overhead and the base footprint, remains below 90\% of the cap.
 Derive the soft threshold from the memory cap rather than from the pool (Section~\ref{sec:rq3}).
 Enable the reserve lever at 15\% and paced restore.
 Leave allocation backpressure off.
@@ -87,8 +87,8 @@ Leave allocation backpressure off.
 \section{Lessons Learned\label{sec:lessons}}
 
 Five working rules emerged from the investigation and are recorded here for successors.
-Pin every configuration knob explicitly; one differing binary default produced a fake optimum.
-Pre-register every hypothesis; the refuted explanations were as informative as the confirmed ones.
+Pin every configuration knob explicitly; a single differing binary default produced a false optimum.
+Pre-register every hypothesis; refuted explanations are as informative as confirmed ones.
 Report negative results in full; three of the six design mechanisms converted nothing, and stating this plainly is part of the contribution.
 Verify the allocation assumption behind every experiment; the levers acted on a pool without window state for an entire campaign.
 Validate component benchmarks at the system level; the storage backend's component-level byte savings did not hold under the memory cap.
@@ -106,7 +106,7 @@ The deadlock diagnosis isolates this reserve as the one missing mechanism, and i
 The second item is closed-loop ingest admission keyed to pool headroom, which would replace the accidental throttling by the memory cap with a deliberate mechanism.
 The third item is the 20\% state reduction from removing the unused virtual-dispatch pointer from map entries.
 The fourth item is an exception-safe restore path.
-The fifth item is epoch-stamped slice-cache invalidation, the upstream fix for the diagnosed corruption and for the hidden state growth the growth signal exposed (Section~\ref{sec:growth-release-results}).
+The fifth item is epoch-stamped slice-cache invalidation, the upstream fix for the diagnosed corruption and for the hidden state growth that the signal exposed (Section~\ref{sec:growth-release-results}).
 The sixth item is open-window spilling, which requires changes to the compilation pipeline and is out of scope here; it is the one remaining mechanism for the un-spillable hot slice that page release cannot reclaim.
 The seventh item is support for sliding windows and a fuller Nexmark suite.
 
@@ -120,10 +120,10 @@ The deadlock does not distinguish build-path from drain-path allocations (C5), s
 The second experiment studies the storage device directly.
 This thesis ran on one SD card and treated its write bandwidth as a fixed bound (Section~\ref{sec:rq4}).
 Profiling the SD card's read and write throughput directly, and re-running the best configurations on faster storage such as an \ac{SSD}, would separate the device limit from the engine limit.
-It would show how much of the residual failure is the card and how much is the engine.
+It would show how much of the residual failure is attributable to the card and how much to the engine.
 
 % [9.3]
 Three recommendations go upstream to NebulaStream independently of out-of-core processing.
-Raise the 4096-byte operator buffer default toward the page size; the default is slower at every tested cell, and the in-memory engine alone gains up to 13\%.
-Make the pooled-versus-unpooled allocation boundary explicit and observable instead of an implicit size comparison.
+Increase the 4096-byte operator buffer default toward the page size; the default is slower on every tested cell, and the in-memory engine alone gains up to 13\%.
+Make the pooled-versus-unpooled allocation boundary explicit and observable, rather than relying on an implicit size comparison.
 Ship the pool-pressure levers configuration-gated.

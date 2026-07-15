@@ -124,9 +124,10 @@ def main() -> None:
     ax.set_ylabel("memory (MB); solid: anonymous set (incl. pool)")
     ax.set_ylim(0, CAP + 40)
     ax.set_xlim(left=0)
-    ax.set_title("Pacing lets the heaviest load complete; lighter loads abort or OOM")
     fig.legend(handles=handles, loc="outside lower center", ncol=3,
                fontsize=8.0)
+    fig.suptitle("Pacing lets the heaviest load complete; lighter loads abort or OOM",
+                 fontsize=11, fontweight="bold")
     style.save(fig, "fig_throttle_trace")
 
 

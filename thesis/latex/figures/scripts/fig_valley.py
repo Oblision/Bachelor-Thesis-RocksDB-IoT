@@ -89,23 +89,7 @@ def main() -> None:
         2, 1, figsize=(6.6, 5.6), sharex=True,
         gridspec_kw=dict(height_ratios=[1.0, 1.0]))
 
-    # ---- panel (a): completion, observed valley vs expected pyramid ----
-    # naive expectation: completion tapers with size -- a pyramid, full at the
-    # light workloads and sloping to zero as the state grows. Drawn as a
-    # schematic silhouette (indicative, NOT a fitted / quantitative model).
-    xs = np.linspace(x[0], x[-1], 200)
-    t = (xs - x[0]) / (x[-1] - x[0])
-    # high at the very start, then a sharp roll-off on the left and a long low
-    # tail -- a left-leaning pyramid, drawn as a qualitative sketch (not a
-    # fitted model). Exponent < 1 pushes the steep descent toward the left.
-    expected = 0.5 * (1.0 + np.cos(np.pi * t ** 0.58))
-    ax0.fill_between(xs, 0, expected, color=style.GREY, alpha=0.08, zorder=1)
-    ax0.plot(xs, expected, ls="--", color=style.GREY, lw=1.6,
-             label="naive expectation: a pyramid tapering with size (qualitative)",
-             zorder=2)
-    ax0.text(1.18, 0.90, "qualitative",
-             ha="center", va="center", fontsize=7.8, color=style.GREY,
-             style="italic")
+    # ---- panel (a): observed completion valley ----
     ax0.plot(x, fracs, color=style.BLUE, lw=1.4, zorder=3)
     ax0.scatter(x, fracs, c=colors, s=95, zorder=4, edgecolors="white",
                 linewidths=1.1)
@@ -140,7 +124,6 @@ def main() -> None:
     ax0.set_ylim(-0.08, 1.16)
     ax0.set_yticks([0, 0.25, 0.5, 0.75, 1.0])
     ax0.set_title("(a) completion fraction: the valley and its recovery")
-    ax0.legend(loc="lower left", fontsize=8.3)
 
     # ---- panel (b): ingest rate vs drain ceiling ----
     ing = np.array([r["ingest"] for r in rows])

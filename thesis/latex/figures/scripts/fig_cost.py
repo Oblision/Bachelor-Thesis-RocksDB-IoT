@@ -2,7 +2,7 @@
 
 Three matched coordinates (~8 K buffers in every variant, same pool per arm):
 (512/16k/r075), (1024/32k/r100), (2048/64k/r200). Arms: in-memory baseline (I8),
-heap out-of-core (U8 control), bounded out-of-core (W). Medians over ok reps.
+heap out-of-core (U8 control), bounded out-of-core (W). Means over ok reps.
 Panels: throughput delta vs in-memory, p99 ratio vs in-memory, steady resident
 anon footprint (the -33% bounded advantage at 2048/r200).
 """
@@ -87,7 +87,7 @@ def main() -> None:
     ax.set_title("(c) resident footprint")
     ax.legend(fontsize=8, loc="upper left")
 
-    fig.suptitle("The cost of out-of-core at matched I/O granularity (~8 K buffers in every arm)",
+    fig.suptitle("The cost of out-of-core at matched I/O granularity",
                  fontsize=11, fontweight="bold")
     style.caption(fig, extra="three pool-matched coordinates · bars = means over completing reps")
     style.save(fig, "fig_cost")

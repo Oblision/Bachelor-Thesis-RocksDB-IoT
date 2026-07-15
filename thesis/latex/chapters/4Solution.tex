@@ -2,24 +2,24 @@
 % Drafted per POINT-SEQUENCE.md Ch.4 (points 5.1–5.11 design, 6.1–6.6 implementation).
 
 This chapter presents the backend as one final design.
-It works top-down.
-The complete solution comes first, at a high level.
-The chapter then decomposes it into components and describes each one in detail.
+The complete high-level solution comes first.
+The chapter then breaks down into components and describes each in detail.
 Where a component exists because a simpler design fell short, its section states the simpler alternative and why it is not enough, so the alternatives justify the final design.
 The last sections describe the implementation: the integration points and the instrumentation the system exposes.
-The harness that runs the evaluation belongs to the evaluation and opens Chapter~\ref{cha:evaluation}.
+The harness that runs the evaluation is part of the evaluation and opens Chapter~\ref{cha:evaluation}.
 
 \section{The Solution at a Glance\label{sec:solution-overview}}
 
 The backend stores tumbling-window state that is larger than main memory.
 It replaces NebulaStream's in-memory slice store with a spillable slice store behind the same interface, so operators above it do not change (Section~\ref{sec:architecture}).
-Figure~\ref{fig:system-overview} shows the components involved and the path window state takes through them; the rest of this chapter describes each component in turn.
+Figure~\ref{fig:system-overview} shows the components involved and the path window state takes through them.
 A background spiller thread moves completed windows to a RocksDB backend on local disk before memory pressure becomes fatal.
 
 \input{figures/system_overview}
-Two thresholds drive it: a soft threshold triggers preemptive spilling, and a hard threshold forces synchronous spilling under acute pressure (Section~\ref{sec:architecture}).
+Two thresholds drive it.
+A soft threshold triggers preemptive spilling, and a hard threshold forces synchronous spilling under acute pressure (Section~\ref{sec:architecture}).
 Three mechanism groups complete this core in the final design.
-The spiller reacts to the slice budget alone, so the design adds levers that react to pressure on the shared buffer pool (Section~\ref{sec:levers}).
+The spiller responds only to the slice budget, the live byte count of slice data pages, so the design adds levers that respond to pressure on the shared buffer pool (Section~\ref{sec:levers}).
 An allocation can still fail when the pool empties, so allocation backpressure lets it stall instead of abort (Section~\ref{sec:backpressure}).
 The controller sees a slice only when it is created, and spilled memory is never returned to the operating system, so a growth signal and page release close these two gaps (Section~\ref{sec:growth-release}).
 Every mechanism beyond the core is off by default, so the shipped baseline is byte-identical to the unmodified engine.
@@ -28,9 +28,9 @@ Every mechanism beyond the core is off by default, so the shipped baseline is by
 
 % [5.1]
 Four requirements follow from the goal in Chapter~\ref{cha:problem}.
-First, the backend spills state before memory pressure becomes fatal: a soft threshold triggers preemptive background spilling so that cold state leaves memory while the system is still healthy.
+First, the backend spills state before memory pressure becomes fatal: a soft threshold triggers preemptive background spilling, allowing cold state to leave memory while usage is still below the hard threshold.
 Second, preemptive spilling can fall behind.
-When pressure crosses a hard threshold despite it, the backend forces a synchronous spill on the allocating thread.
+When pressure crosses a hard threshold, the backend forces a synchronous spill on the allocating thread.
 The forced spill evicts state as quickly as the storage device permits, so an \ac{OOM} failure is averted rather than merely deferred.
 Third, it never changes query results.
 A window that was spilled and restored must produce the same output, byte for byte, as one that never left memory; Section~\ref{sec:reproducibility} describes how this is verified.
@@ -58,7 +58,7 @@ Figure~\ref{fig:ooc-integration} shows the store, its new components, and their 
 % [5.3b — emit lag: the thesis's addition that creates the cold-slice population]
 Standard NebulaStream emits a completed window without delay.
 This backend instead holds it for a configured emit lag $L$.
-During the lag no operator writes to the window anymore, so the spiller has time to move it to storage.
+During the lag, no operator writes to the window anymore, so the spiller has time to move it to storage.
 With window length $W$, the store then holds $N_w = L/W$ completed windows as cold slices at any time.
 
 % [5.4]
@@ -68,7 +68,7 @@ When the live slice bytes exceed the soft threshold, the spiller moves cold slic
 It moves cold slices first because no operator writes to them anymore.
 
 % [5.5]
-The hard threshold is a higher level for forced spilling.
+The hard threshold is a higher level at which forced spilling occurs.
 When the live slice bytes reach it, the store spills synchronously.
 This covers the case where the background spiller falls behind the arrival rate.
 
@@ -81,26 +81,26 @@ A restore is therefore a plain byte copy back into pages.
 Before a window's results are emitted, the store restores its spilled slices.
 
 % [5.8]
-The spill controller observes one signal: the live byte count of slice data pages.
+The spill controller observes a single signal: the live byte count of slice data pages.
 Other consumers of the buffer pool, such as input buffers and emission buffers, are invisible to it.
-This is a design property, stated here openly: the controller defends the slice budget, not the whole pool.
+Tracking the slice budget rather than the whole pool is a deliberate design choice, since the whole pool also carries transient input and emission traffic unrelated to state growth.
 
 % The RocksDB knob selection (three knobs + table) moved to the evaluation
 % (Section 5.2, sec:rocksdb-eval), per the advisor note: Chapter 4 does no evaluation.
 The store spills into RocksDB in one fixed configuration; selecting its values is a measurement question, and the experimental analysis that opens the evaluation answers it (Section~\ref{sec:rocksdb-eval}).
-The controller itself, however, still watches only the slice budget; the next section adds the levers that watch the pool.
+The controller itself, however, still only watches the slice budget; the next section adds the levers that monitor the pool.
 
 \section{Pool-Pressure Levers\label{sec:levers}}
 
 % [5.9]
-A store with the core spiller alone would be simpler, but it falls short.
+A store with only the core spiller would be simpler, but it would fall short.
 The core spiller watches the slice budget alone.
-It stays blind to the shared buffer pool that every other part of the engine draws from.
-A run can therefore exhaust the pool and abort while the slice budget still looks healthy, because input buffers, queues, and emission buffers consumed the pool instead.
-The design therefore adds four levers that react to pool pressure directly.
+It does not observe the shared buffer pool that every other part of the engine draws from.
+A run can therefore exhaust the pool and abort while the slice budget is still within its limit, because input buffers, queues, and emission buffers consumed the pool instead.
+The design therefore adds four levers that directly respond to pool pressure.
 Each one is gated behind its own configuration flag.
-Lever 1a lets the spiller also drain when the free buffers in the pool fall below a reserve.
-Lever 1b reacts to an allocation that finds the pool empty: it triggers an immediate spill of one cold slice instead of waiting passively.
+Lever 1a also allows the spiller to drain when the free buffers in the pool fall below the reserve level.
+Lever 1b reacts to an allocation that finds the pool empty: it triggers an immediate spill of one cold slice rather than passively waiting.
 Lever 1c paces restores: a restore before emission proceeds only when the pool has headroom.
 Lever 1d adds the bucket directories (Section~\ref{sec:bg-windows}) to the live slice budget.
 Whether these levers convert failing runs into completing ones is an empirical question; Section~\ref{sec:rq3} answers it.
@@ -109,7 +109,7 @@ Whether these levers convert failing runs into completing ones is an empirical q
 
 % [5.10]
 The spiller can fall behind the arrival rate.
-When it does and all buffers are in flight, NebulaStream aborts the next allocation (Section~\ref{sec:bg-nes}).
+When it does, and all buffers are in flight, NebulaStream aborts the next allocation (Section~\ref{sec:bg-nes}).
 
 Stream engines handle this demand--supply gap with backpressure.
 Reactive Streams propagate demand signals upstream; Flink uses credit-based flow control; Storm and Heron throttle at the source~\cite{reactivestreams,flink_credit,storm886,kulkarni2015heron}.
@@ -117,8 +117,7 @@ This design applies backpressure at the allocation layer: an allocation that wou
 
 The stall must be bounded.
 A progress guard tracks how many buffers return to the pool each round.
-If none come back across two consecutive rounds, the threads that would return buffers are blocked on the same pool, so waiting cannot break the cycle.
-The guard aborts.
+If none come back across two consecutive rounds, the threads that would return buffers are blocked on the same pool, so waiting cannot break the cycle and the guard aborts.
 
 % [5.11]
 Every mechanism in this chapter is off by default.
@@ -128,11 +127,11 @@ Every comparison in Chapter~\ref{cha:evaluation} is therefore an A/B test on one
 \section{The Growth Signal and Page Release\label{sec:growth-release}}
 
 % [5.12]
-Two gaps survive the mechanisms so far.
+Two gaps remain after the mechanisms so far.
 The controller checks the live budget only when a slice is created.
-A high-cardinality aggregation grows one slice between window boundaries without creating a new one, so that growth is unseen until the next safety-net spiller wake.
+A high-cardinality aggregation grows one slice between window boundaries without creating a new slice, so growth is not visible until the next window boundary.
 And a spilled slice frees its logical state but not its resident memory.
-The pool is one fixed slab reserved at startup, so a recycled buffer only returns to the free list; the anonymous pages it touched were faulted in once and are never returned to the operating system.
+The pool is a single fixed slab reserved at startup, so a recycled buffer only returns to the free list within the pool. The operating system assigns physical memory to that buffer once, when it is first used, and does not reclaim it when the buffer returns to the free list.
 
 % [5.13]
 The growth signal closes the first gap.
@@ -144,9 +143,10 @@ A typical stride $N$ is a few thousand writes; $N = 0$ disables the signal and r
 
 % [5.14]
 Page release closes the second gap.
-On recycle the buffer manager advises the kernel to drop a recycled buffer's physical pages, and does so only while the free list already holds a configured fraction of the pool.
-This free-list gate (a pool-occupancy condition, unrelated to the event-time watermark of Section~\ref{sec:bg-windows}) confines the release to the idle, post-drain state and spares the fast-cycling input buffers.
-The advice is issued before the buffer re-enters the free list, so no concurrent allocation can fault the page underneath it.
+On recycle, the buffer manager advises the kernel to drop a recycled buffer's physical pages, and does so only while the free list already holds a configured fraction of the pool.
+This free-list threshold is a pool-occupancy condition and is unrelated to the event-time watermark in Section~\ref{sec:bg-windows}.
+It limits the release to the idle period after a drain (Section~\ref{sec:levers}), so fast-cycling buffers, such as input buffers, are left alone.
+This drop hint is given before the buffer re-enters the free list, so a concurrent allocation can never reuse the buffer while its physical memory is still being dropped underneath it.
 The default sixty-four-byte buffer alignment is too coarse for a per-buffer page operation, so the flag also switches the pool to a page-aligned layout that keeps the control blocks in a separate region.
 Both mechanisms are off by default, and page release extends the buffer manager rather than the store.
 
@@ -154,7 +154,7 @@ Both mechanisms are off by default, and page release extends the buffer manager 
 
 % [6.0 — provenance: the upstream state all changes build on]
 The implementation builds on a public fork of the NebulaStream repository.
-The base state is commit \texttt{cc754a94} of the fork's \texttt{main} branch, taken on May 20, 2026, before any change of this thesis.
+The base state is commit \texttt{cc754a94} of the fork's \texttt{main} branch, taken on May 20, 2026, before any change in this thesis.
 This base was verified clean: the unmodified tree builds and passes all 752 unit tests.
 Every mechanism in this chapter is a change against that state, and the byte-identical baseline of Section~\ref{sec:backpressure} refers to it.
 
@@ -163,37 +163,37 @@ The store is created when the query is lowered into its physical plan.
 Its configuration travels from the worker configuration through the engine builder into the store and the buffer manager.
 
 % [6.2]
-One comparison inside ChainedHashMap decides whether a hash map page is pooled.
-A page is pooled if the configured page size fits into the engine's buffer size.
+One comparison inside ChainedHashMap determines whether a hash map page is pooled.
+A page is pooled if its configured size fits within the engine's buffer size.
 The engine's default buffer size is 4096 bytes.
 The page size in this thesis is 8192 bytes.
-The default therefore keeps every hash map page unpooled, on the process heap rather than in the global buffer pool.
+The default, therefore, keeps every hash map page unpooled on the process heap rather than in the global buffer pool.
 
 % [6.3]
 The buffer manager gains three extensions.
-An availability query reports the number of free buffers.
-Pressure listeners notify the store when an allocation finds the pool empty; lever 1b uses this hook.
-The backpressure loop uses a recycle counter as its progress signal.
+An availability query lets a caller ask, at any moment, how many buffers are currently free; lever 1a polls it to determine when the reserve is breached.
+Pressure listeners work the other way around: the buffer manager notifies the store when an allocation finds the pool empty, rather than the store having to ask; lever 1b uses this hook to trigger an immediate spill.
+The backpressure loop uses a recycle counter as its progress signal, the same counter the progress guard of Section~\ref{sec:backpressure} checks before aborting a stall.
 
 \section{Instrumentation\label{sec:instrumentation}}
 
 % [6.4]
 Measuring a spilling system cleanly requires separating what the kernel does for bookkeeping from what the workload actually uses.
-A spilling backend writes slices to disk and reads them back on restore; the kernel's response is to grow the page cache.
-An early evaluation round read undifferentiated \texttt{memory.current} totals and produced footprint numbers that moved with the spill volume rather than with the window working set.
+A spilling backend writes slices to disk and reads them back on restore; the kernel responds by growing the page cache.
+An early evaluation round read undifferentiated \texttt{memory.current} totals and produced footprint numbers that moved with the spill volume rather than with the working set window.
 The fix is to read \texttt{memory.stat} instead, which breaks cgroup consumption into anonymous memory, page cache, and shared memory (Section~\ref{sec:bg-metrics}).
 A sampler does this every 0.2 seconds; the per-process anonymous set from the kernel's per-process status file runs alongside it as a cross-check on the cgroup accounting.
 
 Five further gauges observe what the application sees.
 A pool gauge records occupancy at every buffer allocation, exposing when the pool runs dry and by how much.
-An unpooled gauge tracks the live bytes held outside the pool, bounding the share of memory invisible to the spill controller.
+An unpooled gauge tracks the live bytes held outside the pool, thereby bounding the share of memory that is invisible to the spill controller.
 A map gauge captures the exact page-count composition of every hash map at its destruction, so the evaluation can attribute footprint to individual window slots.
-A spill gauge records the controller's state at every 100-millisecond spiller wake.
+A spill gauge records the controller's state at every 100-millisecond wake of the spiller.
 A backpressure gauge logs each stall with its duration.
 
-Together, the six probes let Chapter~\ref{cha:evaluation} separate working-set footprint from spill artifacts, trace the controller's decisions under pressure, and cross-examine each claim against independent signals.
+Together, the six probes let Chapter~\ref{cha:evaluation} separate working-set footprint from spill artifacts, trace the controller's decisions under pressure, and check each claim against independent signals.
 
 % The evaluation harness and reproducibility material moved to Section 5.1
 % (start of the Experimental Setup), per the advisor note: Chapter 4 does no evaluation.
 The backend, its levers, and its probes are in place.
-The next chapter sets up the evaluation harness and evaluates them.
+The next chapter uses this harness to evaluate the backend.

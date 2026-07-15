@@ -36,14 +36,14 @@
 \node[existing] (handler) at (\cA,0)
   {WindowBasedOperatorHandler\\\footnotesize\itshape triggers windows, drives emit};
 \node[existing] (iface) at (\cA,-3)
-  {WindowSlicesStoreInterface\\\footnotesize\itshape «interface» --- unchanged\\\footnotesize\itshape (requirement R4 met)};
+  {WindowSlicesStoreInterface\\\footnotesize\itshape «interface», unchanged\\\footnotesize\itshape (requirement R4 met)};
 \node[newcomp, minimum height=2.6cm] (store) at (\cA,-6.2)
   {\textbf{SpillableTimeBasedSliceStore}\\[1pt]
    \footnotesize soft / hard thresholds $\cdot$ spiller (100\,ms)\\
    \footnotesize levers 1a reserve $\cdot$ 1b rescue\\
    \footnotesize 1c paced restore $\cdot$ 1d dir.\ accounting};
 \node[newcomp] (bp) at (\cA,-9.6)
-  {Allocation backpressure\\\footnotesize\itshape + progress guard --- converted\\\footnotesize\itshape nothing; ships as diagnostics};
+  {Allocation backpressure\\\footnotesize\itshape + progress guard (converted\\\footnotesize\itshape nothing); ships as diagnostics};
 
 % ================= COLUMN B : state path =================
 \node[newcomp] (cfg) at (\cB,0)
@@ -63,7 +63,7 @@
 \node[hook] (chained) at (\cC,-3)
   {ChainedHashMap pooling boundary\\\footnotesize\itshape pooled iff page size $\leq$ buffer size;\\\footnotesize\itshape 8192-flag = pooled configuration};
 \node[existing] (cache) at (\cC,-6.2)
-  {Per-worker slice cache\\\footnotesize\itshape raw map pointers ---\\\footnotesize\itshape bypasses every spill fence};
+  {Per-worker slice cache\\\footnotesize\itshape raw map pointers\\\footnotesize\itshape bypass the spill checks};
 \node[newcomp] (gauges) at (\cC,-9.6)
   {Six memory gauges\\\footnotesize cgroup $\cdot$ pool $\cdot$ unpooled\\\footnotesize map $\cdot$ spill $\cdot$ backpressure};
 
@@ -100,12 +100,12 @@
       text width=19.6cm, inner sep=8pt, align=left,
       font=\sffamily\footnotesize] (future) at (\cB,-18.6)
   {\textbf{\textcolor{red!70!black}{Potential further improvements (Section~\ref{sec:future}, in order of precision)}}\\[3pt]
-   \textbf{F1} role-aware allocation: a drain-side reserve that build-path allocations cannot consume --- merges the two allocation types' operating windows\\
-   \textbf{F2} closed-loop ingest admission keyed to pool headroom --- replaces accidental throttling by the cap with a deliberate mechanism\\
+   \textbf{F1} role-aware allocation, a drain-side reserve that build-path allocations cannot consume; merges the two allocation types' operating windows\\
+   \textbf{F2} closed-loop ingest admission keyed to pool headroom; replaces accidental throttling by the cap with a deliberate mechanism\\
    \textbf{F3} entry-header refactor: remove the unused virtual-dispatch pointer ($-$20\,\% state) and fix directory sizing on all map-creation paths\\
    \textbf{F4} exception-safe restore path in the spillable slice\\
-   \textbf{F5} epoch-stamped slice-cache invalidation --- the upstream fix for the diagnosed corruption, one comparison per cache hit\\
-   \textbf{F6} open-window spilling (build-side partitioning) --- requires compilation-pipeline changes, out of scope here\\
+   \textbf{F5} epoch-stamped slice-cache invalidation, the upstream fix for the diagnosed corruption; one comparison per cache hit\\
+   \textbf{F6} open-window spilling (build-side partitioning); requires compilation-pipeline changes, out of scope here\\
    \textbf{F7} sliding windows and a fuller Nexmark suite (evaluation scope, no component change)};
 
 % ================= LEGEND =================
@@ -127,8 +127,8 @@ the one-comparison pooling boundary whose engine default silently disabled the
 pooled configuration (Section~\ref{sec:rq3}). Dashed red badges F1--F6 pin the
 future-work items of Section~\ref{sec:future} to the component they would
 modify; F7 concerns the evaluation scope only. The dashed red edge marks the
-diagnosed corruption mechanism: the per-worker slice cache hands compiled code
-raw map pointers that bypass the spill fences, which F5 would invalidate per
+diagnosed corruption mechanism. The per-worker slice cache passes compiled code
+raw map pointers that bypass the spill checks, and F5 would invalidate them per
 epoch.}
 \label{fig:final-status}
 \end{figure}

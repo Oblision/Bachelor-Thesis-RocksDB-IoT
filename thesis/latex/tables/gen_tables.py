@@ -17,7 +17,7 @@ OUT = os.path.join(os.path.dirname(__file__), "appendixA_cells.tex")
 KEEP = {
     "L",   # primary cap x pool matrix (RQ1/RQ2, in-mem baselines)
     "W",   # bounded final grid (corrected pooling flag)
-    "N",   # attribution ladder at the decisive cell
+    "N",   # attribution ladder at 1024 MB / 32k / s736 (r150)
     "U",   # matched-granularity heap control (cost attribution)
     "I8",  # in-memory baseline at matched granularity (cost table)
     "b",   # flagship 512 MB three-variant comparison (RQ1 headline)
@@ -80,7 +80,7 @@ NOTES = {
     "V":   "\\textbf{DEMOTED.} Soft threshold derived from the pool (pool/3) understates memory pressure; retained as the threshold-sensitivity arm only.",
     "V2":  "Follow-up to the demoted V arm; threshold-sensitivity probes.",
     "W":   "Bounded final grid: pooled configuration (8192-byte flag engages pooling) with reserve and paced-restore levers.",
-    "N":   "Attribution-ladder arms at the decisive cell: B0 pooling without levers, B1 +reserve, B2 +paced restore (8192-byte pooling flag).",
+    "N":   "Attribution-ladder arms at 1024\\,MB / 32k pool / s736: B0 pooling without levers, B1 +reserve, B2 +paced restore (8192-byte pooling flag).",
     "U":   "Matched-granularity heap control (8128-byte buffers: granularity matched, allocation still heap) --- the disambiguation arm.",
     "I8":  "In-memory baseline at matched $\\sim$8\\,K granularity (cost-table reference).",
     "B3":  "Allocation-backpressure diagnostics; source of the gridlock evidence (Figure on the allocation deadlock).",

@@ -51,7 +51,7 @@ def main() -> None:
                                      rect.get_height() + 0.02),
                         ha="center", va="bottom", fontsize=9)
 
-    labels = [r"$\rho \approx $" f"{rho_mb[w] / cap:.2f}\n(r{w})" for w in workloads]
+    labels = [r"$\rho \approx $" f"{rho_mb[w] / cap:.2f}\n({data.wlabel(w)})" for w in workloads]
     ax.set_xticks(x, labels)
     ax.set_ylim(0, 1.18)
     ax.set_ylabel("completion fraction (completed / attempted)")

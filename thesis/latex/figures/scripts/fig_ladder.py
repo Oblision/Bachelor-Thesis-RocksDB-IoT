@@ -31,6 +31,8 @@ STEPS = [
 def main() -> None:
     style.use_style()
     df = data.load_runs()
+    rho_mb = data.rho_table(df)
+    rho150 = rho_mb[150] / 1024
 
     counts = []
     for _, cell, _ in STEPS:
@@ -53,12 +55,14 @@ def main() -> None:
     ax.set_ylim(0, 1.06)
     ax.set_ylabel("completion fraction")
     ax.text(0.02, 0.96,
-            "decisive cell: 1024 MB / 32k pool / r150\n"
+            f"cell: 1024 MB / 32k pool / {data.wlabel(150)} "
+            f"($\\rho$ {rho150:.2f})\n"
             "levers within pooling (0/8 $\\to$ 7/8): Fisher $p = 7.0\\times10^{-4}$",
             transform=ax.transAxes, va="top", ha="left", fontsize=8.5,
             bbox=dict(boxstyle="round,pad=0.35", fc="white", ec=style.GREY, lw=0.8))
-    fig.suptitle("The one-flag unlock, decomposed at the decisive cell "
-                 "(1024 MB cap / 32k pool / r150)", fontsize=11, fontweight="bold")
+    fig.suptitle("The one-flag unlock, decomposed at the cell "
+                 f"(1024 MB cap / 32k pool / {data.wlabel(150)}, $\\rho$ {rho150:.2f})",
+                 fontsize=11, fontweight="bold")
     style.caption(fig, extra="bar labels = completed/attempted · Fisher's exact test, one-sided")
     style.save(fig, "fig_ladder")
 
