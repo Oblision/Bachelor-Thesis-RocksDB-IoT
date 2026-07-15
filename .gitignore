@@ -88,3 +88,7 @@ thesis/latex/_compile_check.*
 thesis/latex/_verify.*
 thesis/fig_*.png
 thesis/latex/figures/scripts/__preview/
+
+# FUSE artifacts + local exports
+.fuse_hidden*
+/Abschlussarbeit_396953.zip
