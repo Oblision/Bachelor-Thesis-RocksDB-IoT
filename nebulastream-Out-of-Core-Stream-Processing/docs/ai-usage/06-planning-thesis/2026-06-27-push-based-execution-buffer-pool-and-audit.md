@@ -1,7 +1,7 @@
 ---
 title: Push-based execution model explained; buffer-pool claim verified; Ch.2 statistics framework; full-thesis consistency audit (resume)
 date: 2026-06-27
-phase: 02-understanding-topic
+phase: 06-planning-thesis
 level_of_use: 4
 model: claude-opus-4-8 (dominant model id in both session logs)
 tool: Claude Code (CLI)

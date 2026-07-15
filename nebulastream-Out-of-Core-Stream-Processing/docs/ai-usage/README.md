@@ -5,8 +5,12 @@ the bachelor's thesis *Out-of-Core Stream Processing in NebulaStream: A
 RocksDB-Based State Backend for Memory-Constrained Edge Devices* at TU Berlin
 (DIMA chair).
 
-The eight subfolders mirror the phases listed in `misc/declaration-of-aids.tex`
-of the thesis LaTeX project. Each conversation gets its own markdown file. Once
+The subfolders mirror the thesis phases listed in `misc/declaration-of-aids.tex`
+of the thesis LaTeX project. Topic finding, topic understanding, and the
+initial literature research belonged to the thesis *proposal*, not the thesis;
+they are recorded in [`proposal-phase.md`](proposal-phase.md). Folder numbers
+keep their historical positions (04-08) so that existing links and entry
+frontmatter stay stable. Each conversation gets its own markdown file. Once
 committed, entries are not edited; corrections go in a follow-up entry that
 links back to the original.
 
@@ -14,9 +18,7 @@ links back to the original.
 
 | Phase | Folder |
 |-------|--------|
-| 1. Finding and nailing down the topic | [`01-topic-finding/`](01-topic-finding) |
-| 2. Understanding the topic | [`02-understanding-topic/`](02-understanding-topic) |
-| 3. Literature research | [`03-literature-research/`](03-literature-research) |
+| Proposal (topic finding, understanding, literature research) | [`proposal-phase.md`](proposal-phase.md) |
 | 4. Implementing the prototype | [`04-implementing-prototype/`](04-implementing-prototype) |
 | 5. Testing the prototype | [`05-testing-prototype/`](05-testing-prototype) |
 | 6. Planning the thesis | [`06-planning-thesis/`](06-planning-thesis) |
