@@ -1,9 +1,15 @@
 # AI Tool Usage
 
-This folder records every use of AI tools (Anthropic's Claude family) during
-the bachelor's thesis *Out-of-Core Stream Processing in NebulaStream: A
+This folder archives conversations with AI tools (Anthropic's Claude family)
+from the bachelor's thesis *Out-of-Core Stream Processing in NebulaStream: A
 RocksDB-Based State Backend for Memory-Constrained Edge Devices* at TU Berlin
 (DIMA chair).
+
+Coverage is best-effort rather than guaranteed complete. Entries were written
+up from Claude Code session logs and desktop-app transcripts; conversations for
+which no log or transcript survived are not represented here, and some entries
+record their model as not known for the same reason. The archive documents what
+could be recovered, and each entry states plainly what it is.
 
 The subfolders mirror the thesis phases listed in `misc/declaration-of-aids.tex`
 of the thesis LaTeX project. Topic finding, topic understanding, and the
@@ -18,7 +24,9 @@ links back to the original.
 
 | Phase | Folder |
 |-------|--------|
-| Proposal (topic finding, understanding, literature research) | [`proposal-phase.md`](proposal-phase.md) |
+| 1. Finding and nailing down the topic | [`01-topic-finding/`](01-topic-finding) |
+| 2. Understanding the topic | [`02-understanding-topic/`](02-understanding-topic) |
+| 3. Literature research | [`03-literature-research/`](03-literature-research) |
 | 4. Implementing the prototype | [`04-implementing-prototype/`](04-implementing-prototype) |
 | 5. Testing the prototype | [`05-testing-prototype/`](05-testing-prototype) |
 | 6. Planning the thesis | [`06-planning-thesis/`](06-planning-thesis) |
