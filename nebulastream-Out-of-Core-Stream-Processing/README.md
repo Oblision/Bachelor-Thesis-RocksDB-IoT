@@ -21,6 +21,20 @@
 
 ----
 
+> [!NOTE]
+> **This is a fork of NebulaStream with an out-of-core (spill-to-disk) window-state backend**, built for the
+> bachelor's thesis *Out-of-Core Stream Processing in NebulaStream: A RocksDB-Based State Backend for
+> Memory-Constrained Edge Devices* (TU Berlin, DIMA, 2026). See the
+> [project README](../README.md) for the design, results, and how to build and run it.
+>
+> Main additions: `SpillableTimeBasedSliceStore`, `SpillableAggregationSlice`, `SpillBackend` /
+> `RocksDBSpillBackend` and `SliceSerializer` in `nes-physical-operators/`; `SpillConfig` in
+> `nes-query-compiler/interface/`; pool-pressure hooks in `nes-memory/`. Every mechanism is off by default
+> (`--worker.default_query_execution.spill.enabled=false`), so the default build behaves like upstream.
+> The evaluation harness and its raw results live in `.planning/eval-phase/`.
+>
+> The upstream NebulaStream README follows unchanged.
+
 NebulaStream is an end-to-end data-management system for cloud-edge-sensor deployments.
 The platform combines ease of use, extensibility, and efficiency to let teams focus on business logic while the engine optimizes the data path.
 

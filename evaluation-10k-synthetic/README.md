@@ -5,8 +5,8 @@
 > RocksDB"*. The dataset and figures in this folder come from a fully-completed
 > 54-rep sweep (3.4 days of compute, Thu 2026-05-28 19:23 → Mon 2026-06-01 04:23
 > CEST) on a single Linux host (i7-10700K, 32 GB RAM, native Docker). A
-> separate realistic-workload (Nexmark) phase is in progress at the time of this
-> upload; its results are intentionally **not** included here.
+> later phase refined these results into the final thesis evaluation (Chapter 5,
+> including Nexmark); see the [top-level README](../README.md).
 
 ## What's in this folder
 
