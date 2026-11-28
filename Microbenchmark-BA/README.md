@@ -1,6 +1,8 @@
 # RocksDB Microbenchmark Suite
 
-Standalone microbenchmark suite for evaluating RocksDB LSM-tree tuning parameters, built for a Bachelor thesis on out-of-core state management in NebulaStream.
+Standalone microbenchmark suite for evaluating RocksDB LSM-tree tuning parameters. It is part of the bachelor's thesis
+[*Out-of-Core Stream Processing in NebulaStream*](../README.md): its results chose the RocksDB configuration
+(compression, write-buffer and block-cache sizes) used by the out-of-core state backend.
 
 Uses RocksDB's built-in `db_bench` tool with a Python orchestrator that sweeps the parameter space (based on Jin et al.) and collects structured results.
 
@@ -22,8 +24,8 @@ pip3 install pandas matplotlib
 
 ```bash
 # Clone with submodule
-git clone --recurse-submodules <repo-url>
-cd Microbenchmark-BA
+git clone --recurse-submodules https://github.com/Oblision/Bachelor-Thesis-RocksDB-IoT.git
+cd Bachelor-Thesis-RocksDB-IoT/Microbenchmark-BA
 
 # Or if already cloned:
 git submodule update --init --recursive

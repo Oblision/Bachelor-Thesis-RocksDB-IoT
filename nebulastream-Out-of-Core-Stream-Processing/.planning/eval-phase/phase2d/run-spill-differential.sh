@@ -11,7 +11,7 @@
 # Example (512 MB cap, big pool, hard=8/soft=4, 2-window band via emit_lag, 2 threads — partitioning matters at P>1):
 #   ./run-spill-differential.sh 512 16000 4 8 200000 2
 #
-# DO NOT run from inside Claude — the orchestrator owns the Docker gate. This script documents the exact invocation.
+# This script documents the exact invocation; run it manually on the evaluation host.
 set -euo pipefail
 
 CAP_MB="${1:-512}"; POOL="${2:-16000}"; SOFT="${3:-4}"; HARD="${4:-8}"; EMIT_LAG="${5:-200000}"; THREADS="${6:-2}"

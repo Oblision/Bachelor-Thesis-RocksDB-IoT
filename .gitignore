@@ -1,8 +1,7 @@
 # Build artifacts
 Microbenchmark-BA/rocksdb/build/
 
-# Bachelor-Thesis/ is its own git repo (Oblision/bachelor-thesis, TU Berlin
-# thesis-template upstream) for the LaTex thesis. NOT tracked by this wrapper.
+# Separate checkout of the thesis template (not tracked here)
 /Bachelor-Thesis/
 
 # Vendored NES OOC build artifacts (DO NOT commit cmake-build-debug — ~14 GB)
@@ -51,44 +50,25 @@ Microbenchmark-BA/constrained_run.log
 # OS
 .DS_Store
 
-# IDE
+# IDE / local tool configuration
 .vscode/
 .idea/
+.claude/
+CLAUDE.md
 
-# Unrelated files
+# Personal files that must never be committed
 music-venture/
-
-# Handwritten notes / signatures (personal)
 *.jpeg
 *.jpg
 2026-01-26_130519_signature.pdf
 
-# LaTeX build artifacts (thesis/latex)
-thesis/latex/**/*.aux
-thesis/latex/*.log
-thesis/latex/*.out
-thesis/latex/*.toc
-thesis/latex/*.lof
-thesis/latex/*.lot
-thesis/latex/*.loa
-thesis/latex/*.bbl
-thesis/latex/*.blg
-thesis/latex/Template.pdf
-thesis/latex/_compile_check.*
-thesis/latex/ngerman.ldf.broken-404-stub
-thesis/latex/*.fdb_latexmk
-thesis/latex/*.fls
-thesis/latex/*.synctex.gz
 .gstack/
-
-# build/scratch artifacts (uid-locked, do not commit)
-thesis/latex/Template_test.*
-thesis/latex/chk2.*
-thesis/latex/_compile_check.*
-thesis/latex/_verify.*
-thesis/fig_*.png
-thesis/latex/figures/scripts/__preview/
+analysis/figures/__preview/
 
 # FUSE artifacts + local exports
 .fuse_hidden*
 /Abschlussarbeit_396953.zip
+
+# Generated analysis output
+analysis/figures/out/
+analysis/out/
