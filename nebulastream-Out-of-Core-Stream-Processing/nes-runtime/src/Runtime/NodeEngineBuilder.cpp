@@ -37,7 +37,10 @@ std::unique_ptr<NodeEngine> NodeEngineBuilder::build(const Host& host)
 {
     auto bufferManager = BufferManager::create(
         workerConfiguration.defaultQueryExecution.operatorBufferSize.getValue(),
-        workerConfiguration.numberOfBuffersInGlobalBufferManager.getValue());
+        workerConfiguration.numberOfBuffersInGlobalBufferManager.getValue(),
+        /// OOC anon-release on drain: 0 = off (current 64B layout, byte-identical); >0 = page-aligned layout +
+        /// madvise(DONTNEED) of recycled buffers once the free-list passes this percent of the pool.
+        workerConfiguration.pooledReleaseWatermarkPct.getValue());
     bufferManager->setAllocationBackpressureMs(workerConfiguration.defaultQueryExecution.allocationBackpressureMs.getValue());
     auto queryLog = std::make_shared<QueryLog>();
 

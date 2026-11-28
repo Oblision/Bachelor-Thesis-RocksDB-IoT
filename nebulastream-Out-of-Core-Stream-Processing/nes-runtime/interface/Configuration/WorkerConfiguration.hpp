@@ -66,6 +66,18 @@ public:
            "Source admission gate: minimum free-buffer percentage of the global pool required before a source rents an input buffer. 0 disables.",
            {std::make_shared<NumberValidation>()}};
 
+    /// OOC anon-release on drain: when > 0, recycled pool buffers are madvise(MADV_DONTNEED)'d so a spilled
+    /// slice's pages stop counting against RSS — but ONLY while the free-list is at least this percentage of
+    /// the pool (i.e. the pool is idle/post-drain, not the hot path). Enabling it also switches the pool to a
+    /// page-aligned payload layout (required for a per-buffer madvise). 0 = off = current 64B-interleaved
+    /// layout, byte-identical baseline. Trades a zero-fill re-fault on buffer reuse for lower resident anon.
+    UIntOption pooledReleaseWatermarkPct
+        = {"pooled_release_watermark_pct",
+           "0",
+           "Release (madvise DONTNEED) recycled pool buffer pages when the free-list is >= this percent of the "
+           "pool; also page-aligns the pool layout. 0 disables (baseline 64B-interleaved layout, no madvise).",
+           {std::make_shared<NumberValidation>()}};
+
     EnumOption<DumpMode::Options> dumpQueryCompilationIR
         = {"dump_compilation_result",
            DumpMode::Options::NONE,
@@ -84,6 +96,7 @@ private:
             &numberOfBuffersInGlobalBufferManager,
             &defaultMaxInflightBuffers,
             &sourceAdmissionGatePct,
+            &pooledReleaseWatermarkPct,
             &dumpQueryCompilationIR,
             &dumpGraph};
     }

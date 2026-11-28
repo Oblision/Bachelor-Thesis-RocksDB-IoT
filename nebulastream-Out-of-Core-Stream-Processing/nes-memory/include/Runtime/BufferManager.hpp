@@ -72,6 +72,7 @@ public:
         Private,
         uint32_t bufferSize,
         uint32_t numOfBuffers,
+        uint32_t pooledReleaseWatermarkPct,
         std::shared_ptr<std::pmr::memory_resource> memoryResource,
         uint32_t withAlignment);
 
@@ -83,6 +84,7 @@ public:
     static std::shared_ptr<BufferManager> create(
         uint32_t bufferSize = DEFAULT_BUFFER_SIZE,
         uint32_t numOfBuffers = DEFAULT_NUMBER_OF_BUFFERS,
+        uint32_t pooledReleaseWatermarkPct = 0,
         const std::shared_ptr<std::pmr::memory_resource>& memoryResource = std::make_shared<NesDefaultMemoryAllocator>(),
         uint32_t withAlignment = DEFAULT_ALIGNMENT);
 
@@ -161,6 +163,15 @@ private:
 
     size_t bufferSize;
     size_t numOfBuffers;
+
+    /// OOC anon-release on drain (0 = off). When > 0, the pool uses a page-aligned payload layout and recycled
+    /// buffers are madvise(DONTNEED)'d once the free-list is >= this percent of the pool. Set once at construction.
+    uint32_t pooledReleaseWatermarkPct{0};
+    /// Alignment the pool slab was allocated with (page-aligned when pooledReleaseWatermarkPct>0, else DEFAULT_ALIGNMENT);
+    /// remembered so destroy() deallocates with the SAME alignment the pmr resource was given.
+    size_t poolAlignment{DEFAULT_ALIGNMENT};
+    /// Anon-release instrumentation: physical pages returned to the OS via madvise (logged in destroy()).
+    std::atomic<uint64_t> pagesReleasedCount{0};
 
     uint8_t* basePointer{nullptr};
     size_t allocatedAreaSize;
