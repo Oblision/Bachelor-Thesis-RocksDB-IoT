@@ -1,8 +1,7 @@
 # Build artifacts
 Microbenchmark-BA/rocksdb/build/
 
-# Bachelor-Thesis/ is its own git repo (Oblision/bachelor-thesis, TU Berlin
-# thesis-template upstream) for the LaTex thesis. NOT tracked by this wrapper.
+# Separate checkout of the thesis template (not tracked here)
 /Bachelor-Thesis/
 
 # Vendored NES OOC build artifacts (DO NOT commit cmake-build-debug — ~14 GB)
@@ -51,14 +50,14 @@ Microbenchmark-BA/constrained_run.log
 # OS
 .DS_Store
 
-# IDE
+# IDE / local tool configuration
 .vscode/
 .idea/
+.claude/
+CLAUDE.md
 
-# Unrelated files
+# Personal files that must never be committed
 music-venture/
-
-# Handwritten notes / signatures (personal)
 *.jpeg
 *.jpg
 2026-01-26_130519_signature.pdf
