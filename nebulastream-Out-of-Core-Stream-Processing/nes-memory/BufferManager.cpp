@@ -39,6 +39,7 @@ extern "C" void __asan_unpoison_memory_region(void const volatile*, size_t);
 #include <memory_resource>
 #include <mutex>
 #include <optional>
+#include <sys/mman.h> /// madvise(MADV_DONTNEED) for the anon-release-on-drain path (pooledReleaseWatermarkPct)
 #include <thread>
 #include <utility>
 #include <unistd.h>
@@ -57,12 +58,14 @@ BufferManager::BufferManager(
     Private,
     const uint32_t bufferSize,
     const uint32_t numOfBuffers,
+    const uint32_t pooledReleaseWatermarkPct,
     std::shared_ptr<std::pmr::memory_resource> memoryResource,
     const uint32_t withAlignment)
     : availableBuffers(numOfBuffers)
     , unpooledChunksManager(std::make_shared<UnpooledChunksManager>(memoryResource))
     , bufferSize(bufferSize)
     , numOfBuffers(numOfBuffers)
+    , pooledReleaseWatermarkPct(pooledReleaseWatermarkPct)
     , memoryResource(std::move(memoryResource))
 {
     ((void)withAlignment);
@@ -70,9 +73,13 @@ BufferManager::BufferManager(
 }
 
 std::shared_ptr<BufferManager> BufferManager::create(
-    uint32_t bufferSize, uint32_t numOfBuffers, const std::shared_ptr<std::pmr::memory_resource>& memoryResource, uint32_t withAlignment)
+    uint32_t bufferSize,
+    uint32_t numOfBuffers,
+    uint32_t pooledReleaseWatermarkPct,
+    const std::shared_ptr<std::pmr::memory_resource>& memoryResource,
+    uint32_t withAlignment)
 {
-    return std::make_shared<BufferManager>(Private{}, bufferSize, numOfBuffers, memoryResource, withAlignment);
+    return std::make_shared<BufferManager>(Private{}, bufferSize, numOfBuffers, pooledReleaseWatermarkPct, memoryResource, withAlignment);
 }
 
 BufferManager::~BufferManager()
@@ -96,6 +103,15 @@ void BufferManager::destroy()
                 bpGridlockAborts.load(std::memory_order_relaxed),
                 bpBudgetAborts.load(std::memory_order_relaxed),
                 bpStallUsTotal.load(std::memory_order_relaxed));
+        }
+        if (pooledReleaseWatermarkPct > 0)
+        {
+            const auto pages = pagesReleasedCount.load(std::memory_order_relaxed);
+            NES_INFO(
+                "ANONRELEASE watermark_pct={} pages_released={} approx_mb={}",
+                pooledReleaseWatermarkPct,
+                pages,
+                (pages * static_cast<uint64_t>(sysconf(_SC_PAGE_SIZE))) / 1048576);
         }
         bool success = true;
         if (allBuffers.size() != getNumberOfAvailableBuffers())
@@ -124,7 +140,9 @@ void BufferManager::destroy()
 
         availableBuffers = decltype(availableBuffers)();
         NES_DEBUG("Shutting down Buffer Manager completed");
-        memoryResource->deallocate(basePointer, allocatedAreaSize, DEFAULT_ALIGNMENT);
+        /// Deallocate with the SAME alignment the slab was allocated with (page-aligned under the anon-release layout,
+        /// DEFAULT_ALIGNMENT otherwise) — a pmr resource requires matching allocate/deallocate alignment.
+        memoryResource->deallocate(basePointer, allocatedAreaSize, poolAlignment);
         allocatedAreaSize = 0;
 
         /// Destroying the unpooled chunks
@@ -160,35 +178,63 @@ void BufferManager::initialize(uint32_t withAlignment)
         alignof(detail::BufferControlBlock));
 
     allBuffers.reserve(numOfBuffers);
-    auto controlBlockSize = alignBufferSize(sizeof(detail::BufferControlBlock), withAlignment);
-    auto alignedBufferSize = alignBufferSize(bufferSize, withAlignment);
-    allocatedAreaSize = alignBufferSize(controlBlockSize + alignedBufferSize, withAlignment);
-    const size_t offsetBetweenBuffers = allocatedAreaSize;
-    allocatedAreaSize *= numOfBuffers;
-    basePointer = static_cast<uint8_t*>(memoryResource->allocate(allocatedAreaSize, withAlignment));
-    NES_TRACE(
-        "Allocated {} bytes with alignment {} buffer size {} num buffer {} controlBlockSize {} {}",
-        allocatedAreaSize,
-        withAlignment,
-        alignedBufferSize,
-        numOfBuffers,
-        controlBlockSize,
-        alignof(detail::BufferControlBlock));
+    const auto controlBlockSize = alignBufferSize(sizeof(detail::BufferControlBlock), withAlignment);
 
-    INVARIANT(basePointer, "memory allocation failed, because 'basePointer' was a nullptr");
-    uint8_t* ptr = basePointer;
-    for (size_t i = 0; i < numOfBuffers; ++i)
+    if (pooledReleaseWatermarkPct > 0)
     {
-        uint8_t* controlBlock = ptr;
-        uint8_t* payload = ptr + controlBlockSize;
-        allBuffers.emplace_back(
-            payload,
-            bufferSize,
-            [](detail::MemorySegment* segment, BufferRecycler* recycler) { recycler->recyclePooledBuffer(segment); },
-            controlBlock);
-
-        availableBuffers.write(&allBuffers.back());
-        ptr += offsetBetweenBuffers;
+        /// Anon-release layout (pooledReleaseWatermarkPct>0): control blocks and payloads live in SEPARATE regions so
+        /// each payload is page-aligned and page-strided — the precondition for madvise(MADV_DONTNEED) of an individual
+        /// recycled buffer. The default interleaved slot is only DEFAULT_ALIGNMENT(64B)-aligned, so a payload would
+        /// share pages with its neighbours / control block and could not be released in isolation. Control blocks stay
+        /// densely 64B-packed (tiny, always resident); only the page-aligned payloads are ever advised away.
+        const size_t pageSz = sysconf(_SC_PAGE_SIZE);
+        poolAlignment = pageSz;
+        const size_t payloadStride = alignBufferSize(bufferSize, pageSz); /// page-aligned payload size (8192 == 2 pages)
+        const size_t controlRegionSize = alignBufferSize(controlBlockSize * numOfBuffers, pageSz); /// pad so payloads start page-aligned
+        allocatedAreaSize = controlRegionSize + (payloadStride * numOfBuffers);
+        basePointer = static_cast<uint8_t*>(memoryResource->allocate(allocatedAreaSize, pageSz));
+        INVARIANT(basePointer, "memory allocation failed, because 'basePointer' was a nullptr");
+        uint8_t* const payloadBase = basePointer + controlRegionSize; /// page-aligned: base is page-aligned, controlRegionSize is a page multiple
+        for (size_t i = 0; i < numOfBuffers; ++i)
+        {
+            uint8_t* controlBlock = basePointer + (i * controlBlockSize);
+            uint8_t* payload = payloadBase + (i * payloadStride);
+            allBuffers.emplace_back(
+                payload,
+                bufferSize,
+                [](detail::MemorySegment* segment, BufferRecycler* recycler) { recycler->recyclePooledBuffer(segment); },
+                controlBlock);
+            availableBuffers.write(&allBuffers.back());
+        }
+        NES_INFO(
+            "BufferManager anon-release layout: page-aligned payloads (stride={}, controlRegion={}B), release watermark={}%",
+            payloadStride,
+            controlRegionSize,
+            pooledReleaseWatermarkPct);
+    }
+    else
+    {
+        /// Default layout: control block + payload interleaved per slot, DEFAULT_ALIGNMENT-aligned. Byte-identical baseline.
+        poolAlignment = withAlignment;
+        const auto alignedBufferSize = alignBufferSize(bufferSize, withAlignment);
+        allocatedAreaSize = alignBufferSize(controlBlockSize + alignedBufferSize, withAlignment);
+        const size_t offsetBetweenBuffers = allocatedAreaSize;
+        allocatedAreaSize *= numOfBuffers;
+        basePointer = static_cast<uint8_t*>(memoryResource->allocate(allocatedAreaSize, withAlignment));
+        INVARIANT(basePointer, "memory allocation failed, because 'basePointer' was a nullptr");
+        uint8_t* ptr = basePointer;
+        for (size_t i = 0; i < numOfBuffers; ++i)
+        {
+            uint8_t* controlBlock = ptr;
+            uint8_t* payload = ptr + controlBlockSize;
+            allBuffers.emplace_back(
+                payload,
+                bufferSize,
+                [](detail::MemorySegment* segment, BufferRecycler* recycler) { recycler->recyclePooledBuffer(segment); },
+                controlBlock);
+            availableBuffers.write(&allBuffers.back());
+            ptr += offsetBetweenBuffers;
+        }
     }
     NES_DEBUG("BufferManager configuration bufferSize={} numOfBuffers={}", this->bufferSize, this->numOfBuffers);
 }
@@ -390,6 +436,22 @@ void BufferManager::recyclePooledBuffer(detail::MemorySegment* segment)
     INVARIANT(
         segment->controlBlock->owningBufferRecycler == nullptr, "Buffer should not retain a reference to its parent while not in use");
     NES_POOL_POISON(segment->ptr, segment->size);
+    /// Anon-release on drain: BEFORE returning the segment to the free queue (while we still EXCLUSIVELY own it, so no
+    /// other thread can rent + write it underneath the madvise), release its physical pages when the pool is already
+    /// idle — free-list >= pooledReleaseWatermarkPct of the pool. That is the post-drain state (the spiller just freed a
+    /// band), never the hot path (a busy pool has few free buffers => skipped => the fast-cycling I/O buffers are not
+    /// thrashed). Payloads are page-aligned in this mode (see initialize), so madvise touches only this buffer's pages.
+    if (pooledReleaseWatermarkPct > 0)
+    {
+        const auto freeAfterRecycle = getNumberOfAvailableBuffers() + 1; /// +1: this segment is not enqueued yet
+        if (freeAfterRecycle * 100 >= static_cast<uint64_t>(numOfBuffers) * pooledReleaseWatermarkPct)
+        {
+            if (::madvise(segment->ptr, segment->size, MADV_DONTNEED) == 0)
+            {
+                pagesReleasedCount.fetch_add(segment->size / sysconf(_SC_PAGE_SIZE), std::memory_order_relaxed);
+            }
+        }
+    }
     USED_IN_DEBUG const auto couldRecycleBuffer = availableBuffers.writeIfNotFull(segment);
     INVARIANT(couldRecycleBuffer, "should always succeed");
     /// N2 progress guard: any recycle proves the pipeline is draining — stalled allocators may keep waiting.

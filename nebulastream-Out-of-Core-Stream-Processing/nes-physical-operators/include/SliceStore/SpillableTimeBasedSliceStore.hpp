@@ -28,6 +28,7 @@
 #include <stop_token>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 #include <Identifiers/Identifiers.hpp>
 #include <Nautilus/Interface/HashMap/HashMap.hpp>
@@ -107,7 +108,10 @@ public:
         uint64_t emitLag = 0,
         uint64_t numberOfPartitions = 1,
         uint64_t poolReservePct = 0,
-        bool pacedTriggerFlush = false);
+        bool pacedTriggerFlush = false,
+        uint64_t growthSpillCheckStride = 0,
+        bool growthSpillObserveOnly = false,
+        bool growthSpillSoftOnly = false);
 
     /// 2d: number of grace-hash partitions for the terminal partitioned-emit path. 1 (default) = no partitioning; the
     /// handler then delegates terminal emit to the byte-identical base path. P>1 routes the terminal flush through
@@ -188,6 +192,21 @@ public:
     /// residentBytesOf(*slice) (0 for spilled). Read-only snapshot: locks `createdSlices` only, skips expired
     /// weak_ptrs; touches no private base map.
     [[nodiscard]] uint64_t residentBytes() const;
+
+    /// Lever 1e growth-mapping: the single largest resident slice as (SliceEnd, residentBytesOf). Same locking
+    /// discipline as residentBytes() (evictionMutex → createdSlices; skips in-flight and expired slices). Returns
+    /// {SliceEnd(0), 0} when no slice is resident. Used only by the sampled growth-path trace, so it never runs per
+    /// record; lets the instrumentation attribute growth to a specific slice (one slice ballooning vs. broad growth).
+    [[nodiscard]] std::pair<SliceEnd, uint64_t> largestResidentSlice() const;
+
+    /// Lever 1e steady-state hook: sample the growth-path budget. Called once per record from the build operator's
+    /// data-structure lookup (the cache-HIT path that getSlicesOrCreate never re-enters). Cheap (one relaxed atomic)
+    /// unless the configured stride trips, at which point it re-evaluates the soft/hard thresholds and acts/observes.
+    void growthPathSample();
+
+    /// Lever 1e: the configured stride (0 = disabled). The slice-store Ref reads this at TRACE time to decide whether
+    /// to emit the per-record growthPathSample() invoke at all, so a stride-0 query stays byte-identical (no extra call).
+    [[nodiscard]] uint64_t getGrowthSpillCheckStride() const noexcept { return growthSpillCheckStride; }
 
     /// --- PR-1/PR-2 test hooks (deterministic drive points; no production behavior; public so the unit test can call
     /// them directly, mirroring how the test already drives setBufferProvider/forceSpill). ---
@@ -334,6 +353,30 @@ private:
     const uint64_t poolReservePct;
     /// Lever 1c: pace the steady-state trigger flush per-window against the pool reserve (only effective with reserve > 0).
     const bool pacedTriggerFlush;
+    /// Lever 1e: re-check the spill thresholds every `growthSpillCheckStride` writes into an EXISTING slice (the
+    /// getSlicesOrCreate cache-hit path), so intra-slice growth between window boundaries triggers spilling without
+    /// waiting for the next new slice or the SPILLER_POLL_INTERVAL tick. 0 = disabled (baseline byte-identical).
+    const uint64_t growthSpillCheckStride;
+    /// Lever 1e observe-only switch: trace/count the growth signal but take NO spill action (the diagnosis arm). Only
+    /// meaningful with growthSpillCheckStride > 0; default false = the growth signal acts (armed) when enabled.
+    const bool growthSpillObserveOnly;
+    /// Lever 1e soft-only armed switch: when armed, wake the background spiller even over hard instead of the default
+    /// synchronous inline evictUntilUnderHard() (which stalls the worker/ingest pipeline). Defends the pool via the
+    /// async spiller without blocking the worker. Ignored under observe-only or stride==0.
+    const bool growthSpillSoftOnly;
+    /// Lever 1e sampling counter: bumped on every existing-slice write; when it reaches growthSpillCheckStride it is
+    /// reset and the budget is re-evaluated. Relaxed/approximate on purpose — exact spacing is irrelevant for sampling,
+    /// and keeping it lock-free avoids adding contention to the worker write path.
+    std::atomic<uint64_t> growthCheckCounter{0};
+    /// Lever 1e instrumentation: spills initiated because intra-slice growth crossed soft/hard on the cache-hit path.
+    std::atomic<std::uint64_t> growthSpillCount{0};
+    /// Lever 1e observe-only instrumentation: spills the growth signal WOULD have initiated had it been armed (counted
+    /// only when growthSpillObserveOnly is set). Lets the diagnosis arm quantify the missed signal on a still-failing run.
+    std::atomic<std::uint64_t> growthWouldSpillCount{0};
+    /// Lever 1e observe-only attribution: of those would-be spills, how many crossed HARD (vs only soft). The hard
+    /// crossings are the ones the per-creation inline-evict would have caught, so this is the decisive "the at-creation
+    /// check was insufficient" counter; surfaced on SPILLGAUGE as growth_would_hard.
+    std::atomic<std::uint64_t> growthWouldHardCount{0};
     /// Reserve in BUFFERS, computed once in setBufferProvider from getNumOfPooledBuffers() × poolReservePct / 100.
     std::atomic<uint64_t> poolReserveBuffers{0};
     /// 1b: id of the pool-pressure rescue listener registered with the provider (0 = none). Unregistered in stopSpiller.
