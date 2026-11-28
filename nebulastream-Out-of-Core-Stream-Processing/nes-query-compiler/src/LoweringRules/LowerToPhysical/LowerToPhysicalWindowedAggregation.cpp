@@ -253,11 +253,18 @@ LoweringRuleResultSubgraph LowerToPhysicalWindowedAggregation::apply(LogicalOper
             /// Stability levers (branch ooc-stability-levers): pool-pressure reserve % (1a/1b/1d; 0 = baseline) and
             /// paced steady-state trigger flush (1c; effective only with reserve > 0).
             conf.spill.poolReservePct.getValue(),
-            conf.spill.pacedTriggerFlush.getValue());
+            conf.spill.pacedTriggerFlush.getValue(),
+            /// Lever 1e: growth-path spill signal. Re-check the thresholds every N writes into an existing slice so a
+            /// slice growing between window boundaries triggers spilling without waiting for the ~100 ms poll. 0 = baseline.
+            conf.spill.growthSpillCheckStride.getValue(),
+            /// Lever 1e observe-only diagnosis arm: trace/count the growth signal without acting (needs stride > 0).
+            conf.spill.growthSpillObserveOnly.getValue(),
+            /// Lever 1e soft-only armed mode: wake the spiller even over hard (no synchronous inline evict on the worker).
+            conf.spill.growthSpillSoftOnly.getValue());
         NES_INFO(
             "Lowering windowed aggregation handlerId={} with out-of-core spill enabled (rocksdb at {}, emit_lag={}ms, "
             "write_buffer={}MB, block_cache={}MB, number_of_partitions={}; 0=RocksDB default; pool_reserve_pct={}, "
-            "paced_trigger_flush={})",
+            "paced_trigger_flush={}, growth_spill_check_stride={}, growth_spill_observe_only={}, growth_spill_soft_only={})",
             handlerId,
             conf.spill.rocksdbPath.getValue(),
             conf.spill.emitLag.getValue(),
@@ -265,7 +272,10 @@ LoweringRuleResultSubgraph LowerToPhysicalWindowedAggregation::apply(LogicalOper
             conf.spill.blockCacheSizeMB.getValue(),
             conf.spill.numberOfPartitions.getValue(),
             conf.spill.poolReservePct.getValue(),
-            conf.spill.pacedTriggerFlush.getValue());
+            conf.spill.pacedTriggerFlush.getValue(),
+            conf.spill.growthSpillCheckStride.getValue(),
+            conf.spill.growthSpillObserveOnly.getValue(),
+            conf.spill.growthSpillSoftOnly.getValue());
     }
     else
     {

@@ -101,6 +101,42 @@ public:
            "Pace the steady-state trigger flush per-window against the pool reserve (requires pool_reserve_pct > 0); "
            "false (default) = historic batch unspill."};
 
+    /// Stability lever 1e (growth-path spill signal). The hard inline-spill and the soft condvar wake only fire when a
+    /// GENUINELY NEW slice is created (the per-slice budget check in getSlicesOrCreate). A high-cardinality aggregation,
+    /// however, keeps GROWING the current slice's HashMap between window boundaries WITHOUT creating a new slice, so
+    /// neither signal fires and the only backstop for that growth is the SPILLER_POLL_INTERVAL safety-net tick (~100 ms).
+    /// This knob re-evaluates the SAME soft/hard thresholds on the existing-slice (cache-hit) write path, sampled every
+    /// N writes so the budget read (which takes the eviction mutex and scans the tracked slices) never runs per record.
+    /// N=0 (default) disables the extra signal entirely — byte-identical to the pre-lever store. A typical armed value
+    /// is a few thousand (trade signal latency against the sampling cost); start at 4096 and tune from the SPILLGAUGE trace.
+    UIntOption growthSpillCheckStride
+        = {"growth_spill_check_stride",
+           "0",
+           "Re-check spill thresholds every N writes into an existing slice so intra-slice growth triggers spilling "
+           "without waiting for the next new slice or the ~100 ms poll; 0 (default) disables (baseline behavior)."};
+
+    /// Lever 1e observe-only (diagnosis) switch. With growth_spill_check_stride > 0 the growth signal normally ACTS
+    /// (inline hard eviction / soft spiller wake). Set this true to make it only TRACE and COUNT the spill it WOULD
+    /// have triggered — no eviction, no wake — so a re-run of a cell that died at baseline shows whether a single
+    /// established slice crossed soft/hard between window boundaries BEFORE the death, without the controller changing
+    /// the outcome. Meaningless (and ignored) when growth_spill_check_stride == 0. False (default) = the signal acts.
+    BoolOption growthSpillObserveOnly
+        = {"growth_spill_observe_only",
+           "false",
+           "Diagnosis arm for growth_spill_check_stride: trace/count the growth-path spill signal but take NO action "
+           "(no eviction, no spiller wake); requires growth_spill_check_stride > 0; false (default) = the signal acts."};
+
+    /// Lever 1e soft-only armed mode. When the growth signal is armed (stride>0, not observe-only), the default HARD
+    /// branch runs a SYNCHRONOUS evictUntilUnderHard() on the worker thread — which the full-matrix run showed stalls
+    /// the ingest pipeline into a buffer-alloc timeout (rc=11) even with the pool healthy. Set this true to make the
+    /// armed signal ALWAYS just wake the background spiller (the soft action), never evict inline — defending the pool
+    /// via the async spiller without blocking the worker. Trades "guaranteed under hard on return" for no worker stall.
+    BoolOption growthSpillSoftOnly
+        = {"growth_spill_soft_only",
+           "false",
+           "Armed growth signal wakes the background spiller even over hard (no synchronous inline eviction on the "
+           "worker); requires growth_spill_check_stride > 0 and not observe-only; false (default) = inline evict over hard."};
+
 private:
     std::vector<BaseOption*> getOptions() override
     {
@@ -115,7 +151,10 @@ private:
             &emitLag,
             &numberOfPartitions,
             &poolReservePct,
-            &pacedTriggerFlush};
+            &pacedTriggerFlush,
+            &growthSpillCheckStride,
+            &growthSpillObserveOnly,
+            &growthSpillSoftOnly};
     }
 };
 

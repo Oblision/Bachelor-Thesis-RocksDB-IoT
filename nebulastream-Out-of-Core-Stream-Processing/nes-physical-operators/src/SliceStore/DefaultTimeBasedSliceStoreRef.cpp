@@ -65,6 +65,16 @@ void defaultTimeBasedSliceStoreRefCacheMissProxy(
     entryToReplace->dataStructure = sliceStoreRef->dataStructureExtractor(*slices[0], workerThreadId).data();
 }
 
+/// Lever 1e steady-state proxy: invoked once per record from getDataStructureRef (cache HIT or MISS) so the growth-path
+/// budget check observes the cache-HIT writes that grow an already-resident slice — the path getSlicesOrCreate (and the
+/// M1 creation gate) never sees. The caller emits this invoke only when the store is a spillable store with stride>0
+/// (a TRACE-time decision), so a stride-0 query carries no per-record cost. Thin forward to growthPathSample().
+void defaultTimeBasedSliceStoreRefGrowthCheckProxy(SpillableTimeBasedSliceStore* spillableStore)
+{
+    PRECONDITION(spillableStore != nullptr, "growth-check proxy: the spillable store should not be null");
+    spillableStore->growthPathSample();
+}
+
 DefaultTimeBasedSliceStoreRef::DefaultTimeBasedSliceStoreRef(
     SliceCacheConfiguration sliceCacheConfiguration,
     DefaultTimeBasedSliceStore* sliceStore,
@@ -96,7 +106,7 @@ nautilus::val<SliceCacheEntry::DataStructure> DefaultTimeBasedSliceStoreRef::get
     const nautilus::val<OperatorHandler*>& operatorHandler)
 {
     nautilus::val<DefaultTimeBasedSliceStore*> sliceStoreVal{sliceStore};
-    return sliceCache->getDataStructureRef(
+    auto dataStructure = sliceCache->getDataStructureRef(
         timestamp,
         workerThreadId,
         [&](const nautilus::val<SliceCacheEntry*>& entryToReplace)
@@ -110,6 +120,18 @@ nautilus::val<SliceCacheEntry::DataStructure> DefaultTimeBasedSliceStoreRef::get
                 nautilus::val<const DefaultTimeBasedSliceStoreRef*>(this),
                 sliceStoreVal);
         });
+    /// Lever 1e (growth-path spill signal): the slice cache serves steady-state writes WITHOUT re-entering the store,
+    /// so the growth check must be sampled HERE — once per record, hit or miss. Emitted only when the concrete store is
+    /// a spillable store with stride>0; this is a TRACE-time decision on C++ values (the pointer/stride do not change
+    /// between tracing and runtime), so a stride-0 query emits nothing and stays byte-identical. growthPathSample()
+    /// itself is cheap (one relaxed atomic) until the stride trips.
+    if (auto* spillableStore = dynamic_cast<SpillableTimeBasedSliceStore*>(sliceStore);
+        spillableStore != nullptr && spillableStore->getGrowthSpillCheckStride() > 0)
+    {
+        nautilus::invoke(
+            defaultTimeBasedSliceStoreRefGrowthCheckProxy, nautilus::val<SpillableTimeBasedSliceStore*>{spillableStore});
+    }
+    return dataStructure;
 }
 
 void setupSliceStoreProxy(

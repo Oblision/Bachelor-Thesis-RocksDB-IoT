@@ -128,7 +128,10 @@ SpillableTimeBasedSliceStore::SpillableTimeBasedSliceStore(
     const uint64_t emitLag,
     const uint64_t numberOfPartitions,
     const uint64_t poolReservePct,
-    const bool pacedTriggerFlush)
+    const bool pacedTriggerFlush,
+    const uint64_t growthSpillCheckStride,
+    const bool growthSpillObserveOnly,
+    const bool growthSpillSoftOnly)
     : DefaultTimeBasedSliceStore(windowSize, windowSlide, std::move(sliceCacheConfiguration))
     , backend(std::move(backend))
     , entriesPerPage(entriesPerPage)
@@ -139,6 +142,9 @@ SpillableTimeBasedSliceStore::SpillableTimeBasedSliceStore(
     , numberOfPartitions(numberOfPartitions)
     , poolReservePct(poolReservePct)
     , pacedTriggerFlush(pacedTriggerFlush)
+    , growthSpillCheckStride(growthSpillCheckStride)
+    , growthSpillObserveOnly(growthSpillObserveOnly)
+    , growthSpillSoftOnly(growthSpillSoftOnly)
 {
     PRECONDITION(poolReservePct <= 90, "pool_reserve_pct must be in [0, 90], got {}", poolReservePct);
     PRECONDITION(this->backend != nullptr, "SpillableTimeBasedSliceStore requires a non-null SpillBackend");
@@ -309,7 +315,81 @@ std::vector<std::shared_ptr<Slice>> SpillableTimeBasedSliceStore::getSlicesOrCre
             spillerCv.notify_one();
         }
     }
+    /// Lever 1e (growth-path spill signal) is NOT checked here. The per-worker slice cache serves the steady-state
+    /// (cache-HIT) writes that grow an already-resident slice WITHOUT re-entering getSlicesOrCreate, which the JIT'd
+    /// build path calls only on a cache MISS (defaultTimeBasedSliceStoreRefCacheMissProxy). A growth check placed here
+    /// is therefore blind to exactly the growth it must catch — measured: growth_would_* stayed 0 with the cache on,
+    /// 1265/479 with it off. The check now lives in growthPathSample(), invoked once per record from
+    /// DefaultTimeBasedSliceStoreRef::getDataStructureRef (hit or miss). The M1 creation-path check above remains the
+    /// at-creation gate; growthPathSample is the steady-state gate.
     return result;
+}
+
+void SpillableTimeBasedSliceStore::growthPathSample()
+{
+    /// Lever 1e growth-path budget sample — called ONCE PER RECORD from the build operator's data-structure lookup
+    /// (DefaultTimeBasedSliceStoreRef::getDataStructureRef), the only point that observes the cache-HIT writes which
+    /// grow an already-resident slice (getSlicesOrCreate runs only on a cache MISS, so a check there is bypassed in
+    /// steady state). Cost per call is one relaxed atomic increment; the expensive residentBytes()/largestResidentSlice()
+    /// budget read (both take evictionMutex and scan the tracked slices) runs only every growthSpillCheckStride-th call.
+    /// The caller only emits the invoke when stride > 0, so this is never reached on the byte-identical baseline.
+    if (growthSpillCheckStride == 0
+        || growthCheckCounter.fetch_add(1, std::memory_order_relaxed) + 1 < growthSpillCheckStride)
+    {
+        return;
+    }
+    growthCheckCounter.store(0, std::memory_order_relaxed);
+    const auto resident = residentBytes();
+    /// Growth MAP: the largest single resident slice (TRACE-level; stripped in release — the SPILLGAUGE largest_slice_mb
+    /// field carries the same attribution at the spiller's INFO cadence). Distinguishes one ballooning slice from broad
+    /// growth across many slices. Only runs on the sampled tick.
+    if (const auto [largestEnd, largestBytes] = largestResidentSlice(); largestBytes > 0)
+    {
+        NES_TRACE(
+            "GROWTHMAP resident_mb={} soft_mb={} hard_mb={} largest_slice={} largest_slice_mb={}",
+            resident / 1048576,
+            softThresholdBytes / 1048576,
+            hardThresholdBytes / 1048576,
+            largestEnd,
+            largestBytes / 1048576);
+    }
+    const bool overHard = resident > hardThresholdBytes;
+    const bool overSoft = !overHard && (resident > softThresholdBytes || poolUnderPressure());
+    /// Observe-only (diagnosis arm): fire the signal but take NO action — count/trace the spill it WOULD have triggered,
+    /// so a re-run of a failed cell shows whether a slice crossed soft/hard in steady state without changing the outcome.
+    if (growthSpillObserveOnly)
+    {
+        if (overHard || overSoft)
+        {
+            NES_TRACE(
+                "GROWTHWOULD {} crossed on growth path (resident={}, soft={}, hard={}); observe-only, no spill",
+                overHard ? "hard" : "soft",
+                resident,
+                softThresholdBytes,
+                hardThresholdBytes);
+            growthWouldSpillCount.fetch_add(1, std::memory_order_relaxed);
+            if (overHard)
+            {
+                growthWouldHardCount.fetch_add(1, std::memory_order_relaxed);
+            }
+        }
+    }
+    else if (overHard && !growthSpillSoftOnly)
+    {
+        NES_DEBUG("Hard threshold crossed on growth path (resident={} > hard={}); synchronous spill", resident, hardThresholdBytes);
+        evictUntilUnderHard();
+        growthSpillCount.fetch_add(1, std::memory_order_relaxed);
+    }
+    else if (overHard || overSoft)
+    {
+        /// Soft path: wake the background spiller WITHOUT stalling the worker. In soft-only armed mode this branch also
+        /// handles the over-hard case (the inline-evict branch above is skipped) — the full-matrix run showed the
+        /// synchronous evictUntilUnderHard on the worker stalls the ingest pipeline into a buffer-alloc timeout (rc=11)
+        /// even with the pool healthy, so soft-only defends the pool via the async spiller instead of blocking the worker.
+        NES_TRACE("Soft/hard threshold crossed on growth path (resident={}, soft={}); waking spiller", resident, softThresholdBytes);
+        spillerCv.notify_one();
+        growthSpillCount.fetch_add(1, std::memory_order_relaxed);
+    }
 }
 
 bool SpillableTimeBasedSliceStore::recordCreatedSlice(const std::shared_ptr<Slice>& slice)
@@ -1054,6 +1134,37 @@ uint64_t SpillableTimeBasedSliceStore::residentBytes() const
     return sum;
 }
 
+std::pair<SliceEnd, uint64_t> SpillableTimeBasedSliceStore::largestResidentSlice() const
+{
+    /// Lever 1e growth-mapping. Same race-free snapshot as residentBytes(): hold evictionMutex so an unreserved slice
+    /// cannot begin a concurrent spill()/unspill() (which frees/rebuilds its maps) while we read residentBytesOf, skip
+    /// in-flight (spillInProgress) and expired-weak_ptr slices, and take NO further lock. CALLER CONTRACT: must NOT
+    /// already hold evictionMutex (identical to residentBytes()). Returns {SliceEnd(0), 0} when nothing is resident.
+    SliceEnd maxEnd{0};
+    uint64_t maxBytes = 0;
+    std::unique_lock lock(evictionMutex);
+    createdSlices.withRLock(
+        [&](const auto& tracked)
+        {
+            for (const auto& [end, weak] : tracked)
+            {
+                if (spillInProgress.contains(end))
+                {
+                    continue;
+                }
+                if (const auto slice = weak.lock())
+                {
+                    if (const auto bytes = residentBytesOf(*slice); bytes > maxBytes)
+                    {
+                        maxBytes = bytes;
+                        maxEnd = end;
+                    }
+                }
+            }
+        });
+    return {maxEnd, maxBytes};
+}
+
 void SpillableTimeBasedSliceStore::setLastSeenWatermarkForTest(const Timestamp watermark)
 {
     /// Test hook: seed the learned watermark directly (not monotonic-guarded — the test owns ordering).
@@ -1233,9 +1344,15 @@ void SpillableTimeBasedSliceStore::spillerLoop(std::stop_token stopToken)
         /// The harness plots this against the 0.2 s mem_trace to attribute anon movements to spiller activity.
         if (const auto provider = bufferProvider.copy(); provider != nullptr)
         {
+            /// Lever 1e attribution: the single largest live slice (same lock discipline as residentBytes(), which has
+            /// already released evictionMutex above). Surfaced at the spiller's INFO cadence (~100 ms) so the RELEASE
+            /// build — which strips the per-tick GROWTHMAP/GROWTHWOULD traces (TRACE/DEBUG) — can still distinguish a
+            /// single ballooning slice (largest_slice_mb ≈ resident_mb) from broad growth (largest ≪ resident). The
+            /// growth_would_hard counter is the observe-only HARD-crossing tally (the decisive insufficiency signal).
+            const auto [largestEnd, largestBytes] = largestResidentSlice();
             NES_INFO(
                 "SPILLGAUGE resident_mb={} soft_mb={} avail_buf={} reserve_buf={} pressure={} pressure_spills={} rescue_spills={} "
-                "paced_waits={}",
+                "paced_waits={} growth_spills={} growth_would_spills={} growth_would_hard={} largest_slice_mb={} largest_slice_end={}",
                 resident / 1048576,
                 softThresholdBytes / 1048576,
                 provider->getNumberOfAvailableBuffers(),
@@ -1243,7 +1360,12 @@ void SpillableTimeBasedSliceStore::spillerLoop(std::stop_token stopToken)
                 pressure,
                 pressureSpillCount.load(std::memory_order_relaxed),
                 rescueSpillCount.load(std::memory_order_relaxed),
-                pacedWaitCount.load(std::memory_order_relaxed));
+                pacedWaitCount.load(std::memory_order_relaxed),
+                growthSpillCount.load(std::memory_order_relaxed),
+                growthWouldSpillCount.load(std::memory_order_relaxed),
+                growthWouldHardCount.load(std::memory_order_relaxed),
+                largestBytes / 1048576,
+                largestEnd);
         }
         while (resident > softThresholdBytes || pressure)
         {

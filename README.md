@@ -96,7 +96,7 @@ and [`nes-query-compiler`](nebulastream-Out-of-Core-Stream-Processing/nes-query-
 | `SliceSerializer` | Turns a window's chained hash map into flat key–value records and back, byte for byte. |
 | `SpillConfig` | All settings, exposed as worker configuration (`--worker.default_query_execution.spill.*`). |
 | Pool-pressure levers | Reserve-based spilling, paced restore and optional allocation backpressure, driven by `BufferManager` hooks. |
-| Growth signal, page release | Make intra-slice growth visible to the spiller and return freed pages to the OS. |
+| Growth signal, page release | Make intra-slice growth visible to the spiller (`spill.growth_spill_check_stride`) and return freed pool pages to the OS after a drain (`--worker.pooled_release_watermark_pct`). |
 
 Every mechanism is **off by default**. With all switches closed, the engine is byte-identical to upstream
 NebulaStream.
