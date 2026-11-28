@@ -2,7 +2,7 @@
 
 Panel (a): hash-map state composition at a 26 M-entry working set, from the
 HMGAUGE per-map census (headers 51%, payload 34%, bucket directory 14%,
-page slack <1% — DATA-AUDIT.md RQ5; the raw gauge lines live in the run logs
+page slack <1%; the raw gauge lines live in the run logs
 on the measurement host, the audited shares are reproduced here).
 Panel (b): on-disk spill footprint vs state pressure, from the result TSVs.
 16/8 RocksDB configuration only: the 32/32 backend-size twin runs (*_b32_*)

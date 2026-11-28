@@ -2,10 +2,11 @@
 
 **A RocksDB-based state backend for memory-constrained edge devices**
 
-Bachelor's thesis · Computer Engineering · TU Berlin, DIMA group (Prof. Dr. Volker Markl) · 2026
-Author: Benjamin Steinbüchel
+Code, experiments and data for a bachelor's thesis · Computer Engineering · TU Berlin, DIMA group
+(Prof. Dr. Volker Markl) · 2026 · Author: Benjamin Steinbüchel
 
-📄 **[Read the thesis (PDF)](thesis/Thesis.pdf)** · 🧩 [LaTeX source](thesis/latex/) · ⚙️ [Engine source (fork)](nebulastream-Out-of-Core-Stream-Processing/)
+⚙️ [Engine source (fork)](nebulastream-Out-of-Core-Stream-Processing/) · 📊 [Analysis scripts](analysis/) ·
+🧪 [Evaluation harness and raw data](nebulastream-Out-of-Core-Stream-Processing/.planning/eval-phase/lag-validation/)
 
 ---
 
@@ -47,7 +48,7 @@ of 512, 1024 and 2048 MB.
 - [Conclusions and practical guidance](#conclusions-and-practical-guidance)
 - [Repository layout](#repository-layout)
 - [Getting started](#getting-started)
-- [Reproducing the thesis evaluation](#reproducing-the-thesis-evaluation)
+- [Reproducing the evaluation](#reproducing-the-evaluation)
 - [Other experiment phases](#other-experiment-phases)
 - [Documentation of AI tool usage](#documentation-of-ai-tool-usage)
 - [License and citation](#license-and-citation)
@@ -236,19 +237,15 @@ sliding windows, and experiments across core counts and storage devices.
 .
 ├── README.md                                   ← you are here
 ├── docs/figures/                               ← figures used in this README
-├── thesis/
-│   ├── Thesis.pdf                              ← the compiled thesis
-│   ├── DATA-AUDIT.md                           ← which dataset backs which claim
-│   ├── latex/                                  ← LaTeX source, figures, tables
-│   │   ├── chapters/                           ← chapters 1–7
-│   │   ├── figures/scripts/                    ← Python scripts that regenerate every data figure
-│   │   └── tables/gen_tables.py                ← per-cell result tables (Appendix A)
-│   └── experiments/rb32-config-contrast/       ← RocksDB backend-size experiment (Appendix E)
+├── analysis/
+│   ├── figures/                                ← Python scripts that regenerate every data figure
+│   ├── gen_tables.py                           ← per-cell result tables from the raw TSVs
+│   └── rb32-config-contrast/                   ← RocksDB backend-size experiment (16/8 vs 32/32)
 ├── nebulastream-Out-of-Core-Stream-Processing/ ← NebulaStream fork with the OOC backend
 │   ├── nes-physical-operators/                 ← spillable slice store, spill backends, serializer
 │   ├── nes-query-compiler/                     ← SpillConfig + lowering to the spillable store
 │   ├── nes-memory/                             ← buffer-manager hooks (pool pressure, page release)
-│   ├── .planning/eval-phase/lag-validation/    ← final evaluation harness + raw results (thesis Ch. 5)
+│   ├── .planning/eval-phase/lag-validation/    ← final evaluation harness + raw results
 │   ├── .planning/eval-phase/e3big/             ← 10k-cell synthetic sweep harness
 │   ├── REPRODUCE-10K-SWEEP.md                  ← runbook for the 10k sweep
 │   └── docs/ai-usage/                          ← documentation of AI tool usage (see below)
@@ -263,8 +260,6 @@ sliding windows, and experiments across core counts and storage devices.
 - Linux (x86_64 or arm64) with Docker ≥ 18.09 (BuildKit). macOS with Docker Desktop also works for building.
 - ~30 GB free disk space (the debug build directory alone is about 14 GB).
 - Python 3 with `pandas`, `numpy`, `matplotlib` and `scipy` for the analysis and figure scripts.
-- A TeX Live installation (`latexmk`, `texlive-latex-extra`, `texlive-science`, `texlive-lang-german`) if you
-  want to rebuild the thesis.
 
 ### 1. Clone
 
@@ -332,9 +327,9 @@ To run it by hand, substitute them first. See
 [`SpillConfig.hpp`](nebulastream-Out-of-Core-Stream-Processing/nes-query-compiler/interface/SpillConfig.hpp)
 for every option and its default.
 
-## Reproducing the thesis evaluation
+## Reproducing the evaluation
 
-The Chapter 5 evaluation runs through the **lag-validation harness** in
+The final evaluation runs through the **lag-validation harness** in
 [`nebulastream-Out-of-Core-Stream-Processing/.planning/eval-phase/lag-validation/`](nebulastream-Out-of-Core-Stream-Processing/.planning/eval-phase/lag-validation/).
 Each run (one "cell") is one capped container execution:
 
@@ -351,23 +346,24 @@ bash run-cell.sh demo_s736_r1 <tuples> <window_ms> <emit_rate> <emit_lag_ms> 512
 - By default, spill files go to an SD card mounted at `/mnt/sd-spill`. Set `SPILL_HOST_DIR=tmp` to spill
   inside the container instead.
 - **All raw results are committed** (`results/*.tsv`, `traces/`), so the figures and tables can be rebuilt
-  without re-running anything:
+  without re-running anything. The figure PDFs land in `analysis/figures/out/`, the per-cell table in
+  `analysis/out/`:
 
 ```bash
-cd thesis/latex/figures/scripts && bash make_all.sh
+bash analysis/figures/make_all.sh
 ```
 
 ```bash
-python3 thesis/latex/tables/gen_tables.py
+python3 analysis/rb32-config-contrast/fig_rb32.py
 ```
 
 ```bash
-cd thesis/latex && latexmk -pdf Template.tex
+python3 analysis/gen_tables.py
 ```
 
 ## Other experiment phases
 
-The thesis grew out of two earlier phases, which are kept for completeness:
+The final evaluation grew out of two earlier phases, which are kept for completeness:
 
 - **[`Microbenchmark-BA/`](Microbenchmark-BA/)**: a stand-alone RocksDB `db_bench` study of compression,
   write-buffer, L0 trigger and block-cache settings under a 512 MB cap. It produced the research-informed
@@ -380,14 +376,14 @@ The thesis grew out of two earlier phases, which are kept for completeness:
 ## Documentation of AI tool usage
 
 TU Berlin's rules of good scientific practice require a declaration of the tools used to write a thesis.
-The thesis declaration (Appendix, "Documentation of Tool Usage") links to the archive in
+The thesis's declaration ("Documentation of Tool Usage") links to the archive in
 [`nebulastream-Out-of-Core-Stream-Processing/docs/ai-usage/`](nebulastream-Out-of-Core-Stream-Processing/docs/ai-usage/).
 That folder is kept unchanged at its published path so the links in the submitted thesis keep working.
 
 ## License and citation
 
 The NebulaStream fork is licensed under the [Apache License 2.0](nebulastream-Out-of-Core-Stream-Processing/LICENSE),
-like upstream NebulaStream. The thesis text and figures are © 2026 Benjamin Steinbüchel.
+like upstream NebulaStream. Figures and analysis © 2026 Benjamin Steinbüchel. To cite the thesis:
 
 ```bibtex
 @thesis{steinbuechel2026ooc,

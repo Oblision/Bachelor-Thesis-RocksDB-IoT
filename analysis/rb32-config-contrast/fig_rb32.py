@@ -2,7 +2,7 @@
 """Build the RB32 (32/32 vs 16/8) thesis figures. Pure-stdlib TSV/trace parsing + matplotlib
 (no pandas dependency, robust across versions). Run with the figs venv:
   ~/.venv-thesis-figs/bin/python fig_rb32.py
-PDFs land in thesis/latex/img/fig_rb32_*.pdf."""
+PDFs land in analysis/figures/out/fig_rb32_*.pdf."""
 import glob, os, sys
 from statistics import median, mean
 import matplotlib
@@ -11,9 +11,9 @@ import matplotlib.pyplot as plt
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 LAGVAL = os.environ.get("LAGVAL_DIR",
-    os.path.join(HERE, "../../../nebulastream-Out-of-Core-Stream-Processing/.planning/eval-phase/lag-validation"))
+    os.path.join(HERE, "../../nebulastream-Out-of-Core-Stream-Processing/.planning/eval-phase/lag-validation"))
 RES = os.path.join(LAGVAL, "results"); TRC = os.path.join(LAGVAL, "traces")
-IMG = os.path.join(HERE, "../../latex/img"); os.makedirs(IMG, exist_ok=True)
+IMG = os.path.join(HERE, "../figures/out"); os.makedirs(IMG, exist_ok=True)
 
 COLS = ("label tuples window emit_rate emit_lag n_w cap spill rc status elapsed_s peak_mb spill_dir_mb "
         "store_peak_b slices cpu_usec io_r_b io_w_b lat_p50 lat_p95 lat_p99 tps peak_anon steady_anon "

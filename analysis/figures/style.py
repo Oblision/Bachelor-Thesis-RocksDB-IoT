@@ -65,9 +65,10 @@ def caption(fig, extra: str = "") -> None:  # noqa: ARG001 - kept for compatibil
 
 
 def save(fig, name: str) -> None:
-    """Write a PDF into latex/img/ and report the path."""
+    """Write a PDF into analysis/figures/out/ and report the path."""
     from data import IMG_OUT
 
+    IMG_OUT.mkdir(parents=True, exist_ok=True)
     out = IMG_OUT / f"{name}.pdf"
     fig.savefig(out)
     plt.close(fig)

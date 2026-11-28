@@ -3,7 +3,7 @@
 # run_rb32_contrast.sh — drive the 32/32 RocksDB-config mirror of the existing
 # 16/8 spill campaigns (full spill-ON A/B). See DESIGN.md.
 #
-# Canonical scripts live HERE in the thesis wrapper repo. This runner deploys
+# Canonical scripts live here, in analysis/rb32-config-contrast. This runner deploys
 # only UNTRACKED, removable files into the NebulaStream fork's lag-validation
 # dir: it copies the run-cell-rb32.sh shim there and generates *_rb32.sh mirror
 # drivers from the originals by redirecting their run-cell.sh calls to the shim
@@ -23,7 +23,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-LAGVAL="${LAGVAL_DIR:-$HERE/../../../nebulastream-Out-of-Core-Stream-Processing/.planning/eval-phase/lag-validation}"
+LAGVAL="${LAGVAL_DIR:-$HERE/../../nebulastream-Out-of-Core-Stream-Processing/.planning/eval-phase/lag-validation}"
 SHIM="$HERE/run-cell-rb32.sh"
 
 # Spill-ON headline + grid drivers to mirror (the shim auto-skips any spill-OFF

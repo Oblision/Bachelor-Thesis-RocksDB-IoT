@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Regenerate every data figure (PDFs land in latex/img/).
+# Regenerate every data figure (PDFs land in analysis/figures/out/).
 # Requires: python3 with pandas, numpy, matplotlib; the lag-validation results
 # tree at nebulastream-Out-of-Core-Stream-Processing/.planning/eval-phase/.
 set -euo pipefail

@@ -12,11 +12,11 @@ from pathlib import Path
 import pandas as pd
 
 HERE = Path(__file__).resolve().parent
-REPO = HERE.parents[3] / "nebulastream-Out-of-Core-Stream-Processing"
+REPO = HERE.parents[1] / "nebulastream-Out-of-Core-Stream-Processing"
 LAGVAL = REPO / ".planning/eval-phase/lag-validation"
 RESULTS = LAGVAL / "results"
 TRACES = LAGVAL / "traces"
-IMG_OUT = HERE.parents[1] / "img"
+IMG_OUT = HERE / "out"
 
 COLUMNS = [
     "label", "tuples", "window", "emit_rate", "emit_lag", "n_w", "cap", "spill",

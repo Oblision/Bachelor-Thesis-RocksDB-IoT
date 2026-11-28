@@ -2,7 +2,7 @@
 
 Out-of-core (b_ooc, 8 reps per rho point) vs capped in-memory (b_inm, 6 reps)
 at the three beyond-memory rho points r150/r200/r300. Totals 14/24 vs 0/18,
-Fisher two-sided p = 4.1e-5 (matches DATA-AUDIT.md; one-sided is 3.7e-5).
+Fisher two-sided p = 4.1e-5 (one-sided is 3.7e-5).
 """
 from __future__ import annotations
 

@@ -144,7 +144,7 @@ experiment portable. On the target machine:
 3. Recreate the inputs the baseline used: the `rho_*.csv` files in
    `/dev/shm/nes-input` (RAM-backed) and the SD spill mount `/mnt/sd-spill`
    (or set `SPILL_HOST_DIR`).
-4. `cd thesis/experiments/rb32-config-contrast` and run, pointing at the fork if
+4. `cd analysis/rb32-config-contrast` and run, pointing at the fork if
    the layout differs:
    ```bash
    LAGVAL_DIR=/abs/path/to/.../lag-validation ./run_rb32_contrast.sh run
